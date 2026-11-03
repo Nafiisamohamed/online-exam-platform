@@ -17,6 +17,8 @@ npm install
 npm run db:migrate          # applies all migrations (prisma migrate deploy)
 ```
 
+Every rule below is covered by the automated tests. See [testing.md](testing.md).
+
 ## Conventions
 
 - PostgreSQL table and column names are `snake_case`; Prisma model and field names are `camelCase`.

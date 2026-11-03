@@ -13,10 +13,14 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "prisma": "7.10.1"
+    "pg": "8.19.0",
+    "prisma": "7.10.1",
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "@prisma/client": "7.10.1",
