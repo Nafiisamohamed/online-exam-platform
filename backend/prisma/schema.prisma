@@ -826,7 +826,8 @@ model Payment {
   mockReference  String?         @map("mock_reference")
   /// Set only on SUCCESS. Format DEMO-<EVC|ZAAD|EDAHAB>-YYYYMMDD-XXXXXX.
   receiptNumber  String?         @unique @map("receipt_number")
-  expiresAt      DateTime        @map("expires_at") @db.Timestamptz(6)
+  /// Set by the database at creation: created_at + 5 minutes. Never changes.
+  expiresAt      DateTime        @default(dbgenerated("(now() + '00:05:00'::interval)")) @map("expires_at") @db.Timestamptz(6)
   confirmedAt    DateTime?       @map("confirmed_at") @db.Timestamptz(6)
   isSimulated    Boolean         @default(true) @map("is_simulated")
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)

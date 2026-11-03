@@ -6,6 +6,7 @@ PostgreSQL 13 or newer (`gen_random_uuid()` is built in from version 13). The sc
 |---|---|
 | [backend/prisma/schema.prisma](../backend/prisma/schema.prisma) | Tables, columns, enums, keys, relations and ordinary indexes |
 | [backend/prisma/migrations/20261103000000_init/migration.sql](../backend/prisma/migrations/20261103000000_init/migration.sql) | First migration: the SQL Prisma generated from the schema, followed by a hand-written **RAW SQL SECTION** |
+| [backend/prisma/migrations/20261103120000_payment_guard_hardening/migration.sql](../backend/prisma/migrations/20261103120000_payment_guard_hardening/migration.sql) | Second migration: stricter payment rules (PIN attempt counter, 5-minute expiry, new payments must start at the beginning of the flow) |
 
 ## Setup
 
@@ -89,6 +90,10 @@ Trigger errors use SQLSTATE `P0001`, and the error message is a stable code (for
 | payments | `payments_receipt_chk` | A receipt number exists exactly when the status is SUCCESS | Payment flow |
 | payments | `payments_receipt_format_chk` | Receipt matches `DEMO-<EVC\|ZAAD\|EDAHAB>-YYYYMMDD-XXXXXX` and the provider code matches the provider | Payment flow |
 | payments | `payments_failure_chk`, `payments_confirmed_chk`, `payments_completed_chk` | FAILED has a reason; PENDING_PIN, SUCCESS and FAILED have a confirmation time; final states have a completion time | Payment flow |
+| payments | `payments_pin_unconfirmed_chk` | No PIN attempts before the student presses Yes | Payment flow (migration 2) |
+| payments | `payments_pin_limit_chk` | A payment waiting for a PIN has fewer than 3 wrong attempts, so the third wrong PIN must fail it | Payment flow (migration 2) |
+| payments | `payments_failed_attempts_chk` | A FAILED payment has exactly 3 wrong attempts | Payment flow (migration 2) |
+| payments | `payments_expiry_window_chk` | `expires_at = created_at + 5 minutes` | Payment flow (migration 2) |
 | sms_outbox | `sms_outbox_simulated_chk` | `is_simulated` must be true | Section 7 |
 | sms_outbox | `sms_outbox_demo_body_chk` | Body starts with `[DEMO]` | SMS design |
 | sms_outbox | `sms_outbox_no_secrets_chk` | `params` never contains keys `password`, `tempPassword`, `temporaryPassword`, `pin` or `demoPin` | D3 adjustment |
@@ -113,7 +118,21 @@ Trigger errors use SQLSTATE `P0001`, and the error message is a stable code (for
 | `question_options_protect_locked`, `accepted_answers_protect_locked`, `rubric_criteria_protect_locked` | before insert, update or delete | Blocks changes to the options, accepted answers and rubric of a locked version | `QUESTION_VERSION_LOCKED` | P4 |
 | `grade_revisions_append_only`, `result_publications_append_only`, `audit_logs_append_only` | before update or delete | Rows can only be added | `APPEND_ONLY_TABLE` | P1, 6.2 |
 | `answers_deadline_guard` | `answers`, before insert or update | Backup for the service check. A response can be written only while the attempt is IN_PROGRESS and the database clock is before the deadline. It locks the attempt row `FOR SHARE`, so a save running alongside an auto-submit waits and then fails. Grading updates that don't change the response are allowed. It sets `saved_at` to the server time. | `ATTEMPT_DEADLINE_PASSED`, `ATTEMPT_ALREADY_SUBMITTED` | Condition 2, 4.7 |
-| `payments_guard` | `payments`, before update or delete | Allows only the approved status changes (PENDING_CONFIRMATION → PENDING_PIN, CANCELLED or EXPIRED; PENDING_PIN → SUCCESS, FAILED or EXPIRED). Final payments never change. Student, exam, provider, phone, amount, currency, recipient and request key can't change. Payments can't be deleted. | `PAYMENT_INVALID_TRANSITION`, `PAYMENT_ALREADY_FINAL`, `PAYMENT_FIELDS_IMMUTABLE`, `PAYMENT_DELETE_FORBIDDEN` | P7, payment flow |
+| `payments_on_insert` | `payments`, before insert | A new payment must start as PENDING_CONFIRMATION, with no PIN attempts, receipt, confirmation or completion. The database sets `created_at = now()` and `expires_at = now() + 5 minutes`, ignoring any values sent by the app. | `PAYMENT_INVALID_INSERT` | Payment flow (migration 2) |
+| `payments_guard` | `payments`, before update or delete | Allows only the approved status changes (PENDING_CONFIRMATION → PENDING_PIN, CANCELLED or EXPIRED; PENDING_PIN → SUCCESS, FAILED, CANCELLED or EXPIRED). Final payments never change. Student, exam, provider, phone, amount, currency, recipient, request key, creation time and **expiry** can't change. Payments can't be deleted. **Since migration 2:** once the expiry time is reached, the only allowed change is to EXPIRED (no Yes, No, PIN or success), and EXPIRED is only allowed after that time. `pin_attempts` never goes down, goes up by exactly 1 per wrong PIN, only while PENDING_PIN, and stays the same on SUCCESS. | `PAYMENT_INVALID_TRANSITION`, `PAYMENT_ALREADY_FINAL`, `PAYMENT_FIELDS_IMMUTABLE`, `PAYMENT_DELETE_FORBIDDEN`, `PAYMENT_EXPIRED`, `PAYMENT_NOT_EXPIRED`, `PAYMENT_PIN_ATTEMPTS_DECREASED`, `PAYMENT_PIN_ATTEMPTS_INVALID` | P7, payment flow |
+
+### Payment outcomes (simulated)
+
+| Outcome | How it happens | Database guarantees |
+|---|---|---|
+| SUCCESS | Correct demo PIN, checked by the backend | Only from PENDING_PIN, after Yes, before expiry, with fewer than 3 wrong attempts and a valid DEMO receipt. The PIN counter doesn't change. |
+| FAILED | Third wrong demo PIN | Only from PENDING_PIN, in the same update that records the 3rd attempt |
+| CANCELLED | Student presses No, or cancels during PIN entry | From PENDING_CONFIRMATION or PENDING_PIN, before expiry. The PIN counter doesn't change. |
+| EXPIRED | 5 minutes after creation | Only once `expires_at` is reached. After that, nothing else is allowed. |
+
+All four outcomes are final. The 5-minute expiry is fixed in the database, and there is no `.env` setting for it.
+
+The database can't check the demo PIN itself, because the PIN is never stored. The backend compares it with `DEMO_PAYMENT_PIN` using `crypto.timingSafeEqual`, then records SUCCESS or a wrong attempt. The database guarantees that SUCCESS can only be recorded at the right point in the flow.
 
 ### Composite foreign keys (in schema.prisma)
 
@@ -133,7 +152,7 @@ These rules span several rows or tables, so the service layer enforces them. Eac
 - **Access:** students must be enrolled, and can start only inside the window, from an allowed room or network, and after paying if the exam has a fee.
 - **Ownership:** every request checks that the attempt or payment belongs to the current user. A failed check returns 404.
 - **Grading:** blind second grading and the 20% discrepancy rule.
-- **Payments:** the demo PIN check and the 5-minute expiry.
+- **Payments:** checking the demo PIN itself, and marking unfinished payments EXPIRED once the database allows it.
 
 ## Known limits of the database protections
 
