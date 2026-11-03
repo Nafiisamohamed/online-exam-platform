@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Environment files and secrets (only .env.example files are committed)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Database files and local data
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+pgdata/
+postgres-data/
+/data/
+
+# Generated code and build output
+backend/src/generated/
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Uploads (question images are stored locally, not in git)
+uploads/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp

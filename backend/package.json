@@ -1,0 +1,25 @@
+{
+  "name": "online-exam-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Online Exam Platform (Project 18) - Express API and database",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "prisma": "7.10.1"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.1",
+    "dotenv": "16.4.7"
+  }
+}
