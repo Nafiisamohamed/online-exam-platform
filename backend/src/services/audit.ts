@@ -8,6 +8,7 @@
 import type { Request } from "express";
 import type { Db } from "../db/prisma.ts";
 import { clientIp } from "../lib/network.ts";
+import { insertAuditLog } from "../repositories/audit.repository.ts";
 
 const SECRET_KEYS = /pass(word)?|pin|token|secret/i;
 
@@ -33,10 +34,13 @@ export interface AuditEntry {
   req?: Request;
 }
 
-/** Writes one audit row (pass the transaction client to keep it atomic with the change). */
-export async function audit(db: Db, entry: AuditEntry): Promise<void> {
-  await db.auditLog.create({
-    data: {
+/**
+ * Writes one audit row. Pass the transaction handle to keep it atomic with the
+ * change it records, or null when there is no transaction.
+ */
+export async function audit(db: Db | null, entry: AuditEntry): Promise<void> {
+  await insertAuditLog(
+    {
       actorId: entry.actorId,
       actionCode: entry.action,
       entityType: entry.entityType,
@@ -44,5 +48,6 @@ export async function audit(db: Db, entry: AuditEntry): Promise<void> {
       details: entry.details ? (scrub(entry.details) as object) : undefined,
       ipAddress: entry.req ? clientIp(entry.req) : null,
     },
-  });
+    db ?? undefined,
+  );
 }

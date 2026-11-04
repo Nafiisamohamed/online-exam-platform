@@ -5,28 +5,35 @@
  * - a course is unique by code + semester (Q3) and has one lecturer;
  * - students can only take exams for courses they are ACTIVE in;
  * - dropping a student sets the enrolment to DROPPED and keeps every past
- *   attempt and result (rows are never deleted); enrolling again reactivates it.
+ *   attempt and result (rows are never deleted); enrolling again reactivates it;
+ * - enrolling (or reactivating) is refused when one of the course's upcoming
+ *   approved exams overlaps another upcoming exam of the student (4.5: two exams
+ *   of the same student must never overlap). See enrolmentConflicts().
  */
 import type { Request } from "express";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import type { Tx } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
+import * as coursesRepo from "../../repositories/courses.repository.ts";
+import { findStudent, findUserWithRole } from "../../repositories/users.repository.ts";
 import { audit } from "../../services/audit.ts";
 import { manageableCourse, viewableCourse } from "../../services/access.ts";
 
 // --- Faculties ------------------------------------------------------------------
 
+/** All faculties with their number of courses. */
 export function listFaculties() {
-  return prisma.faculty.findMany({ orderBy: { code: "asc" }, include: { _count: { select: { courses: true } } } });
+  return coursesRepo.listFaculties();
 }
 
 /** @throws 409 FACULTY_CODE_TAKEN */
 export async function createFaculty(data: { code: string; name: string }, actorId: string, req: Request) {
   try {
     return await transaction(async (tx) => {
-      const f = await tx.faculty.create({ data: { code: data.code.toUpperCase(), name: data.name } });
+      const f = await coursesRepo.insertFaculty({ code: data.code.toUpperCase(), name: data.name }, tx);
       await audit(tx, { actorId, action: "FACULTY_CREATED", entityType: "faculty", entityId: f.id, details: { code: f.code }, req });
       return f;
     });
@@ -38,9 +45,9 @@ export async function createFaculty(data: { code: string; name: string }, actorI
 
 /** Renames a faculty. @throws 404 FACULTY_NOT_FOUND */
 export async function updateFaculty(id: string, data: { name?: string }, actorId: string, req: Request) {
-  if (!(await prisma.faculty.findUnique({ where: { id } }))) throw notFound("FACULTY_NOT_FOUND");
+  if (!(await coursesRepo.findFaculty(id))) throw notFound("FACULTY_NOT_FOUND");
   return transaction(async (tx) => {
-    const f = await tx.faculty.update({ where: { id }, data });
+    const f = await coursesRepo.updateFaculty(id, data, tx);
     await audit(tx, { actorId, action: "FACULTY_UPDATED", entityType: "faculty", entityId: id, req });
     return f;
   });
@@ -48,11 +55,8 @@ export async function updateFaculty(id: string, data: { name?: string }, actorId
 
 // --- Courses --------------------------------------------------------------------
 
-const courseInclude = {
-  faculty: { select: { id: true, code: true, name: true } },
-  lecturer: { select: { id: true, fullName: true, email: true } },
-  _count: { select: { enrolments: { where: { status: "ACTIVE" as const } } } },
-};
+type CourseRow = Awaited<ReturnType<typeof coursesRepo.findCourseDetail>>;
+const toCourse = ({ _count, ...c }: CourseRow) => ({ ...c, activeStudents: _count.enrolments });
 
 /** Courses the user may see: admin all; lecturer own; student ACTIVE enrolments; invigilator none. */
 export async function listCourses(user: AuthUser, q: { semester?: string; facultyId?: string }) {
@@ -62,29 +66,27 @@ export async function listCourses(user: AuthUser, q: { semester?: string; facult
     user.role === "LECTURER" ? { lecturerId: user.id } :
     user.role === "STUDENT" ? { enrolments: { some: { studentId: user.id, status: "ACTIVE" as const } } } :
     { id: "00000000-0000-0000-0000-000000000000" };
-  const rows = await prisma.course.findMany({ where: { ...filter, ...scope }, include: courseInclude, orderBy: [{ semester: "desc" }, { code: "asc" }] });
-  return rows.map(({ _count, ...c }) => ({ ...c, activeStudents: _count.enrolments }));
+  return (await coursesRepo.listCourses({ ...filter, ...scope })).map(toCourse);
 }
 
 /** One course with its faculty, lecturer and active student count. @throws 404 COURSE_NOT_FOUND */
 export async function getCourse(user: AuthUser, id: string) {
   await viewableCourse(user, id);
-  const { _count, ...c } = await prisma.course.findUniqueOrThrow({ where: { id }, include: courseInclude });
-  return { ...c, activeStudents: _count.enrolments };
+  return toCourse(await coursesRepo.findCourseDetail(id));
 }
 
 async function assertLecturer(lecturerId: string) {
-  const l = await prisma.user.findUnique({ where: { id: lecturerId }, include: { role: true } });
+  const l = await findUserWithRole(lecturerId);
   if (!l || l.role.name !== "LECTURER" || !l.isActive) throw badRequest("LECTURER_INVALID", "Choose an active lecturer");
 }
 
 /** @throws 400 LECTURER_INVALID / FACULTY_NOT_FOUND, 409 COURSE_EXISTS */
 export async function createCourse(data: { facultyId: string; code: string; name: string; semester: string; lecturerId: string }, actorId: string, req: Request) {
   await assertLecturer(data.lecturerId);
-  if (!(await prisma.faculty.findUnique({ where: { id: data.facultyId } }))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
+  if (!(await coursesRepo.findFaculty(data.facultyId))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
   try {
     return await transaction(async (tx) => {
-      const c = await tx.course.create({ data: { ...data, code: data.code.toUpperCase() } });
+      const c = await coursesRepo.insertCourse({ ...data, code: data.code.toUpperCase() }, tx);
       await audit(tx, { actorId, action: "COURSE_CREATED", entityType: "course", entityId: c.id, details: { code: c.code, semester: c.semester }, req });
       return c;
     });
@@ -96,10 +98,10 @@ export async function createCourse(data: { facultyId: string; code: string; name
 
 /** Changes a course's name, lecturer or faculty. @throws 404 COURSE_NOT_FOUND, 400 LECTURER_INVALID */
 export async function updateCourse(id: string, data: { name?: string; lecturerId?: string; facultyId?: string }, actorId: string, req: Request) {
-  if (!(await prisma.course.findUnique({ where: { id } }))) throw notFound("COURSE_NOT_FOUND");
+  if (!(await coursesRepo.findCourse(id))) throw notFound("COURSE_NOT_FOUND");
   if (data.lecturerId) await assertLecturer(data.lecturerId);
   return transaction(async (tx) => {
-    const c = await tx.course.update({ where: { id }, data });
+    const c = await coursesRepo.updateCourse(id, data, tx);
     await audit(tx, { actorId, action: "COURSE_UPDATED", entityType: "course", entityId: id, details: { fields: Object.keys(data) }, req });
     return c;
   });
@@ -110,30 +112,39 @@ export async function updateCourse(id: string, data: { name?: string; lecturerId
 /** Students of a course (admin or the course lecturer). Includes dropped students, marked DROPPED. */
 export async function listEnrolments(user: AuthUser, courseId: string, status?: "ACTIVE" | "DROPPED") {
   await manageableCourse(user, courseId);
-  const rows = await prisma.enrolment.findMany({
-    where: { courseId, ...(status ? { status } : {}) },
-    include: { student: { select: { id: true, studentNumber: true, fullName: true, phone: true } } },
-    orderBy: { student: { studentNumber: "asc" } },
-  });
+  const rows = await coursesRepo.listEnrolments(courseId, status);
   return rows.map((e) => ({ id: e.id, status: e.status, enrolledAt: e.enrolledAt, droppedAt: e.droppedAt, student: e.student }));
 }
 
 /**
+ * Exam clashes that enrolling the student in `newCourseIds` would create:
+ * upcoming approved exams of the new courses that overlap an upcoming exam of
+ * the student's other active courses, or of another new course. Call it inside
+ * the enrolment transaction after lockScheduling(), so a schedule approval
+ * cannot slip in between the check and the enrolment.
+ */
+export async function enrolmentConflicts(tx: Tx, studentId: string, newCourseIds: string[]) {
+  const current = (await coursesRepo.findActiveCourseIds(studentId, tx)).filter((id) => !newCourseIds.includes(id));
+  return coursesRepo.findOverlappingSchedules(newCourseIds, [...current, ...newCourseIds], tx);
+}
+
+/**
  * Enrols one student (by id or student number). Reactivates a dropped enrolment.
- * @throws 400 STUDENT_NOT_FOUND, 409 ALREADY_ENROLLED
+ * @throws 400 STUDENT_NOT_FOUND, 409 ALREADY_ENROLLED, 409 ENROLMENT_SCHEDULE_CONFLICT { conflicts }
  */
 export async function enrolStudent(courseId: string, who: { studentId?: string; studentNumber?: string }, actorId: string, req: Request) {
-  if (!(await prisma.course.findUnique({ where: { id: courseId } }))) throw notFound("COURSE_NOT_FOUND");
-  const student = await prisma.user.findFirst({
-    where: { ...(who.studentId ? { id: who.studentId } : { studentNumber: who.studentNumber?.toUpperCase() }), role: { name: "STUDENT" } },
-  });
+  if (!(await coursesRepo.findCourse(courseId))) throw notFound("COURSE_NOT_FOUND");
+  const student = await findStudent({ id: who.studentId, studentNumber: who.studentNumber?.toUpperCase() });
   if (!student) throw badRequest("STUDENT_NOT_FOUND", "No student with this id or number");
   return transaction(async (tx) => {
-    const existing = await tx.enrolment.findUnique({ where: { studentId_courseId: { studentId: student.id, courseId } } });
+    const existing = await coursesRepo.findEnrolment(student.id, courseId, tx);
     if (existing?.status === "ACTIVE") throw conflict("ALREADY_ENROLLED", "The student is already enrolled");
+    await coursesRepo.lockScheduling(tx);
+    const conflicts = await enrolmentConflicts(tx, student.id, [courseId]);
+    if (conflicts.length) throw conflict("ENROLMENT_SCHEDULE_CONFLICT", "The student already has an exam at the same time", { conflicts });
     const e = existing
-      ? await tx.enrolment.update({ where: { id: existing.id }, data: { status: "ACTIVE", droppedAt: null } })
-      : await tx.enrolment.create({ data: { studentId: student.id, courseId } });
+      ? await coursesRepo.setEnrolmentStatus(existing.id, "ACTIVE", null, tx)
+      : await coursesRepo.insertEnrolment(student.id, courseId, tx);
     await audit(tx, { actorId, action: existing ? "ENROLMENT_REACTIVATED" : "ENROLMENT_CREATED", entityType: "course", entityId: courseId, details: { student: student.studentNumber }, req });
     return e;
   });
@@ -141,12 +152,13 @@ export async function enrolStudent(courseId: string, who: { studentId?: string; 
 
 /** Drops a student. Their attempts and results stay. @throws 404 ENROLMENT_NOT_FOUND, 409 ALREADY_DROPPED */
 export async function dropStudent(courseId: string, studentId: string, actorId: string, req: Request) {
-  const e = await prisma.enrolment.findUnique({ where: { studentId_courseId: { studentId, courseId } }, include: { student: true } });
+  const e = await coursesRepo.findEnrolment(studentId, courseId);
   if (!e) throw notFound("ENROLMENT_NOT_FOUND");
   if (e.status === "DROPPED") throw conflict("ALREADY_DROPPED", "The student is already dropped");
+  const student = await findUserWithRole(studentId);
   return transaction(async (tx) => {
-    const updated = await tx.enrolment.update({ where: { id: e.id }, data: { status: "DROPPED", droppedAt: now() } });
-    await audit(tx, { actorId, action: "ENROLMENT_DROPPED", entityType: "course", entityId: courseId, details: { student: e.student.studentNumber }, req });
+    const updated = await coursesRepo.setEnrolmentStatus(e.id, "DROPPED", now(), tx);
+    await audit(tx, { actorId, action: "ENROLMENT_DROPPED", entityType: "course", entityId: courseId, details: { student: student?.studentNumber }, req });
     return updated;
   });
 }

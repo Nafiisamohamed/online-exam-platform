@@ -10,6 +10,7 @@
 import type { Db } from "../db/prisma.ts";
 import { num0 } from "../lib/format.ts";
 import { letterFor, loadScale } from "../modules/grading-scale/grading-scale.ts";
+import * as gradingRepo from "../repositories/grading.repository.ts";
 
 /** Total, maximum and percentage (2 decimals) of a list of question marks. */
 export function computeTotals(items: { marks: number; awarded: number | null }[]) {
@@ -21,15 +22,11 @@ export function computeTotals(items: { marks: number; awarded: number | null }[]
 
 /** Recalculates and saves the working grade of one submitted attempt. */
 export async function recalcGrade(db: Db, attemptId: string) {
-  const questions = await db.attemptQuestion.findMany({ where: { attemptId }, select: { marks: true, answer: { select: { marksAwarded: true } } } });
+  const questions = await gradingRepo.findAttemptMarks(attemptId, db);
   const { total, max, percentage } = computeTotals(
     questions.map((q) => ({ marks: num0(q.marks), awarded: q.answer?.marksAwarded == null ? null : num0(q.answer.marksAwarded) })),
   );
   if (max <= 0) return null;
   const letterGrade = letterFor(percentage, await loadScale(db));
-  return db.grade.upsert({
-    where: { attemptId },
-    create: { attemptId, totalScore: total, maxScore: max, percentage, letterGrade },
-    update: { totalScore: total, maxScore: max, percentage, letterGrade, calculatedAt: new Date() },
-  });
+  return gradingRepo.upsertGrade(attemptId, { totalScore: total, maxScore: max, percentage, letterGrade }, db);
 }

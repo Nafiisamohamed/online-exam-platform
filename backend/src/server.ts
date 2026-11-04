@@ -8,12 +8,12 @@
 import { createApp } from "./app.ts";
 import { env } from "./config/env.ts";
 import { syncClock } from "./db/clock.ts";
-import { prisma } from "./db/prisma.ts";
+import { disconnectDatabase } from "./db/prisma.ts";
 import { startJobs } from "./jobs/scheduler.ts";
 import { logger } from "./lib/logger.ts";
 
 async function main() {
-  const offset = await syncClock(prisma);
+  const offset = await syncClock();
   logger.info("database connected", { clockOffsetMs: Math.round(offset) });
 
   const app = createApp();
@@ -24,7 +24,7 @@ async function main() {
     logger.info("shutting down", { signal });
     stopJobs();
     server.close(() => {
-      void prisma.$disconnect().finally(() => process.exit(0));
+      void disconnectDatabase().finally(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };

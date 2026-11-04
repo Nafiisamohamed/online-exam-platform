@@ -19,7 +19,10 @@
 import type { Request } from "express";
 import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findExpiredAttemptsOfExam } from "../../repositories/attempts.repository.ts";
+import { findExamWithCourse, lockExam, updateExam } from "../../repositories/exams.repository.ts";
+import * as resultsRepo from "../../repositories/results.repository.ts";
 import type { Language } from "../../generated/prisma/enums.ts";
 import { formatDateTime, LABELS } from "../../i18n/messages.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
@@ -44,13 +47,9 @@ interface QuestionMark {
 
 /** Can the exam's results be published now? Returns the blocking counts (empty = ready). */
 export async function publicationBlockers(examId: string) {
-  const expired = await prisma.examAttempt.findMany({ where: { examId, status: "IN_PROGRESS", deadline: { lt: now() } }, select: { id: true, status: true, deadline: true } });
+  const expired = await findExpiredAttemptsOfExam(examId, now());
   for (const a of expired) await submitIfExpired(a);
-  const [inProgress, unfinished, submitted] = await Promise.all([
-    prisma.examAttempt.count({ where: { examId, status: "IN_PROGRESS" } }),
-    prisma.answer.groupBy({ by: ["gradingStatus"], where: { attempt: { examId, status: "SUBMITTED" }, gradingStatus: { in: [...UNFINISHED_STATUSES] } }, _count: { _all: true } }),
-    prisma.examAttempt.count({ where: { examId, status: "SUBMITTED" } }),
-  ]);
+  const [inProgress, unfinished, submitted] = await resultsRepo.findPublicationCounts(examId, [...UNFINISHED_STATUSES]);
   return {
     inProgress,
     submitted,
@@ -72,22 +71,14 @@ export async function publishResults(user: AuthUser, examId: string, reason: str
   if (!blockers.submitted) throw badRequest("NO_SUBMISSIONS", "No student has submitted this exam");
 
   const result = await transaction(async (tx) => {
-    await tx.$executeRaw`SELECT id FROM exams WHERE id = ${examId}::uuid FOR UPDATE`;
-    const fresh = await tx.exam.findUniqueOrThrow({ where: { id: examId }, include: { course: true } });
+    await lockExam(examId, tx);
+    const fresh = (await findExamWithCourse(examId, tx))!;
     if (fresh.resultsStatus === "PUBLISHED") throw conflict("RESULTS_ALREADY_PUBLISHED", "Reopen grading to publish changes");
-    const last = await tx.resultPublication.aggregate({ where: { examId }, _max: { publicationNumber: true } });
-    const number = (last._max.publicationNumber ?? 0) + 1;
+    const number = await resultsRepo.nextPublicationNumber(examId, tx);
     if (number > 1 && !reason?.trim()) throw badRequest("PUBLICATION_REASON_REQUIRED", "Explain why the results are published again");
-    const publication = await tx.resultPublication.create({ data: { examId, publicationNumber: number, publishedById: user.id, reason: number > 1 ? reason!.trim() : reason?.trim() || null } });
+    const publication = await resultsRepo.insertPublication({ examId, publicationNumber: number, publishedById: user.id, reason: number > 1 ? reason!.trim() : reason?.trim() || null }, tx);
 
-    const attempts = await tx.examAttempt.findMany({
-      where: { examId, status: "SUBMITTED" },
-      include: {
-        student: { select: { id: true, phone: true, preferredLanguage: true, isActive: true } },
-        questions: { include: { answer: { select: { marksAwarded: true, gradingStatus: true } } }, orderBy: { position: "asc" } },
-        gradeRevisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
-      },
-    });
+    const attempts = await resultsRepo.findAttemptsToPublish(examId, tx);
     const changed: typeof attempts = [];
     for (const a of attempts) {
       const grade = (await recalcGrade(tx, a.id))!;
@@ -95,18 +86,19 @@ export async function publishResults(user: AuthUser, examId: string, reason: str
         position: q.position, questionVersionId: q.questionVersionId, maxMarks: num0(q.marks), awarded: num0(q.answer?.marksAwarded), status: q.answer?.gradingStatus ?? null,
       }));
       const prev = a.gradeRevisions[0];
-      await tx.gradeRevision.create({
-        data: {
+      await resultsRepo.insertRevision(
+        {
           publicationId: publication.id, attemptId: a.id, revisionNumber: (prev?.revisionNumber ?? 0) + 1,
           totalScore: grade.totalScore, maxScore: grade.maxScore, percentage: grade.percentage, letterGrade: grade.letterGrade,
           questionMarks: questionMarks as unknown as object, countedFocusLosses: a.countedFocusLosses,
         },
-      });
+        tx,
+      );
       const prevMarks = (prev?.questionMarks as unknown as QuestionMark[] | undefined)?.map((m) => `${m.position}:${m.awarded}`).join("|");
       const isChanged = !prev || num0(prev.totalScore) !== num0(grade.totalScore) || prev.letterGrade !== grade.letterGrade || prevMarks !== questionMarks.map((m) => `${m.position}:${m.awarded}`).join("|");
       if (number === 1 || (prev && isChanged)) changed.push(a);
     }
-    await tx.exam.update({ where: { id: examId }, data: { resultsStatus: "PUBLISHED" } });
+    await updateExam(examId, { resultsStatus: "PUBLISHED" }, tx);
 
     const template = number === 1 ? "RESULTS_PUBLISHED" : "RESULTS_CHANGED";
     const recipients = changed.filter((a) => a.student.isActive);
@@ -126,7 +118,7 @@ export async function reopenResults(user: AuthUser, examId: string, reason: stri
   const exam = await manageableExam(user, examId, { ownerOnly: true });
   if (exam.resultsStatus !== "PUBLISHED") throw conflict("RESULTS_NOT_PUBLISHED", "Only published results can be reopened");
   await transaction(async (tx) => {
-    await tx.exam.update({ where: { id: examId }, data: { resultsStatus: "REOPENED" } });
+    await updateExam(examId, { resultsStatus: "REOPENED" }, tx);
     await audit(tx, { actorId: user.id, action: "RESULTS_REOPENED", entityType: "exam", entityId: examId, details: { reason }, req });
   });
   return { resultsStatus: "REOPENED" };
@@ -135,15 +127,8 @@ export async function reopenResults(user: AuthUser, examId: string, reason: stri
 /** Staff results table: every enrolled or attempting student, with working and published grades. Absent students are listed. */
 export async function examResults(user: AuthUser, examId: string) {
   const exam = await manageableExam(user, examId);
-  const [attempts, enrolled, publications, blockers] = await Promise.all([
-    prisma.examAttempt.findMany({
-      where: { examId },
-      include: { student: { select: { id: true, studentNumber: true, fullName: true } }, grade: true, gradeRevisions: { orderBy: { revisionNumber: "desc" }, take: 1 } },
-    }),
-    prisma.user.findMany({ where: { enrolments: { some: { courseId: exam.courseId } } }, select: { id: true, studentNumber: true, fullName: true, enrolments: { where: { courseId: exam.courseId }, select: { status: true } } } }),
-    prisma.resultPublication.findMany({ where: { examId }, orderBy: { publicationNumber: "asc" }, include: { publishedBy: { select: { fullName: true } } } }),
-    publicationBlockers(examId),
-  ]);
+  const blockers = await publicationBlockers(examId);
+  const [attempts, enrolled, publications] = await resultsRepo.findExamResultsData(examId, exam.courseId);
   const byStudent = new Map(attempts.map((a) => [a.studentId, a]));
   const ids = new Set([...enrolled.map((e) => e.id), ...attempts.map((a) => a.studentId)]);
   const students = [...ids].map((id) => {
@@ -184,7 +169,7 @@ export async function gradesCsv(user: AuthUser, examId: string, lang: Language, 
     const g = s.published ?? s.working;
     return [s.student.studentNumber, s.student.fullName, s.status === "ABSENT" ? L.absent : s.status, g?.totalScore ?? "", g?.maxScore ?? "", g?.percentage ?? "", g?.letterGrade ?? "", s.countedFocusLosses ?? "", s.submissionType ?? "", s.published ? s.published.revisionNumber : ""];
   });
-  await audit(prisma, { actorId: user.id, action: "GRADES_EXPORTED", entityType: "exam", entityId: examId, details: { rows: rows.length }, req });
+  await audit(null, { actorId: user.id, action: "GRADES_EXPORTED", entityType: "exam", entityId: examId, details: { rows: rows.length }, req });
   return { filename: `grades-${data.exam.title.replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40)}.csv`, csv: toCsv(header, rows) };
 }
 
@@ -192,11 +177,7 @@ export async function gradesCsv(user: AuthUser, examId: string, lang: Language, 
 
 /** The student's published results (latest snapshot per exam). */
 export async function myResults(user: AuthUser) {
-  const revisions = await prisma.gradeRevision.findMany({
-    where: { attempt: { studentId: user.id } },
-    include: { publication: true, attempt: { select: { examId: true, exam: { select: { title: true, course: { select: { code: true, name: true } } } } } } },
-    orderBy: [{ attemptId: "asc" }, { revisionNumber: "desc" }],
-  });
+  const revisions = await resultsRepo.findStudentRevisions(user.id);
   const latest = new Map<string, (typeof revisions)[number]>();
   for (const r of revisions) if (!latest.has(r.attemptId)) latest.set(r.attemptId, r);
   return [...latest.values()].map((r) => ({
@@ -217,20 +198,7 @@ export async function myResults(user: AuthUser) {
  * @throws 404 RESULT_NOT_FOUND when nothing is published (unpublished results are never shown)
  */
 export async function myResult(user: AuthUser, examId: string) {
-  const attempt = await prisma.examAttempt.findUnique({
-    where: { examId_studentId: { examId, studentId: user.id } },
-    include: {
-      exam: { select: { title: true, allowAnswerReview: true, course: { select: { code: true, name: true } } } },
-      gradeRevisions: { orderBy: { revisionNumber: "desc" }, take: 1, include: { publication: true } },
-      questions: {
-        orderBy: { position: "asc" },
-        include: {
-          answer: { include: { essayMarks: { where: { graderRole: "FIRST" }, select: { comment: true } } } },
-          questionVersion: { include: { options: true, acceptedAnswers: true } },
-        },
-      },
-    },
-  });
+  const attempt = await resultsRepo.findStudentResult(examId, user.id);
   const rev = attempt?.gradeRevisions[0];
   if (!attempt || !rev) throw notFound("RESULT_NOT_FOUND");
   const review = attempt.exam.allowAnswerReview;

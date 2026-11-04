@@ -19,7 +19,9 @@
 import type { Request } from "express";
 import { now } from "../../db/clock.ts";
 import type { Tx } from "../../db/prisma.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findExamWithCourse } from "../../repositories/exams.repository.ts";
+import * as gradingRepo from "../../repositories/grading.repository.ts";
 import type { GradingStatus } from "../../generated/prisma/enums.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
@@ -45,23 +47,13 @@ export function resolveEssay(maxMarks: number, hasSecondGrader: boolean, first: 
 
 /** Loads an answer with everything grading needs, and decides the user's grading role. */
 async function loadForGrading(user: AuthUser, answerId: string) {
-  const answer = await prisma.answer.findUnique({
-    where: { id: answerId },
-    include: {
-      attemptQuestion: { select: { position: true, marks: true } },
-      attempt: { select: { id: true, status: true, student: { select: { id: true, studentNumber: true, fullName: true } }, exam: { include: { course: true } } } },
-      essayMarks: { include: { criterionMarks: true, grader: { select: { id: true, fullName: true } } } },
-    },
-  });
+  const answer = await gradingRepo.findAnswerForGrading(answerId);
   if (!answer || answer.attempt.status !== "SUBMITTED") throw notFound("ANSWER_NOT_FOUND");
   const exam = answer.attempt.exam;
   const isOwner = user.role === "LECTURER" && exam.course.lecturerId === user.id;
   const isSecond = user.role === "LECTURER" && exam.secondGraderId === user.id;
   if (!isOwner && !isSecond) throw notFound("ANSWER_NOT_FOUND");
-  const version = await prisma.questionVersion.findUniqueOrThrow({
-    where: { id: answer.questionVersionId },
-    include: { options: { orderBy: { position: "asc" } }, acceptedAnswers: true, rubricCriteria: { orderBy: { position: "asc" } } },
-  });
+  const version = await gradingRepo.findVersionWithKey(answer.questionVersionId);
   // The second grader only grades essays.
   if (!isOwner && version.type !== "ESSAY") throw notFound("ANSWER_NOT_FOUND");
   return { answer, exam, version, isOwner, isSecond };
@@ -80,23 +72,12 @@ const anonymousCode = (attemptId: string) => `ANON-${attemptId.slice(0, 8).toUpp
  * only essays, anonymised, with only their own marks.
  */
 export async function gradingQueue(user: AuthUser, examId: string, filter: { status?: string }) {
-  const exam = await prisma.exam.findUnique({ where: { id: examId }, include: { course: true } });
+  const exam = await findExamWithCourse(examId);
   const isOwner = !!exam && user.role === "LECTURER" && exam.course.lecturerId === user.id;
   const isSecond = !!exam && user.role === "LECTURER" && exam.secondGraderId === user.id;
   if (!exam || (!isOwner && !isSecond)) throw notFound("EXAM_NOT_FOUND");
 
-  const answers = await prisma.answer.findMany({
-    where: {
-      attempt: { examId, status: "SUBMITTED" },
-      ...(isOwner ? {} : { attemptQuestion: { questionVersion: { type: "ESSAY" } }, NOT: { gradingStatus: "NOT_ANSWERED" } }),
-    },
-    include: {
-      attemptQuestion: { select: { position: true, marks: true, questionVersion: { select: { type: true, text: true } } } },
-      attempt: { select: { id: true, student: { select: { studentNumber: true, fullName: true } } } },
-      essayMarks: { select: { graderId: true, graderRole: true, totalMarks: true } },
-    },
-    orderBy: [{ attempt: { startedAt: "asc" } }, { attemptQuestion: { position: "asc" } }],
-  });
+  const answers = await gradingRepo.findAnswersForQueue(examId, !isOwner);
   const counts: Record<string, number> = {};
   for (const a of answers) counts[a.gradingStatus ?? "UNKNOWN"] = (counts[a.gradingStatus ?? "UNKNOWN"] ?? 0) + 1;
 
@@ -163,10 +144,7 @@ export async function getAnswerForGrading(user: AuthUser, answerId: string) {
 
 /** Saves the final status/marks of an answer and recalculates the grade (inside a transaction). */
 async function setAnswerResult(tx: Tx, answerId: string, attemptId: string, status: GradingStatus, marks: number | null, graderId: string) {
-  await tx.answer.update({
-    where: { id: answerId },
-    data: { gradingStatus: status, marksAwarded: marks, gradedById: marks === null ? null : graderId, gradedAt: marks === null ? null : now() },
-  });
+  await gradingRepo.updateAnswerGrading(answerId, { gradingStatus: status, marksAwarded: marks, gradedById: marks === null ? null : graderId, gradedAt: marks === null ? null : now() }, tx);
   await recalcGrade(tx, attemptId);
 }
 
@@ -209,20 +187,8 @@ export async function markEssay(user: AuthUser, answerId: string, input: { crite
   const graderRole = isOwner ? "FIRST" : "SECOND";
 
   await transaction(async (tx) => {
-    const mark = await tx.essayMark.upsert({
-      where: { answerId_graderRole: { answerId: answer.id, graderRole } },
-      create: { answerId: answer.id, graderId: user.id, graderRole, totalMarks: total, comment: input.comment ?? null },
-      update: { totalMarks: total, comment: input.comment ?? null, graderId: user.id },
-    });
-    // Every criterion is always marked, so updating in place keeps the set complete (no deletes needed).
-    for (const [criterionId, m] of given) {
-      await tx.essayCriterionMark.upsert({
-        where: { essayMarkId_rubricCriterionId: { essayMarkId: mark.id, rubricCriterionId: criterionId } },
-        create: { essayMarkId: mark.id, rubricCriterionId: criterionId, marks: m },
-        update: { marks: m },
-      });
-    }
-    const all = await tx.essayMark.findMany({ where: { answerId: answer.id } });
+    await gradingRepo.saveEssayMark({ answerId: answer.id, graderId: user.id, graderRole, totalMarks: total, comment: input.comment ?? null, criteria: given }, tx);
+    const all = await gradingRepo.findEssayMarks(answer.id, tx);
     const first = all.find((m) => m.graderRole === "FIRST");
     const second = all.find((m) => m.graderRole === "SECOND");
     const result = resolveEssay(num0(answer.attemptQuestion.marks), !!exam.secondGraderId, first ? num0(first.totalMarks) : null, second ? num0(second.totalMarks) : null);

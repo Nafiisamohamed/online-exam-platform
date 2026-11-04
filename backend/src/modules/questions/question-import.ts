@@ -21,7 +21,10 @@
  *    are skipped and reported.
  */
 import type { Request } from "express";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findCourse } from "../../repositories/courses.repository.ts";
+import { findImportBatch, insertImportBatch, lockImportBatch, markImportConfirmed } from "../../repositories/imports.repository.ts";
+import { findActiveTexts } from "../../repositories/questions.repository.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { normalizeText } from "../../lib/format.ts";
@@ -88,8 +91,7 @@ export function parseQuestionRow(raw: Record<string, string>): { input: Question
 }
 
 async function validateRows(courseId: string, rows: Record<string, string>[]): Promise<QuestionRow[]> {
-  const bank = await prisma.question.findMany({ where: { courseId, isArchived: false }, select: { normalizedText: true } });
-  const inBank = new Set(bank.map((q) => q.normalizedText));
+  const inBank = new Set(await findActiveTexts(courseId));
   const firstRow = new Map<string, number>();
   return rows.map((raw, i) => {
     const row = i + 2;
@@ -115,22 +117,20 @@ function counts(rows: QuestionRow[]) {
 
 /** Step 1: validate and store a PREVIEW batch. Only the course's lecturer may import. */
 export async function previewQuestionImport(user: AuthUser, courseId: string, file: Express.Multer.File | undefined) {
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  const course = await findCourse(courseId);
   if (!course || course.lecturerId !== user.id) throw notFound("COURSE_NOT_FOUND");
   const rows = parseCsv(file, REQUIRED);
   const results = await validateRows(courseId, rows);
-  const batch = await prisma.importBatch.create({
-    data: {
-      type: "QUESTIONS", courseId, uploadedById: user.id, filename: (file?.originalname ?? "questions.csv").slice(0, 200),
-      ...counts(results), rowResults: results as unknown as object,
-    },
+  const batch = await insertImportBatch({
+    type: "QUESTIONS", courseId, uploadedById: user.id, filename: (file?.originalname ?? "questions.csv").slice(0, 200),
+    ...counts(results), rowResults: results as unknown as object,
   });
   return { batch: { id: batch.id, type: batch.type, courseId, status: batch.status, filename: batch.filename, ...counts(results) }, rows: results };
 }
 
 /** Step 2: save the VALID rows. @throws 409 IMPORT_ALREADY_CONFIRMED, 400 IMPORT_NO_VALID_ROWS */
 export async function confirmQuestionImport(batchId: string, user: AuthUser, req: Request) {
-  const batch = await prisma.importBatch.findUnique({ where: { id: batchId }, include: { course: true } });
+  const batch = await findImportBatch(batchId);
   if (!batch || batch.type !== "QUESTIONS" || batch.course?.lecturerId !== user.id) throw notFound("IMPORT_NOT_FOUND");
   if (batch.status !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
   const stored = batch.rowResults as unknown as QuestionRow[];
@@ -139,10 +139,9 @@ export async function confirmQuestionImport(batchId: string, user: AuthUser, req
   if (valid.length === 0) throw badRequest("IMPORT_NO_VALID_ROWS", "There are no valid rows to save");
 
   await transaction(async (tx) => {
-    const locked = await tx.$queryRaw<{ status: string }[]>`SELECT status::text FROM import_batches WHERE id = ${batchId}::uuid FOR UPDATE`;
-    if (locked[0]?.status !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
+    if ((await lockImportBatch(batchId, tx)) !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
     for (const r of valid) await insertQuestion(tx, batch.courseId!, user.id, r.question!);
-    await tx.importBatch.update({ where: { id: batchId }, data: { status: "CONFIRMED", ...counts(fresh), rowResults: fresh as unknown as object } });
+    await markImportConfirmed(batchId, counts(fresh), fresh as unknown as object, tx);
     await audit(tx, { actorId: user.id, action: "QUESTIONS_IMPORTED", entityType: "course", entityId: batch.courseId, details: { batchId, ...counts(fresh) }, req });
   });
   return { ...counts(fresh), savedRows: valid.length, rows: fresh };

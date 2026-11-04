@@ -9,6 +9,7 @@
  * Without a database (unit tests) the offset is simply 0.
  */
 import type { Db } from "./prisma.ts";
+import { prisma } from "./prisma.ts";
 
 let offsetMs = 0;
 
@@ -21,7 +22,7 @@ export function now(): Date {
  * Measures the offset with one query. The round-trip time is split in half,
  * which is accurate to a few milliseconds on a campus network.
  */
-export async function syncClock(db: Db): Promise<number> {
+export async function syncClock(db: Db = prisma): Promise<number> {
   const before = Date.now();
   // Epoch milliseconds, so the database time zone setting cannot affect the result.
   const rows = await db.$queryRaw<{ ms: number }[]>`SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS ms`;

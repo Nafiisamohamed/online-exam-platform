@@ -7,7 +7,8 @@
  */
 import type { Request } from "express";
 import type { Db } from "../../db/prisma.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import * as gradingRepo from "../../repositories/grading.repository.ts";
 import { num } from "../../lib/format.ts";
 import { audit } from "../../services/audit.ts";
 
@@ -20,8 +21,8 @@ export const DEFAULT_SCALE = [
 ];
 
 /** The scale sorted from the highest band down. Uses the defaults if the table is empty. */
-export async function loadScale(db: Db = prisma): Promise<{ letter: string; minPercentage: number }[]> {
-  const rows = await db.gradingScale.findMany({ orderBy: { minPercentage: "desc" } });
+export async function loadScale(db?: Db): Promise<{ letter: string; minPercentage: number }[]> {
+  const rows = await gradingRepo.findScale(db);
   if (rows.length === 0) return DEFAULT_SCALE;
   return rows.map((r) => ({ letter: r.letter, minPercentage: num(r.minPercentage)! }));
 }
@@ -36,10 +37,7 @@ export function letterFor(percentage: number, scale: { letter: string; minPercen
 export async function replaceScale(bands: { letter: string; minPercentage: number }[], actorId: string, req: Request) {
   const sorted = [...bands].sort((a, b) => b.minPercentage - a.minPercentage);
   await transaction(async (tx) => {
-    await tx.gradingScale.deleteMany({});
-    await tx.gradingScale.createMany({
-      data: sorted.map((b, i) => ({ letter: b.letter.toUpperCase(), minPercentage: b.minPercentage, sortOrder: i + 1 })),
-    });
+    await gradingRepo.replaceScale(sorted.map((b, i) => ({ letter: b.letter.toUpperCase(), minPercentage: b.minPercentage, sortOrder: i + 1 })), tx);
     await audit(tx, { actorId, action: "GRADING_SCALE_UPDATED", entityType: "grading_scale", details: { bands: sorted }, req });
   });
   return loadScale();

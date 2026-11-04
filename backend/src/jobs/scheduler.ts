@@ -12,7 +12,6 @@
  * server was down. A tick never overlaps the previous one.
  */
 import { syncClock } from "../db/clock.ts";
-import { prisma } from "../db/prisma.ts";
 import { logger } from "../lib/logger.ts";
 import { deliverQueuedSms } from "../services/messaging.ts";
 
@@ -47,7 +46,7 @@ export function startJobs(intervalMs: number): () => void {
     if (running) return;
     running = true;
     try {
-      if (ticks++ % Math.max(1, Math.round(60_000 / intervalMs)) === 0) await syncClock(prisma);
+      if (ticks++ % Math.max(1, Math.round(60_000 / intervalMs)) === 0) await syncClock();
       const results = await runJobsOnce();
       const changed = Object.entries(results).filter(([, n]) => n > 0);
       if (changed.length) logger.info("jobs", Object.fromEntries(changed));

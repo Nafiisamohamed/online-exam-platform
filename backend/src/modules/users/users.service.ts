@@ -13,7 +13,8 @@ import type { Request } from "express";
 import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import * as usersRepo from "../../repositories/users.repository.ts";
 import type { Language, RoleName } from "../../generated/prisma/enums.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { paged } from "../../lib/format.ts";
@@ -21,14 +22,9 @@ import { generateTempPassword, hashPassword } from "../../lib/passwords.ts";
 import { audit } from "../../services/audit.ts";
 import { queueSms } from "../../services/messaging.ts";
 
-/** Fields returned for a user. Never the password hash. */
-export const userSelect = {
-  id: true, studentNumber: true, email: true, fullName: true, phone: true, preferredLanguage: true,
-  isActive: true, mustChangePassword: true, createdAt: true, role: { select: { name: true } },
-} as const;
-
 type UserRow = { role: { name: RoleName } } & Record<string, unknown>;
-export const toUser = ({ role, ...u }: UserRow) => ({ ...u, role: role.name });
+/** API shape of a user: the role as a plain name. tokenVersion is internal and dropped. */
+export const toUser = ({ role, tokenVersion: _v, ...u }: UserRow) => ({ ...u, role: role.name });
 
 export interface NewUser {
   role: RoleName;
@@ -55,11 +51,11 @@ export async function createUser(input: NewUser, actorId: string, req: Request) 
   if (!isStudent && !input.email) throw badRequest("EMAIL_REQUIRED", "Staff accounts need an email address");
   const temporaryPassword = generateTempPassword();
   const passwordHash = await hashPassword(temporaryPassword);
-  const role = await prisma.role.findUniqueOrThrow({ where: { name: input.role } });
+  const role = await usersRepo.findRole(input.role);
   try {
     const user = await transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
+      const created = await usersRepo.insertUser(
+        {
           roleId: role.id,
           studentNumber: isStudent ? input.studentNumber!.toUpperCase() : null,
           email: isStudent ? null : input.email!.toLowerCase(),
@@ -70,8 +66,8 @@ export async function createUser(input: NewUser, actorId: string, req: Request) 
           mustChangePassword: true,
           tempPasswordExpiresAt: tempPasswordExpiry(),
         },
-        select: userSelect,
-      });
+        tx,
+      );
       if (isStudent) {
         await queueSms(tx, { id: created.id, phone: created.phone, preferredLanguage: created.preferredLanguage }, "ACCOUNT_CREATED",
           { studentNumber: created.studentNumber! }, { type: "user", id: created.id });
@@ -102,16 +98,13 @@ export async function listUsers(q: { role?: RoleName; search?: string; active?: 
         }
       : {}),
   };
-  const [rows, total] = await Promise.all([
-    prisma.user.findMany({ where, select: userSelect, orderBy: [{ fullName: "asc" }], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
-    prisma.user.count({ where }),
-  ]);
+  const [rows, total] = await usersRepo.listUsers(where, (q.page - 1) * q.pageSize, q.pageSize);
   return paged(rows.map(toUser), total, q.page, q.pageSize);
 }
 
 /** One user (no password hash). @throws 404 USER_NOT_FOUND */
 export async function getUser(id: string) {
-  const u = await prisma.user.findUnique({ where: { id }, select: userSelect });
+  const u = await usersRepo.findUser(id);
   if (!u) throw notFound("USER_NOT_FOUND");
   return toUser(u);
 }
@@ -129,11 +122,7 @@ export async function updateUser(
   if (patch.isActive === false && id === actorId) throw badRequest("CANNOT_DEACTIVATE_SELF", "You cannot deactivate your own account");
   await getUser(id);
   return transaction(async (tx) => {
-    const u = await tx.user.update({
-      where: { id },
-      data: { ...patch, ...(patch.isActive === false ? { tokenVersion: { increment: 1 } } : {}) },
-      select: userSelect,
-    });
+    const u = await usersRepo.updateUser(id, { ...patch, ...(patch.isActive === false ? { tokenVersion: { increment: 1 } } : {}) }, tx);
     await audit(tx, { actorId, action: "USER_UPDATED", entityType: "user", entityId: id, details: { fields: Object.keys(patch) }, req });
     return toUser(u);
   });
@@ -145,10 +134,7 @@ export async function resetPassword(id: string, actorId: string, req: Request) {
   const temporaryPassword = generateTempPassword();
   const passwordHash = await hashPassword(temporaryPassword);
   await transaction(async (tx) => {
-    await tx.user.update({
-      where: { id },
-      data: { passwordHash, mustChangePassword: true, tempPasswordExpiresAt: tempPasswordExpiry(), tokenVersion: { increment: 1 } },
-    });
+    await usersRepo.updateUser(id, { passwordHash, mustChangePassword: true, tempPasswordExpiresAt: tempPasswordExpiry(), tokenVersion: { increment: 1 } }, tx);
     await audit(tx, { actorId, action: "PASSWORD_RESET", entityType: "user", entityId: id, req });
   });
   return { temporaryPassword };
@@ -156,9 +142,5 @@ export async function resetPassword(id: string, actorId: string, req: Request) {
 
 /** Active lecturers or invigilators (id and name only), for choosing graders and invigilators. */
 export async function listStaff(role: "LECTURER" | "INVIGILATOR") {
-  return prisma.user.findMany({
-    where: { role: { name: role }, isActive: true },
-    select: { id: true, fullName: true, email: true },
-    orderBy: { fullName: "asc" },
-  });
+  return usersRepo.listActiveStaff(role);
 }

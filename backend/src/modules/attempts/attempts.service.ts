@@ -24,7 +24,12 @@
  */
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import * as attemptsRepo from "../../repositories/attempts.repository.ts";
+import { findEnrolment } from "../../repositories/courses.repository.ts";
+import { findExam } from "../../repositories/exams.repository.ts";
+import { findSuccessfulPayment } from "../../repositories/payments.repository.ts";
+import { findApprovedSchedule } from "../../repositories/schedules.repository.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { AppError, badRequest, conflict, forbidden, notFound } from "../../lib/errors.ts";
 import { num, num0 } from "../../lib/format.ts";
@@ -56,7 +61,7 @@ function timing(a: { deadline: Date; status: string; startedAt: Date; totalExten
 
 /** Loads the student's own attempt or throws 404. */
 async function ownAttempt(user: AuthUser, attemptId: string) {
-  const a = await prisma.examAttempt.findUnique({ where: { id: attemptId } });
+  const a = await attemptsRepo.findAttempt(attemptId);
   if (!a || a.studentId !== user.id) throw notFound("ATTEMPT_NOT_FOUND");
   return a;
 }
@@ -67,19 +72,7 @@ async function ownAttempt(user: AuthUser, attemptId: string) {
  * Submitted: only the summary (results are shown after publication by the results module).
  */
 export async function attemptView(attemptId: string) {
-  const a = await prisma.examAttempt.findUniqueOrThrow({
-    where: { id: attemptId },
-    include: {
-      exam: { select: { id: true, title: true, instructions: true, course: { select: { code: true, name: true } } } },
-      questions: {
-        orderBy: { position: "asc" },
-        include: {
-          answer: { select: { selectedOptionId: true, textAnswer: true, savedAt: true } },
-          questionVersion: { select: { type: true, text: true, imagePath: true, options: { select: { id: true, text: true } } } },
-        },
-      },
-    },
-  });
+  const a = await attemptsRepo.findAttemptForView(attemptId);
   const answered = a.questions.filter((q) => q.answer && (q.answer.selectedOptionId || q.answer.textAnswer?.trim())).length;
   const base = {
     id: a.id,
@@ -119,23 +112,7 @@ export async function attemptView(attemptId: string) {
 
 /** Exams the student can see: published exams of their active courses with an approved schedule, plus any exam they attempted. */
 export async function listMyExams(user: AuthUser) {
-  const exams = await prisma.exam.findMany({
-    where: {
-      status: "PUBLISHED",
-      OR: [
-        { course: { enrolments: { some: { studentId: user.id, status: "ACTIVE" } } }, schedules: { some: { status: "APPROVED" } } },
-        { attempts: { some: { studentId: user.id } } },
-      ],
-    },
-    include: {
-      course: { select: { id: true, code: true, name: true } },
-      schedules: { where: { status: "APPROVED" }, select: { id: true, windowStart: true, windowEnd: true, durationMinutes: true } },
-      attempts: { where: { studentId: user.id }, select: { id: true, status: true, deadline: true, submittedAt: true } },
-      payments: { where: { studentId: user.id, status: "SUCCESS" }, select: { receiptNumber: true } },
-      rules: { select: { questionCount: true, marksPerQuestion: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const exams = await attemptsRepo.findStudentExams(user.id);
   const t = now();
   return exams.map((e) => {
     const schedule = e.schedules[0] ?? null;
@@ -167,17 +144,17 @@ export async function listMyExams(user: AuthUser) {
  *         403 NETWORK_NOT_ALLOWED, 402 PAYMENT_REQUIRED, 409 EXAM_NOT_ENOUGH_QUESTIONS
  */
 export async function startAttempt(user: AuthUser, examId: string, ip: string) {
-  const existing = await prisma.examAttempt.findUnique({ where: { examId_studentId: { examId, studentId: user.id } } });
+  const existing = await attemptsRepo.findAttemptOfStudent(examId, user.id);
   if (existing) {
     await submitIfExpired(existing);
     return { resumed: true, attempt: await attemptView(existing.id) };
   }
 
-  const exam = await prisma.exam.findUnique({ where: { id: examId } });
+  const exam = await findExam(examId);
   if (!exam || exam.status !== "PUBLISHED") throw notFound("EXAM_NOT_FOUND");
-  const enrolment = await prisma.enrolment.findUnique({ where: { studentId_courseId: { studentId: user.id, courseId: exam.courseId } } });
+  const enrolment = await findEnrolment(user.id, exam.courseId);
   if (enrolment?.status !== "ACTIVE") throw forbidden("NOT_ENROLLED", "You are not enrolled in this course");
-  const schedule = await prisma.examSchedule.findFirst({ where: { examId, status: "APPROVED" }, include: { rooms: { include: { room: true } } } });
+  const schedule = await findApprovedSchedule(examId);
   if (!schedule) throw conflict("EXAM_NOT_SCHEDULED", "This exam has no approved schedule");
 
   const t = now();
@@ -189,29 +166,26 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
     throw forbidden("NETWORK_NOT_ALLOWED", "Start the exam from a computer in one of the exam rooms");
   }
   if (num0(exam.feeAmount) > 0) {
-    const paid = await prisma.payment.findFirst({ where: { studentId: user.id, examId, status: "SUCCESS" } });
+    const paid = await findSuccessfulPayment(user.id, examId);
     if (!paid) throw new AppError(402, "PAYMENT_REQUIRED", "Pay the exam fee first", { amount: num(exam.feeAmount), currency: exam.feeCurrency });
   }
 
   try {
     const attemptId = await transaction(async (tx) => {
       // One clock for the whole start: the database's transaction time.
-      // (as epoch milliseconds, so the database time zone setting cannot shift it).
-      const [{ ms }] = await tx.$queryRaw<{ ms: number }[]>`SELECT floor(extract(epoch FROM now()) * 1000)::float8 AS ms`;
-      const startedAt = new Date(Number(ms));
+      const startedAt = await attemptsRepo.transactionTime(tx);
       // Re-check the window with this authoritative time (the check above used the API's synced clock).
       if (startedAt < schedule.windowStart) throw conflict("EXAM_NOT_OPEN_YET", "The exam window has not opened yet", { windowStart: schedule.windowStart });
       if (startedAt >= schedule.windowEnd) throw conflict("EXAM_WINDOW_CLOSED", "The exam window has closed", { windowEnd: schedule.windowEnd });
-      const pools = await rulesWithPools(tx, exam.courseId, await loadRuleSpecs(tx, examId), examId);
+      const pools = await rulesWithPools(exam.courseId, await loadRuleSpecs(examId, tx), examId, tx);
       const items = generateExam(pools, { shuffleQuestions: exam.shuffleQuestions, shuffleOptions: exam.shuffleOptions });
       const baseDeadline = new Date(Math.min(startedAt.getTime() + schedule.durationMinutes * 60_000, schedule.windowEnd.getTime()));
-      const attempt = await tx.examAttempt.create({
-        data: { examId, scheduleId: schedule.id, studentId: user.id, startedAt, baseDeadline, deadline: baseDeadline, lastSeenAt: startedAt, startIp: ip || null },
-      });
       // The database trigger locks each drawn question version in this same transaction.
-      await tx.attemptQuestion.createMany({
-        data: items.map((i) => ({ attemptId: attempt.id, questionVersionId: i.versionId, examRuleId: i.ruleId, position: i.position, optionOrder: i.optionOrder, marks: i.marks })),
-      });
+      const attempt = await attemptsRepo.insertAttempt(
+        { examId, scheduleId: schedule.id, studentId: user.id, startedAt, baseDeadline, deadline: baseDeadline, lastSeenAt: startedAt, startIp: ip || null },
+        items.map((i) => ({ questionVersionId: i.versionId, examRuleId: i.ruleId, position: i.position, optionOrder: i.optionOrder, marks: i.marks })),
+        tx,
+      );
       await audit(tx, { actorId: user.id, action: "ATTEMPT_STARTED", entityType: "exam_attempt", entityId: attempt.id, details: { examId, questions: items.length, ip } });
       return attempt.id;
     });
@@ -222,7 +196,7 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
     }
     // Two start requests at the same moment: the unique (exam, student) key keeps one attempt.
     if (isUniqueViolation(error)) {
-      const again = await prisma.examAttempt.findUnique({ where: { examId_studentId: { examId, studentId: user.id } } });
+      const again = await attemptsRepo.findAttemptOfStudent(examId, user.id);
       if (again) return { resumed: true, attempt: await attemptView(again.id) };
     }
     throw error;
@@ -252,7 +226,7 @@ async function activeAttempt(user: AuthUser, attemptId: string) {
  */
 export async function saveAnswer(user: AuthUser, attemptId: string, attemptQuestionId: string, body: { selectedOptionId?: string | null; textAnswer?: string | null }) {
   const a = await activeAttempt(user, attemptId);
-  const aq = await prisma.attemptQuestion.findFirst({ where: { id: attemptQuestionId, attemptId: a.id }, include: { questionVersion: { select: { type: true } } } });
+  const aq = await attemptsRepo.findAttemptQuestion(a.id, attemptQuestionId);
   if (!aq) throw notFound("QUESTION_NOT_FOUND");
 
   const choice = aq.questionVersion.type === "MCQ" || aq.questionVersion.type === "TRUE_FALSE";
@@ -268,21 +242,15 @@ export async function saveAnswer(user: AuthUser, attemptId: string, attemptQuest
   }
 
   // The answers_deadline_guard trigger re-checks status and deadline with the database clock.
-  const saved = await prisma.answer.upsert({
-    where: { attemptQuestionId: aq.id },
-    create: { attemptId: a.id, attemptQuestionId: aq.id, questionVersionId: aq.questionVersionId, selectedOptionId, textAnswer },
-    update: { selectedOptionId, textAnswer },
-    select: { savedAt: true },
-  });
-  await prisma.examAttempt.update({ where: { id: a.id }, data: { lastSeenAt: now() } });
+  const saved = await attemptsRepo.upsertAnswer({ attemptId: a.id, attemptQuestionId: aq.id, questionVersionId: aq.questionVersionId, selectedOptionId, textAnswer });
+  await attemptsRepo.touchAttempt(a.id, now());
   return { saved: true, savedAt: saved.savedAt, remainingSeconds: remainingSeconds(a.deadline) };
 }
 
 /** Marks or unmarks a question as flagged (for the navigator). */
 export async function setFlag(user: AuthUser, attemptId: string, attemptQuestionId: string, flagged: boolean) {
   const a = await activeAttempt(user, attemptId);
-  const n = await prisma.attemptQuestion.updateMany({ where: { id: attemptQuestionId, attemptId: a.id }, data: { isFlagged: flagged } });
-  if (n.count !== 1) throw notFound("QUESTION_NOT_FOUND");
+  if ((await attemptsRepo.setQuestionFlag(a.id, attemptQuestionId, flagged)) !== 1) throw notFound("QUESTION_NOT_FOUND");
   return { flagged };
 }
 
@@ -295,8 +263,8 @@ export async function setFlag(user: AuthUser, attemptId: string, attemptQuestion
 export async function heartbeat(user: AuthUser, attemptId: string) {
   const a = await ownAttempt(user, attemptId);
   if (await submitIfExpired(a)) return { status: "SUBMITTED", submissionType: "AUTO_DEADLINE", ...timing({ ...a, status: "SUBMITTED" }) };
-  if (a.status === "IN_PROGRESS") await prisma.examAttempt.update({ where: { id: a.id }, data: { lastSeenAt: now() } });
-  const fresh = await prisma.examAttempt.findUniqueOrThrow({ where: { id: a.id } });
+  if (a.status === "IN_PROGRESS") await attemptsRepo.touchAttempt(a.id, now());
+  const fresh = await attemptsRepo.findAttemptOrThrow(a.id);
   return { status: fresh.status, submissionType: fresh.submissionType, countedFocusLosses: fresh.countedFocusLosses, focusWarning: fresh.countedFocusLosses >= FOCUS_WARNING_THRESHOLD, ...timing(fresh) };
 }
 
@@ -314,23 +282,22 @@ export async function recordFocusEvent(user: AuthUser, attemptId: string, client
   const t = now();
   if (kind === "LOST") {
     try {
-      await prisma.focusEvent.create({ data: { attemptId: a.id, clientEventId, lostAt: t } });
+      await attemptsRepo.insertFocusLoss(a.id, clientEventId, t);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error; // retry of the same event
     }
   } else {
     await transaction(async (tx) => {
-      const ev = await tx.focusEvent.findUnique({ where: { attemptId_clientEventId: { attemptId: a.id, clientEventId } } });
+      const ev = await attemptsRepo.findFocusEvent(a.id, clientEventId, tx);
       if (!ev) throw notFound("FOCUS_EVENT_NOT_FOUND");
       if (ev.returnedAt) return; // already recorded
       const durationMs = Math.max(0, t.getTime() - ev.lostAt.getTime());
       const isCounted = durationMs >= FOCUS_MIN_COUNTED_MS;
-      const n = await tx.focusEvent.updateMany({ where: { id: ev.id, returnedAt: null }, data: { returnedAt: t, durationMs, isCounted } });
-      if (n.count === 1 && isCounted) await tx.examAttempt.update({ where: { id: a.id }, data: { countedFocusLosses: { increment: 1 } } });
+      const changed = await attemptsRepo.closeFocusEvent(ev.id, { returnedAt: t, durationMs, isCounted }, tx);
+      if (changed === 1 && isCounted) await attemptsRepo.incrementFocusLosses(a.id, tx);
     });
   }
-  await prisma.examAttempt.update({ where: { id: a.id }, data: { lastSeenAt: t } });
-  const fresh = await prisma.examAttempt.findUniqueOrThrow({ where: { id: a.id }, select: { countedFocusLosses: true } });
+  const fresh = await attemptsRepo.touchAttempt(a.id, t);
   return { countedFocusLosses: fresh.countedFocusLosses, focusWarning: fresh.countedFocusLosses >= FOCUS_WARNING_THRESHOLD };
 }
 

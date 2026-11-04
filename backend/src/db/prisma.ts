@@ -67,3 +67,8 @@ export async function databaseReachable(): Promise<boolean> {
     return false;
   }
 }
+
+/** Closes the connection pool (on shutdown). */
+export function disconnectDatabase(): Promise<void> {
+  return prisma.$disconnect();
+}

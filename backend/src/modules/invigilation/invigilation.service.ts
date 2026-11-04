@@ -20,7 +20,9 @@
  */
 import type { Request } from "express";
 import { now } from "../../db/clock.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findExpiredAttempts } from "../../repositories/attempts.repository.ts";
+import * as invRepo from "../../repositories/invigilation.repository.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { audit } from "../../services/audit.ts";
@@ -33,10 +35,7 @@ export const MAX_TOTAL_EXTENSION_MINUTES = 15;
 
 /** Loads a schedule the user may watch: assigned invigilator, or admin (view only). */
 async function watchableSchedule(user: AuthUser, scheduleId: string) {
-  const s = await prisma.examSchedule.findUnique({
-    where: { id: scheduleId },
-    include: { invigilators: true, exam: { select: { id: true, title: true, courseId: true, course: { select: { code: true, name: true } } } } },
-  });
+  const s = await invRepo.findScheduleWithInvigilators(scheduleId);
   const ok = s && (user.role === "ADMIN" || (user.role === "INVIGILATOR" && s.invigilators.some((i) => i.invigilatorId === user.id)));
   if (!ok) throw notFound("SCHEDULE_NOT_FOUND");
   return s!;
@@ -44,7 +43,7 @@ async function watchableSchedule(user: AuthUser, scheduleId: string) {
 
 /** Loads an attempt whose session this invigilator is assigned to. */
 async function invigilatedAttempt(user: AuthUser, attemptId: string) {
-  const a = await prisma.examAttempt.findUnique({ where: { id: attemptId }, include: { schedule: { include: { invigilators: true } }, exam: { select: { title: true } } } });
+  const a = await invRepo.findAttemptWithInvigilators(attemptId);
   const ok = a && (user.role === "ADMIN" || a.schedule.invigilators.some((i) => i.invigilatorId === user.id));
   if (!ok) throw notFound("ATTEMPT_NOT_FOUND");
   return a!;
@@ -52,12 +51,7 @@ async function invigilatedAttempt(user: AuthUser, attemptId: string) {
 
 /** Sessions assigned to the invigilator (admin: all approved), newest first. */
 export async function mySessions(user: AuthUser) {
-  const rows = await prisma.examSchedule.findMany({
-    where: { status: "APPROVED", ...(user.role === "INVIGILATOR" ? { invigilators: { some: { invigilatorId: user.id } } } : {}) },
-    include: { exam: { select: { id: true, title: true, course: { select: { code: true, name: true } } } }, rooms: { include: { room: { select: { name: true } } } }, _count: { select: { attempts: true } } },
-    orderBy: { windowStart: "desc" },
-    take: 100,
-  });
+  const rows = await invRepo.findApprovedSessions(user.role === "INVIGILATOR" ? user.id : null);
   const t = now();
   return rows.map((s) => ({
     id: s.id,
@@ -74,26 +68,10 @@ export async function mySessions(user: AuthUser) {
 /** The live list of students for one session. */
 export async function liveView(user: AuthUser, scheduleId: string) {
   const s = await watchableSchedule(user, scheduleId);
-  const expired = await prisma.examAttempt.findMany({ where: { scheduleId, status: "IN_PROGRESS", deadline: { lt: now() } }, select: { id: true, status: true, deadline: true } });
+  const expired = await findExpiredAttempts(now(), 500, scheduleId);
   for (const a of expired) await submitIfExpired(a);
 
-  const [attempts, enrolled, answered, openLosses, notes] = await Promise.all([
-    prisma.examAttempt.findMany({
-      where: { scheduleId },
-      include: { student: { select: { id: true, studentNumber: true, fullName: true } }, _count: { select: { questions: true } } },
-    }),
-    prisma.user.findMany({
-      where: { enrolments: { some: { courseId: s.exam.courseId, status: "ACTIVE" } } },
-      select: { id: true, studentNumber: true, fullName: true },
-    }),
-    prisma.answer.groupBy({
-      by: ["attemptId"],
-      where: { attempt: { scheduleId }, OR: [{ selectedOptionId: { not: null } }, { textAnswer: { not: null } }] },
-      _count: { _all: true },
-    }),
-    prisma.focusEvent.findMany({ where: { attempt: { scheduleId, status: "IN_PROGRESS" }, returnedAt: null }, select: { attemptId: true, lostAt: true } }),
-    prisma.invigilatorNote.groupBy({ by: ["studentId"], where: { scheduleId }, _count: { _all: true } }),
-  ]);
+  const [attempts, enrolled, answered, openLosses, notes] = await invRepo.findLiveViewData(scheduleId, s.exam.courseId);
   const answeredBy = new Map(answered.map((a) => [a.attemptId, a._count._all]));
   const awayBy = new Map(openLosses.map((f) => [f.attemptId, f.lostAt]));
   const notesBy = new Map(notes.map((n) => [n.studentId, n._count._all]));
@@ -143,7 +121,7 @@ export async function liveView(user: AuthUser, scheduleId: string) {
 /** Every focus loss of one attempt, with the server-recorded times and durations. */
 export async function focusEvents(user: AuthUser, attemptId: string) {
   await invigilatedAttempt(user, attemptId);
-  const events = await prisma.focusEvent.findMany({ where: { attemptId }, orderBy: { lostAt: "asc" } });
+  const events = await invRepo.findFocusEvents(attemptId);
   return events.map((e) => ({ id: e.id, lostAt: e.lostAt, returnedAt: e.returnedAt, durationMs: e.durationMs, isCounted: e.isCounted }));
 }
 
@@ -152,13 +130,10 @@ export async function addNote(user: AuthUser, scheduleId: string, text: string, 
   const s = await watchableSchedule(user, scheduleId);
   if (user.role !== "INVIGILATOR") throw notFound("SCHEDULE_NOT_FOUND");
   if (studentId) {
-    const inSession = await prisma.user.count({
-      where: { id: studentId, OR: [{ enrolments: { some: { courseId: s.exam.courseId } } }, { attempts: { some: { scheduleId } } }] },
-    });
-    if (!inSession) throw badRequest("STUDENT_NOT_IN_SESSION", "This student is not part of the session");
+    if (!(await invRepo.isStudentInSession(studentId, s.exam.courseId, scheduleId))) throw badRequest("STUDENT_NOT_IN_SESSION", "This student is not part of the session");
   }
   return transaction(async (tx) => {
-    const note = await tx.invigilatorNote.create({ data: { scheduleId, studentId: studentId ?? null, authorId: user.id, text } });
+    const note = await invRepo.insertNote({ scheduleId, studentId: studentId ?? null, authorId: user.id, text }, tx);
     await audit(tx, { actorId: user.id, action: "INVIGILATOR_NOTE_ADDED", entityType: "exam_schedule", entityId: scheduleId, details: { studentId: studentId ?? null }, req });
     return note;
   });
@@ -167,11 +142,7 @@ export async function addNote(user: AuthUser, scheduleId: string, text: string, 
 /** Notes of a session, newest first. @throws 404 SCHEDULE_NOT_FOUND */
 export async function listNotes(user: AuthUser, scheduleId: string) {
   await watchableSchedule(user, scheduleId);
-  return prisma.invigilatorNote.findMany({
-    where: { scheduleId },
-    include: { author: { select: { id: true, fullName: true } }, student: { select: { id: true, studentNumber: true, fullName: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  return invRepo.findNotes(scheduleId);
 }
 
 /**
@@ -183,17 +154,14 @@ export async function grantExtension(user: AuthUser, attemptId: string, minutes:
   if (user.role !== "INVIGILATOR") throw notFound("ATTEMPT_NOT_FOUND");
   if (await submitIfExpired(a)) throw conflict("ATTEMPT_NOT_IN_PROGRESS", "The attempt has already ended");
   const result = await transaction(async (tx) => {
-    const [row] = await tx.$queryRaw<{ status: string; total: number; base_ms: number }[]>`
-      SELECT status::text, total_extension_minutes AS total, (extract(epoch FROM base_deadline) * 1000)::float8 AS base_ms
-        FROM exam_attempts WHERE id = ${attemptId}::uuid FOR UPDATE`;
+    const row = await invRepo.lockAttemptForExtension(attemptId, tx);
     if (row.status !== "IN_PROGRESS") throw conflict("ATTEMPT_NOT_IN_PROGRESS", "The attempt has already ended");
-    const total = Number(row.total) + minutes;
+    const total = row.total + minutes;
     if (total > MAX_TOTAL_EXTENSION_MINUTES) {
-      throw conflict("EXTENSION_LIMIT_EXCEEDED", "An attempt can be extended by at most 15 minutes in total", { remainingMinutes: MAX_TOTAL_EXTENSION_MINUTES - Number(row.total) });
+      throw conflict("EXTENSION_LIMIT_EXCEEDED", "An attempt can be extended by at most 15 minutes in total", { remainingMinutes: MAX_TOTAL_EXTENSION_MINUTES - row.total });
     }
-    const deadline = new Date(Number(row.base_ms) + total * 60_000);
-    await tx.examAttempt.update({ where: { id: attemptId }, data: { totalExtensionMinutes: total, deadline } });
-    const ext = await tx.timeExtension.create({ data: { attemptId, grantedById: user.id, minutes, reason } });
+    const deadline = new Date(row.baseDeadline.getTime() + total * 60_000);
+    const ext = await invRepo.applyExtension(attemptId, user.id, minutes, reason, total, deadline, tx);
     await audit(tx, { actorId: user.id, action: "TIME_EXTENSION_GRANTED", entityType: "exam_attempt", entityId: attemptId, details: { minutes, totalMinutes: total, reason }, req });
     await notify(tx, a.studentId, "TIME_EXTENSION_GRANTED", { minutes, exam: a.exam.title });
     return { extension: ext, totalExtensionMinutes: total, deadline };

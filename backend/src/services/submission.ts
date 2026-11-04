@@ -18,7 +18,8 @@
  */
 import { now } from "../db/clock.ts";
 import type { Tx } from "../db/prisma.ts";
-import { prisma, transaction } from "../db/prisma.ts";
+import { transaction } from "../db/prisma.ts";
+import * as attemptsRepo from "../repositories/attempts.repository.ts";
 import { num0 } from "../lib/format.ts";
 import { audit } from "./audit.ts";
 import { autoGrade } from "./auto-grade.ts";
@@ -31,13 +32,7 @@ export interface SubmitResult {
 
 /** Grades all questions of an attempt from its saved answers (inside the submit transaction). */
 async function gradeAttempt(tx: Tx, attemptId: string) {
-  const questions = await tx.attemptQuestion.findMany({
-    where: { attemptId },
-    include: {
-      answer: true,
-      questionVersion: { select: { type: true, options: { where: { isCorrect: true }, select: { id: true } }, acceptedAnswers: { select: { normalizedText: true } } } },
-    },
-  });
+  const questions = await attemptsRepo.findQuestionsForGrading(attemptId, tx);
   for (const q of questions) {
     const result = autoGrade({
       type: q.questionVersion.type,
@@ -48,11 +43,9 @@ async function gradeAttempt(tx: Tx, attemptId: string) {
       acceptedNormalized: q.questionVersion.acceptedAnswers.map((a) => a.normalizedText),
     });
     if (q.answer) {
-      await tx.answer.update({ where: { id: q.answer.id }, data: { gradingStatus: result.status, marksAwarded: result.marksAwarded } });
+      await attemptsRepo.setAutoGrade(q.answer.id, result.status, result.marksAwarded, tx);
     } else {
-      await tx.answer.create({
-        data: { attemptId, attemptQuestionId: q.id, questionVersionId: q.questionVersionId, gradingStatus: result.status, marksAwarded: result.marksAwarded },
-      });
+      await attemptsRepo.insertEmptyAnswer({ attemptId, attemptQuestionId: q.id, questionVersionId: q.questionVersionId, gradingStatus: result.status, marksAwarded: result.marksAwarded }, tx);
     }
   }
 }
@@ -64,10 +57,7 @@ async function gradeAttempt(tx: Tx, attemptId: string) {
  */
 export async function submitAttempt(attemptId: string, requested: "MANUAL" | "AUTO_DEADLINE", actorId: string | null, opts: { skipLocked?: boolean } = {}): Promise<SubmitResult> {
   return transaction(async (tx) => {
-    const rows = opts.skipLocked
-      ? await tx.$queryRaw<{ status: string; ms: number }[]>`SELECT status::text, (extract(epoch FROM deadline) * 1000)::float8 AS ms FROM exam_attempts WHERE id = ${attemptId}::uuid FOR UPDATE SKIP LOCKED`
-      : await tx.$queryRaw<{ status: string; ms: number }[]>`SELECT status::text, (extract(epoch FROM deadline) * 1000)::float8 AS ms FROM exam_attempts WHERE id = ${attemptId}::uuid FOR UPDATE`;
-    const row = rows[0] ? { status: rows[0].status, deadline: new Date(Number(rows[0].ms)) } : null;
+    const row = await attemptsRepo.lockAttempt(attemptId, !!opts.skipLocked, tx);
     if (!row || row.status !== "IN_PROGRESS") return { submitted: false };
 
     const at = now();
@@ -77,7 +67,7 @@ export async function submitAttempt(attemptId: string, requested: "MANUAL" | "AU
     const submittedAt = late ? row.deadline : at;
 
     await gradeAttempt(tx, attemptId);
-    await tx.examAttempt.update({ where: { id: attemptId }, data: { status: "SUBMITTED", submissionType, submittedAt } });
+    await attemptsRepo.markSubmitted(attemptId, submissionType, submittedAt, tx);
     await recalcGrade(tx, attemptId);
     await audit(tx, {
       actorId: submissionType === "MANUAL" ? actorId : null,
@@ -98,12 +88,7 @@ export async function submitIfExpired(attempt: { id: string; status: string; dea
 
 /** Background job step: submits every attempt whose deadline has passed. Returns how many. */
 export async function autoSubmitExpired(limit = 25): Promise<number> {
-  const due = await prisma.examAttempt.findMany({
-    where: { status: "IN_PROGRESS", deadline: { lt: now() } },
-    select: { id: true },
-    orderBy: { deadline: "asc" },
-    take: limit,
-  });
+  const due = await attemptsRepo.findExpiredAttempts(now(), limit);
   let n = 0;
   for (const a of due) if ((await submitAttempt(a.id, "AUTO_DEADLINE", null, { skipLocked: true })).submitted) n++;
   return n;

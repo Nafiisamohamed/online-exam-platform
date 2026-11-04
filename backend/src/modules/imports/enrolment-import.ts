@@ -15,10 +15,16 @@
  *
  * Row error codes: STUDENT_ID_REQUIRED, STUDENT_ID_INVALID, STUDENT_NAME_REQUIRED,
  * PHONE_INVALID, COURSE_CODES_REQUIRED, COURSE_NOT_FOUND {code},
- * DUPLICATE_STUDENT_IN_FILE {firstRow}, STUDENT_NAME_MISMATCH {existingName}.
+ * DUPLICATE_STUDENT_IN_FILE {firstRow}, STUDENT_NAME_MISMATCH {existingName},
+ * SCHEDULE_CONFLICT {course, exam, otherCourse, otherExam}: one of the new
+ * courses has an upcoming exam at the same time as another exam of the student.
  */
 import type { Request } from "express";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findCoursesInSemester, findEnrolment, findOverlappingSchedules, insertEnrolment, lockScheduling, setEnrolmentStatus } from "../../repositories/courses.repository.ts";
+import { findImportBatch, insertImportBatch, lockImportBatch, markImportConfirmed } from "../../repositories/imports.repository.ts";
+import { findRole, findStudentsByNumbers, insertUser } from "../../repositories/users.repository.ts";
+import { enrolmentConflicts } from "../courses/courses.service.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { normalizeText } from "../../lib/format.ts";
 import { generateTempPassword, hashPassword } from "../../lib/passwords.ts";
@@ -40,17 +46,15 @@ export interface EnrolmentRow {
 
 /** Validates all rows against the database. Row numbers count the header as row 1. */
 async function validateRows(rows: Record<string, string>[], semester: string): Promise<EnrolmentRow[]> {
-  const courses = await prisma.course.findMany({ where: { semester }, select: { id: true, code: true } });
+  const courses = await findCoursesInSemester(semester);
   const courseByCode = new Map(courses.map((c) => [c.code.toUpperCase(), c.id]));
   const numbers = rows.map((r) => (r.student_id ?? "").trim().toUpperCase()).filter(Boolean);
-  const existing = await prisma.user.findMany({
-    where: { studentNumber: { in: numbers } },
-    select: { id: true, studentNumber: true, fullName: true, enrolments: { where: { status: "ACTIVE" }, select: { courseId: true } } },
-  });
+  const existing = await findStudentsByNumbers(numbers);
   const existingByNumber = new Map(existing.map((u) => [u.studentNumber!, u]));
   const firstRow = new Map<string, number>();
 
-  return rows.map((raw, i) => {
+  const results: EnrolmentRow[] = [];
+  for (const [i, raw] of rows.entries()) {
     const row = i + 2;
     const errors: RowError[] = [];
     const studentNumber = (raw.student_id ?? "").trim().toUpperCase();
@@ -75,13 +79,20 @@ async function validateRows(rows: Record<string, string>[], semester: string): P
     }
     const activeCourseIds = new Set(known?.enrolments.map((e) => e.courseId) ?? []);
     const alreadyEnrolled = courseCodes.filter((c) => activeCourseIds.has(courseByCode.get(c) ?? ""));
-    return {
+    if (!errors.length) {
+      // 4.5: the new courses must not bring an exam that overlaps another exam of this student.
+      const newIds = courseCodes.map((c) => courseByCode.get(c)!).filter((id) => !activeCourseIds.has(id));
+      const clashes = await findOverlappingSchedules(newIds, [...activeCourseIds, ...newIds]);
+      for (const c of clashes) errors.push({ code: "SCHEDULE_CONFLICT", params: c });
+    }
+    results.push({
       row,
       status: errors.length ? "INVALID" : "VALID",
       errors,
       data: { studentNumber, fullName, phone: phone ?? (raw.phone ?? ""), courseCodes, existingStudent: !!known, alreadyEnrolled },
-    };
-  });
+    });
+  }
+  return results;
 }
 
 function summary(rows: EnrolmentRow[]) {
@@ -92,11 +103,9 @@ function summary(rows: EnrolmentRow[]) {
 export async function previewEnrolmentImport(file: Express.Multer.File | undefined, semester: string, actorId: string) {
   const rows = parseCsv(file, ENROLMENT_COLUMNS);
   const results = await validateRows(rows, semester);
-  const batch = await prisma.importBatch.create({
-    data: {
-      type: "ENROLMENTS", semester, uploadedById: actorId, filename: (file?.originalname ?? "enrolments.csv").slice(0, 200),
-      ...summary(results), duplicateRows: 0, rowResults: results as unknown as object,
-    },
+  const batch = await insertImportBatch({
+    type: "ENROLMENTS", semester, uploadedById: actorId, filename: (file?.originalname ?? "enrolments.csv").slice(0, 200),
+    ...summary(results), duplicateRows: 0, rowResults: results as unknown as object,
   });
   return { batch: { id: batch.id, type: batch.type, semester, status: batch.status, filename: batch.filename, ...summary(results) }, rows: results };
 }
@@ -107,7 +116,7 @@ export async function previewEnrolmentImport(file: Express.Multer.File | undefin
  * @throws 404 IMPORT_NOT_FOUND, 409 IMPORT_ALREADY_CONFIRMED
  */
 export async function confirmEnrolmentImport(batchId: string, actorId: string, req: Request) {
-  const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
+  const batch = await findImportBatch(batchId);
   if (!batch || batch.type !== "ENROLMENTS") throw notFound("IMPORT_NOT_FOUND");
   if (batch.status !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
   const stored = batch.rowResults as unknown as EnrolmentRow[];
@@ -128,43 +137,47 @@ export async function confirmEnrolmentImport(batchId: string, actorId: string, r
     }),
   );
 
-  const role = await prisma.role.findUniqueOrThrow({ where: { name: "STUDENT" } });
-  const courses = await prisma.course.findMany({ where: { semester: batch.semester! }, select: { id: true, code: true } });
+  const role = await findRole("STUDENT");
+  const courses = await findCoursesInSemester(batch.semester!);
   const courseByCode = new Map(courses.map((c) => [c.code, c.id]));
 
   const result = await transaction(async (tx) => {
     // Lock the batch row so two confirms cannot run at once.
-    const locked = await tx.$queryRaw<{ status: string }[]>`SELECT status::text FROM import_batches WHERE id = ${batchId}::uuid FOR UPDATE`;
-    if (locked[0]?.status !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
+    if ((await lockImportBatch(batchId, tx)) !== "PREVIEW") throw conflict("IMPORT_ALREADY_CONFIRMED", "This import was already saved");
 
     let enrolled = 0;
     let reactivated = 0;
     for (const c of credentials) {
-      const u = await tx.user.create({
-        data: {
+      const u = await insertUser(
+        {
           roleId: role.id, studentNumber: c.row.data.studentNumber, fullName: c.row.data.fullName, phone: c.row.data.phone,
           passwordHash: c.hash, mustChangePassword: true, tempPasswordExpiresAt: tempPasswordExpiry(),
         },
-      });
+        tx,
+      );
       await queueSms(tx, { id: u.id, phone: u.phone, preferredLanguage: u.preferredLanguage }, "ACCOUNT_CREATED", { studentNumber: u.studentNumber! }, { type: "user", id: u.id });
     }
-    const students = await tx.user.findMany({ where: { studentNumber: { in: valid.map((r) => r.data.studentNumber) } }, select: { id: true, studentNumber: true } });
+    const students = await findStudentsByNumbers(valid.map((r) => r.data.studentNumber), tx);
     const idByNumber = new Map(students.map((s) => [s.studentNumber!, s.id]));
+    // Same lock as schedule approval: no approval can create a clash while these enrolments are written.
+    await lockScheduling(tx);
     for (const r of valid) {
       const studentId = idByNumber.get(r.data.studentNumber)!;
-      for (const code of r.data.courseCodes) {
-        const courseId = courseByCode.get(code)!;
-        const e = await tx.enrolment.findUnique({ where: { studentId_courseId: { studentId, courseId } } });
+      const courseIds = r.data.courseCodes.map((code) => courseByCode.get(code)!);
+      const clashes = await enrolmentConflicts(tx, studentId, courseIds);
+      if (clashes.length) throw conflict("ENROLMENT_SCHEDULE_CONFLICT", "A schedule changed since the preview; preview the file again", { row: r.row, conflicts: clashes });
+      for (const courseId of courseIds) {
+        const e = await findEnrolment(studentId, courseId, tx);
         if (!e) {
-          await tx.enrolment.create({ data: { studentId, courseId } });
+          await insertEnrolment(studentId, courseId, tx);
           enrolled++;
         } else if (e.status === "DROPPED") {
-          await tx.enrolment.update({ where: { id: e.id }, data: { status: "ACTIVE", droppedAt: null } });
+          await setEnrolmentStatus(e.id, "ACTIVE", null, tx);
           reactivated++;
         }
       }
     }
-    await tx.importBatch.update({ where: { id: batchId }, data: { status: "CONFIRMED", ...summary(fresh), rowResults: fresh as unknown as object } });
+    await markImportConfirmed(batchId, summary(fresh), fresh as unknown as object, tx);
     await audit(tx, {
       actorId, action: "ENROLMENTS_IMPORTED", entityType: "import_batch", entityId: batchId,
       details: { semester: batch.semester, validRows: valid.length, newStudents: credentials.length, enrolled, reactivated }, req,

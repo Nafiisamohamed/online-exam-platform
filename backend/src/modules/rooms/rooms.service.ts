@@ -4,13 +4,14 @@
  */
 import type { Request } from "express";
 import { isUniqueViolation } from "../../db/db-errors.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import * as roomsRepo from "../../repositories/schedules.repository.ts";
 import { conflict, notFound } from "../../lib/errors.ts";
 import { audit } from "../../services/audit.ts";
 
 /** All rooms, by name. */
 export function listRooms() {
-  return prisma.room.findMany({ orderBy: { name: "asc" } });
+  return roomsRepo.listRooms();
 }
 
 function nameTaken(error: unknown): never {
@@ -22,7 +23,7 @@ function nameTaken(error: unknown): never {
 export async function createRoom(data: { name: string; building: string; networkRanges: string[] }, actorId: string, req: Request) {
   try {
     return await transaction(async (tx) => {
-      const r = await tx.room.create({ data });
+      const r = await roomsRepo.insertRoom(data, tx);
       await audit(tx, { actorId, action: "ROOM_CREATED", entityType: "room", entityId: r.id, details: { name: r.name }, req });
       return r;
     });
@@ -33,10 +34,10 @@ export async function createRoom(data: { name: string; building: string; network
 
 /** @throws 404 ROOM_NOT_FOUND, 409 ROOM_NAME_TAKEN */
 export async function updateRoom(id: string, data: { name?: string; building?: string; networkRanges?: string[] }, actorId: string, req: Request) {
-  if (!(await prisma.room.findUnique({ where: { id } }))) throw notFound("ROOM_NOT_FOUND");
+  if (!(await roomsRepo.findRoom(id))) throw notFound("ROOM_NOT_FOUND");
   try {
     return await transaction(async (tx) => {
-      const r = await tx.room.update({ where: { id }, data });
+      const r = await roomsRepo.updateRoom(id, data, tx);
       await audit(tx, { actorId, action: "ROOM_UPDATED", entityType: "room", entityId: id, details: { fields: Object.keys(data) }, req });
       return r;
     });

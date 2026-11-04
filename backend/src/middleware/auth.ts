@@ -13,7 +13,7 @@
  * the services, which return 404 so other users' records are not revealed.
  */
 import type { NextFunction, Request, Response } from "express";
-import { prisma } from "../db/prisma.ts";
+import { findSessionUser } from "../repositories/users.repository.ts";
 import type { Language, RoleName } from "../generated/prisma/enums.ts";
 import { forbidden, unauthorized } from "../lib/errors.ts";
 import { readSession, SESSION_COOKIE } from "../lib/session-token.ts";
@@ -43,13 +43,7 @@ declare global {
 async function loadUser(req: Request): Promise<AuthUser> {
   const claims = readSession(req.cookies?.[SESSION_COOKIE]);
   if (!claims) throw unauthorized();
-  const user = await prisma.user.findUnique({
-    where: { id: claims.sub },
-    select: {
-      id: true, fullName: true, email: true, studentNumber: true, phone: true, preferredLanguage: true,
-      mustChangePassword: true, tokenVersion: true, isActive: true, role: { select: { name: true } },
-    },
-  });
+  const user = await findSessionUser(claims.sub);
   if (!user || !user.isActive || user.tokenVersion !== claims.ver) throw unauthorized("SESSION_EXPIRED", "Please log in again");
   const { role, isActive: _active, ...rest } = user;
   return { ...rest, role: role.name };

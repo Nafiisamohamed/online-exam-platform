@@ -19,7 +19,12 @@ import type { Request } from "express";
 import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import type { Db } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { lockScheduling } from "../../repositories/courses.repository.ts";
+import { findExamWithCourse } from "../../repositories/exams.repository.ts";
+import * as schedulesRepo from "../../repositories/schedules.repository.ts";
+import { countActiveWithRole, findActiveStudentsOfCourse } from "../../repositories/users.repository.ts";
 import type { ScheduleStatus } from "../../generated/prisma/enums.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
@@ -35,18 +40,8 @@ export interface ScheduleInput {
   invigilatorIds: string[];
 }
 
-const scheduleInclude = {
-  exam: { select: { id: true, title: true, status: true, course: { select: { id: true, code: true, name: true, lecturerId: true } } } },
-  requestedBy: { select: { id: true, fullName: true } },
-  decidedBy: { select: { id: true, fullName: true } },
-  rooms: { include: { room: { select: { id: true, name: true, building: true, networkRanges: true } } } },
-  invigilators: { include: { invigilator: { select: { id: true, fullName: true } } } },
-};
-
 type ScheduleRow = NonNullable<Awaited<ReturnType<typeof load>>>;
-function load(id: string) {
-  return prisma.examSchedule.findUnique({ where: { id }, include: scheduleInclude });
-}
+const load = (id: string) => schedulesRepo.findScheduleDetail(id);
 
 function serialize(s: ScheduleRow) {
   const { lecturerId: _l, ...course } = s.exam.course;
@@ -74,12 +69,10 @@ async function checkInput(input: ScheduleInput) {
   }
   if (input.windowStart <= now()) throw badRequest("WINDOW_IN_PAST", "The window must start in the future");
   if (input.roomIds.length) {
-    const rooms = await prisma.room.count({ where: { id: { in: input.roomIds } } });
-    if (rooms !== input.roomIds.length) throw badRequest("ROOM_NOT_FOUND", "A room was not found");
+    if ((await schedulesRepo.countRooms(input.roomIds)) !== input.roomIds.length) throw badRequest("ROOM_NOT_FOUND", "A room was not found");
   }
   if (input.invigilatorIds.length) {
-    const ok = await prisma.user.count({ where: { id: { in: input.invigilatorIds }, isActive: true, role: { name: "INVIGILATOR" } } });
-    if (ok !== input.invigilatorIds.length) throw badRequest("INVIGILATOR_INVALID", "Choose active invigilators");
+    if ((await countActiveWithRole(input.invigilatorIds, "INVIGILATOR")) !== input.invigilatorIds.length) throw badRequest("INVIGILATOR_INVALID", "Choose active invigilators");
   }
 }
 
@@ -88,19 +81,19 @@ async function checkInput(input: ScheduleInput) {
  * @throws 409 SCHEDULE_ALREADY_REQUESTED / SCHEDULE_ALREADY_APPROVED
  */
 export async function requestSchedule(user: AuthUser, examId: string, input: ScheduleInput, req: Request) {
-  const exam = await prisma.exam.findUnique({ where: { id: examId }, include: { course: true } });
+  const exam = await findExamWithCourse(examId);
   if (!exam || exam.course.lecturerId !== user.id) throw notFound("EXAM_NOT_FOUND");
   await checkInput(input);
-  const open = await prisma.examSchedule.findFirst({ where: { examId, status: { in: ["REQUESTED", "APPROVED"] } } });
+  const open = await schedulesRepo.findOpenSchedule(examId);
   if (open) throw conflict(open.status === "APPROVED" ? "SCHEDULE_ALREADY_APPROVED" : "SCHEDULE_ALREADY_REQUESTED", "This exam already has an open schedule");
   const id = await transaction(async (tx) => {
-    const s = await tx.examSchedule.create({
-      data: {
+    const s = await schedulesRepo.insertSchedule(
+      {
         examId, requestedById: user.id, windowStart: input.windowStart, windowEnd: input.windowEnd, durationMinutes: input.durationMinutes,
-        rooms: { create: [...new Set(input.roomIds)].map((roomId) => ({ roomId })) },
-        invigilators: { create: [...new Set(input.invigilatorIds)].map((invigilatorId) => ({ invigilatorId })) },
+        roomIds: [...new Set(input.roomIds)], invigilatorIds: [...new Set(input.invigilatorIds)],
       },
-    });
+      tx,
+    );
     await audit(tx, { actorId: user.id, action: "SCHEDULE_REQUESTED", entityType: "exam_schedule", entityId: s.id, details: { examId }, req });
     return s.id;
   });
@@ -114,15 +107,11 @@ export async function listSchedules(user: AuthUser, q: { status?: ScheduleStatus
     user.role === "LECTURER" ? { exam: { course: { lecturerId: user.id } } } :
     user.role === "INVIGILATOR" ? { invigilators: { some: { invigilatorId: user.id } }, status: "APPROVED" as const } :
     { id: "00000000-0000-0000-0000-000000000000" };
-  const rows = await prisma.examSchedule.findMany({
-    where: {
-      ...scope,
-      ...(q.status && user.role !== "INVIGILATOR" ? { status: q.status } : {}),
-      ...(q.from ? { windowEnd: { gte: q.from } } : {}),
-      ...(q.to ? { windowStart: { lte: q.to } } : {}),
-    },
-    include: scheduleInclude,
-    orderBy: { windowStart: "asc" },
+  const rows = await schedulesRepo.listSchedules({
+    ...scope,
+    ...(q.status && user.role !== "INVIGILATOR" ? { status: q.status } : {}),
+    ...(q.from ? { windowEnd: { gte: q.from } } : {}),
+    ...(q.to ? { windowStart: { lte: q.to } } : {}),
   });
   return rows.map(serialize);
 }
@@ -147,38 +136,8 @@ export interface Conflict {
 }
 
 /** Approved schedules that clash with this one (see the module comment). */
-export async function findConflicts(db: Parameters<Parameters<typeof transaction>[0]>[0] | typeof prisma, scheduleId: string): Promise<Conflict[]> {
-  const students = await db.$queryRaw<{ id: string; title: string; n: bigint }[]>`
-    SELECT o.id, oe.title, count(DISTINCT mine.student_id) AS n
-      FROM exam_schedules s
-      JOIN exams e ON e.id = s.exam_id
-      JOIN enrolments mine ON mine.course_id = e.course_id AND mine.status = 'ACTIVE'
-      JOIN enrolments theirs ON theirs.student_id = mine.student_id AND theirs.status = 'ACTIVE'
-      JOIN exams oe ON oe.course_id = theirs.course_id
-      JOIN exam_schedules o ON o.exam_id = oe.id
-     WHERE s.id = ${scheduleId}::uuid AND o.id <> s.id AND o.status = 'APPROVED'
-       AND o.window_start < s.window_end AND o.window_end > s.window_start
-     GROUP BY o.id, oe.title`;
-  const rooms = await db.$queryRaw<{ id: string; title: string; n: bigint }[]>`
-    SELECT o.id, oe.title, count(DISTINCT sr.room_id) AS n
-      FROM exam_schedules s
-      JOIN schedule_rooms sr ON sr.schedule_id = s.id
-      JOIN schedule_rooms osr ON osr.room_id = sr.room_id
-      JOIN exam_schedules o ON o.id = osr.schedule_id
-      JOIN exams oe ON oe.id = o.exam_id
-     WHERE s.id = ${scheduleId}::uuid AND o.id <> s.id AND o.status = 'APPROVED'
-       AND o.window_start < s.window_end AND o.window_end > s.window_start
-     GROUP BY o.id, oe.title`;
-  const invigilators = await db.$queryRaw<{ id: string; title: string; n: bigint }[]>`
-    SELECT o.id, oe.title, count(DISTINCT si.invigilator_id) AS n
-      FROM exam_schedules s
-      JOIN schedule_invigilators si ON si.schedule_id = s.id
-      JOIN schedule_invigilators osi ON osi.invigilator_id = si.invigilator_id
-      JOIN exam_schedules o ON o.id = osi.schedule_id
-      JOIN exams oe ON oe.id = o.exam_id
-     WHERE s.id = ${scheduleId}::uuid AND o.id <> s.id AND o.status = 'APPROVED'
-       AND o.window_start < s.window_end AND o.window_end > s.window_start
-     GROUP BY o.id, oe.title`;
+export async function findConflicts(scheduleId: string, db?: Db): Promise<Conflict[]> {
+  const { students, rooms, invigilators } = await schedulesRepo.findScheduleClashes(scheduleId, db);
   const map = (type: Conflict["type"]) => (r: { id: string; title: string; n: bigint }) => ({ type, scheduleId: r.id, examTitle: r.title, count: Number(r.n) });
   return [...students.map(map("STUDENT")), ...rooms.map(map("ROOM")), ...invigilators.map(map("INVIGILATOR"))];
 }
@@ -199,19 +158,16 @@ export async function approveSchedule(user: AuthUser, id: string, req: Request) 
   if (!s) throw notFound("SCHEDULE_NOT_FOUND");
   try {
     await transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('exam_schedule_approval'))`;
-      const current = await tx.examSchedule.findUniqueOrThrow({ where: { id }, include: { exam: { include: { course: true } } } });
+      await lockScheduling(tx);
+      const current = await schedulesRepo.findScheduleWithExam(id, tx);
       if (current.status !== "REQUESTED") throw conflict("SCHEDULE_NOT_REQUESTED", "Only requested schedules can be approved");
       if (current.exam.status !== "PUBLISHED") throw conflict("EXAM_NOT_PUBLISHED", "Publish the exam before approving its schedule");
       if (current.windowStart <= now()) throw badRequest("WINDOW_IN_PAST", "The window has already started");
-      const conflicts = await findConflicts(tx, id);
+      const conflicts = await findConflicts(id, tx);
       if (conflicts.length) throw conflict("SCHEDULE_CONFLICT", "The schedule clashes with another approved exam", { conflicts });
-      await tx.examSchedule.update({ where: { id }, data: { status: "APPROVED", decidedById: user.id, decidedAt: now() } });
+      await schedulesRepo.updateSchedule(id, { status: "APPROVED", decidedById: user.id, decidedAt: now() }, tx);
 
-      const students = await tx.user.findMany({
-        where: { enrolments: { some: { courseId: current.exam.courseId, status: "ACTIVE" } }, isActive: true },
-        select: { id: true, phone: true, preferredLanguage: true },
-      });
+      const students = await findActiveStudentsOfCourse(current.exam.courseId, tx);
       const { date, window } = windowText(current.windowStart, current.windowEnd);
       for (const st of students) {
         await queueSms(tx, st, "SCHEDULE_APPROVED", { course: current.exam.course.code, date, window }, { type: "exam_schedule", id });
@@ -232,8 +188,8 @@ export async function rejectSchedule(user: AuthUser, id: string, reason: string,
   if (!s) throw notFound("SCHEDULE_NOT_FOUND");
   if (s.status !== "REQUESTED") throw conflict("SCHEDULE_NOT_REQUESTED", "Only requested schedules can be rejected");
   await transaction(async (tx) => {
-    const n = await tx.examSchedule.updateMany({ where: { id, status: "REQUESTED" }, data: { status: "REJECTED", rejectionReason: reason, decidedById: user.id, decidedAt: now() } });
-    if (n.count !== 1) throw conflict("SCHEDULE_NOT_REQUESTED", "Only requested schedules can be rejected");
+    const n = await schedulesRepo.updateScheduleIfStatus(id, "REQUESTED", { status: "REJECTED", rejectionReason: reason, decidedById: user.id, decidedAt: now() }, tx);
+    if (n !== 1) throw conflict("SCHEDULE_NOT_REQUESTED", "Only requested schedules can be rejected");
     await audit(tx, { actorId: user.id, action: "SCHEDULE_REJECTED", entityType: "exam_schedule", entityId: id, details: { reason }, req });
   });
   return serialize((await load(id))!);
@@ -250,9 +206,9 @@ export async function cancelSchedule(user: AuthUser, id: string, req: Request) {
   if (!allowed) throw notFound("SCHEDULE_NOT_FOUND");
   const cancellable = s!.status === "REQUESTED" || (s!.status === "APPROVED" && user.role === "ADMIN");
   if (!cancellable) throw conflict("SCHEDULE_NOT_CANCELLABLE", "This schedule cannot be cancelled");
-  if (await prisma.examAttempt.count({ where: { scheduleId: id } })) throw conflict("SCHEDULE_HAS_ATTEMPTS", "Students have already started this exam");
+  if (await schedulesRepo.countAttemptsOfSchedule(id)) throw conflict("SCHEDULE_HAS_ATTEMPTS", "Students have already started this exam");
   await transaction(async (tx) => {
-    await tx.examSchedule.update({ where: { id }, data: { status: "CANCELLED" } });
+    await schedulesRepo.updateSchedule(id, { status: "CANCELLED" }, tx);
     await audit(tx, { actorId: user.id, action: "SCHEDULE_CANCELLED", entityType: "exam_schedule", entityId: id, req });
   });
   return serialize((await load(id))!);

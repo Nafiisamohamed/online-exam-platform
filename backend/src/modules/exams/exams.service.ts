@@ -17,7 +17,11 @@
  */
 import type { Request } from "express";
 import { env } from "../../config/env.ts";
-import { prisma, transaction } from "../../db/prisma.ts";
+import { transaction } from "../../db/prisma.ts";
+import { findCourse } from "../../repositories/courses.repository.ts";
+import * as examsRepo from "../../repositories/exams.repository.ts";
+import { countTopicsInCourse, findVersions } from "../../repositories/questions.repository.ts";
+import { findUserWithRole } from "../../repositories/users.repository.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { AppError, badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { num, num0 } from "../../lib/format.ts";
@@ -45,27 +49,12 @@ export interface ExamSettings {
   secondGraderId?: string | null;
 }
 
-const examInclude = {
-  course: { select: { id: true, code: true, name: true, semester: true, lecturerId: true } },
-  secondGrader: { select: { id: true, fullName: true } },
-  rules: { include: { topics: { include: { topic: { select: { id: true, name: true } } } } }, orderBy: { position: "asc" as const } },
-  schedules: {
-    orderBy: { createdAt: "desc" as const },
-    include: {
-      rooms: { include: { room: { select: { id: true, name: true, building: true } } } },
-      invigilators: { include: { invigilator: { select: { id: true, fullName: true } } } },
-    },
-  },
-};
-
 type ExamRow = NonNullable<Awaited<ReturnType<typeof loadExam>>>;
-function loadExam(id: string) {
-  return prisma.exam.findUnique({ where: { id }, include: examInclude });
-}
+const loadExam = (id: string) => examsRepo.findExamDetail(id);
 
 /** Staff view of an exam, including how many eligible questions each rule has. */
 async function serializeExam(e: ExamRow) {
-  const pools = await rulesWithPools(prisma, e.courseId, await loadRuleSpecs(prisma, e.id));
+  const pools = await rulesWithPools(e.courseId, await loadRuleSpecs(e.id));
   const available = new Map(pools.map((p) => [p.id, p.pool.length]));
   const totalMarks = e.rules.reduce((s, r) => s + num0(r.marksPerQuestion) * r.questionCount, 0);
   return {
@@ -115,7 +104,7 @@ async function checkSettings(s: ExamSettings, courseLecturerId: string) {
     throw badRequest("CURRENCY_NOT_SUPPORTED", "Choose a supported currency", { supported: env.SUPPORTED_CURRENCIES });
   }
   if (s.secondGraderId) {
-    const g = await prisma.user.findUnique({ where: { id: s.secondGraderId }, include: { role: true } });
+    const g = await findUserWithRole(s.secondGraderId);
     if (!g || g.role.name !== "LECTURER" || !g.isActive) throw badRequest("SECOND_GRADER_INVALID", "The second grader must be an active lecturer");
     if (g.id === courseLecturerId) throw badRequest("SECOND_GRADER_IS_LECTURER", "The second grader must be a different lecturer");
   }
@@ -127,11 +116,11 @@ async function checkRules(courseId: string, rules: RuleInput[]) {
   if (new Set(keys).size !== keys.length) throw badRequest("RULE_DUPLICATE", "Use one rule per type, difficulty and mark value");
   const topicIds = [...new Set(rules.flatMap((r) => r.topicIds ?? []))];
   if (topicIds.length) {
-    const found = await prisma.topic.count({ where: { id: { in: topicIds }, courseId } });
+    const found = await countTopicsInCourse(courseId, topicIds);
     if (found !== topicIds.length) throw badRequest("TOPIC_NOT_IN_COURSE", "Every topic must belong to the course");
   }
   const specs: RuleSpec[] = rules.map((r, i) => ({ id: `new-${i}`, position: i + 1, topicIds: r.topicIds ?? [], ...r }));
-  const short = shortages(await rulesWithPools(prisma, courseId, specs));
+  const short = shortages(await rulesWithPools(courseId, specs));
   if (short.length) {
     throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
   }
@@ -139,37 +128,25 @@ async function checkRules(courseId: string, rules: RuleInput[]) {
 
 /** Creates a DRAFT exam for one of the lecturer's courses (rules optional). */
 export async function createExam(user: AuthUser, courseId: string, s: ExamSettings & { title: string; rules?: RuleInput[] }, req: Request) {
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  const course = await findCourse(courseId);
   if (!course || course.lecturerId !== user.id) throw notFound("COURSE_NOT_FOUND");
   await checkSettings(s, course.lecturerId);
   if (s.rules?.length) await checkRules(courseId, s.rules);
   const id = await transaction(async (tx) => {
-    const exam = await tx.exam.create({
-      data: {
+    const exam = await examsRepo.insertExam(
+      {
         courseId, createdById: user.id, title: s.title, instructions: s.instructions ?? "",
         shuffleQuestions: s.shuffleQuestions ?? true, shuffleOptions: s.shuffleOptions ?? true,
         allowAnswerReview: s.allowAnswerReview ?? false, feeAmount: s.feeAmount ?? 0,
         feeCurrency: s.feeCurrency ?? env.DEFAULT_CURRENCY, secondGraderId: s.secondGraderId ?? null,
       },
-    });
-    if (s.rules?.length) await writeRules(tx, exam.id, s.rules);
+      tx,
+    );
+    if (s.rules?.length) await examsRepo.replaceRules(exam.id, s.rules, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_CREATED", entityType: "exam", entityId: exam.id, details: { title: s.title }, req });
     return exam.id;
   });
   return serializeExam((await loadExam(id))!);
-}
-
-async function writeRules(tx: Parameters<Parameters<typeof transaction>[0]>[0], examId: string, rules: RuleInput[]) {
-  await tx.examRule.deleteMany({ where: { examId } });
-  for (const [i, r] of rules.entries()) {
-    await tx.examRule.create({
-      data: {
-        examId, position: i + 1, questionType: r.questionType, difficulty: r.difficulty,
-        marksPerQuestion: r.marksPerQuestion, questionCount: r.questionCount,
-        topics: r.topicIds?.length ? { create: r.topicIds.map((topicId) => ({ topicId })) } : undefined,
-      },
-    });
-  }
 }
 
 /** Staff view of one exam. @throws 404 EXAM_NOT_FOUND */
@@ -182,15 +159,7 @@ export async function getExam(user: AuthUser, id: string) {
 export async function listExams(user: AuthUser, q: { courseId?: string; status?: "DRAFT" | "PUBLISHED" }) {
   const scope =
     user.role === "ADMIN" ? {} : { OR: [{ course: { lecturerId: user.id } }, { secondGraderId: user.id }] };
-  const rows = await prisma.exam.findMany({
-    where: { ...scope, ...(q.courseId ? { courseId: q.courseId } : {}), ...(q.status ? { status: q.status } : {}) },
-    include: {
-      course: { select: { id: true, code: true, name: true, semester: true } },
-      schedules: { where: { status: { in: ["REQUESTED", "APPROVED"] } }, select: { id: true, status: true, windowStart: true, windowEnd: true, durationMinutes: true } },
-      _count: { select: { attempts: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await examsRepo.listExams({ ...scope, ...(q.courseId ? { courseId: q.courseId } : {}), ...(q.status ? { status: q.status } : {}) });
   return rows.map((e) => ({
     id: e.id, title: e.title, course: e.course, status: e.status, resultsStatus: e.resultsStatus,
     feeAmount: num(e.feeAmount), feeCurrency: e.feeCurrency, schedules: e.schedules, attempts: e._count.attempts,
@@ -211,7 +180,7 @@ export async function updateExam(user: AuthUser, id: string, s: ExamSettings, re
   }
   await checkSettings(s, exam.course.lecturerId);
   await transaction(async (tx) => {
-    await tx.exam.update({ where: { id }, data: s });
+    await examsRepo.updateExam(id, s, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_UPDATED", entityType: "exam", entityId: id, details: { fields: Object.keys(s) }, req });
   });
   return serializeExam((await loadExam(id))!);
@@ -223,7 +192,7 @@ export async function setRules(user: AuthUser, id: string, rules: RuleInput[], r
   if (exam.status !== "DRAFT") throw conflict("EXAM_PUBLISHED_LOCKED", "Rules cannot change after publishing");
   await checkRules(exam.courseId, rules);
   await transaction(async (tx) => {
-    await writeRules(tx, id, rules);
+    await examsRepo.replaceRules(id, rules, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_RULES_UPDATED", entityType: "exam", entityId: id, details: { rules: rules.length }, req });
   });
   return serializeExam((await loadExam(id))!);
@@ -233,12 +202,12 @@ export async function setRules(user: AuthUser, id: string, rules: RuleInput[], r
 export async function publishExam(user: AuthUser, id: string, req: Request) {
   const exam = await manageableExam(user, id, { ownerOnly: true });
   if (exam.status === "PUBLISHED") throw conflict("EXAM_ALREADY_PUBLISHED", "The exam is already published");
-  const specs = await loadRuleSpecs(prisma, id);
+  const specs = await loadRuleSpecs(id);
   if (specs.length === 0) throw badRequest("EXAM_HAS_NO_RULES", "Add at least one question rule first");
-  const short = shortages(await rulesWithPools(prisma, exam.courseId, specs));
+  const short = shortages(await rulesWithPools(exam.courseId, specs));
   if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
   await transaction(async (tx) => {
-    await tx.exam.update({ where: { id }, data: { status: "PUBLISHED" } });
+    await examsRepo.updateExam(id, { status: "PUBLISHED" }, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_PUBLISHED", entityType: "exam", entityId: id, req });
   });
   return serializeExam((await loadExam(id))!);
@@ -250,16 +219,13 @@ export async function publishExam(user: AuthUser, id: string, req: Request) {
  */
 export async function previewExam(user: AuthUser, id: string) {
   const exam = await manageableExam(user, id, { ownerOnly: true });
-  const specs = await loadRuleSpecs(prisma, id);
+  const specs = await loadRuleSpecs(id);
   if (specs.length === 0) throw badRequest("EXAM_HAS_NO_RULES", "Add at least one question rule first");
-  const pools = await rulesWithPools(prisma, exam.courseId, specs);
+  const pools = await rulesWithPools(exam.courseId, specs);
   const short = shortages(pools);
   if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
   const items = generateExam(pools, { shuffleQuestions: exam.shuffleQuestions, shuffleOptions: exam.shuffleOptions });
-  const versions = await prisma.questionVersion.findMany({
-    where: { id: { in: items.map((i) => i.versionId) } },
-    include: { options: true, acceptedAnswers: true, rubricCriteria: { orderBy: { position: "asc" } }, topic: { select: { name: true } } },
-  });
+  const versions = await findVersions(items.map((i) => i.versionId));
   const byId = new Map(versions.map((v) => [v.id, v]));
   const questions = items.map((item) => {
     const v = byId.get(item.versionId)!;
