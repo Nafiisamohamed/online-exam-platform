@@ -9,7 +9,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 - invigilators can watch the session live;
 - lecturers get question analytics.
 
-> **Status:** the database and the **backend API are complete and tested**. The Next.js frontend is the next stage, so screenshots are not available yet.
+> **Status:** the database and the **backend API are complete and tested**. The **frontend foundation** (design system, app shell for the four roles, light and dark mode, Somali/English, profile page and chart components) is in place. The working screens for each module come in the next phases.
 
 ![CI](https://github.com/Nafiisamohamed/online-exam-platform/actions/workflows/ci.yml/badge.svg)
 
@@ -111,7 +111,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | Security | bcryptjs 3.0.3 (cost 12), jsonwebtoken 9.0.3 (HTTP-only cookie), helmet 8.3.0, express-rate-limit 8.7.3 |
 | Files | csv-parse 7.0.3 (imports), PDFKit 0.20.2 (receipts, result slips), multer 2.5.0 (uploads) |
 | Tests | Vitest 4.1.12, supertest 7.3.1, embedded-postgres 17 (throwaway test database) |
-| Frontend (next stage) | Next.js, TypeScript, Tailwind CSS |
+| Frontend | Next.js 16.4.5 (App Router), React 19.3, TypeScript, Tailwind CSS 4.3, Radix UI, Recharts 3.10, Lucide icons |
 
 ## Install on a fresh computer
 
@@ -205,6 +205,20 @@ npm run build && npm start   # production build
 - payment expiry;
 - SMS status updates.
 
+## Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev                  # http://localhost:3000
+npm run build && npm start   # production build
+```
+
+- The browser talks only to the Next.js server. Requests to `/api/*` are forwarded to the API at `BACKEND_URL` (default `http://localhost:4000`), so the session cookie stays on one origin.
+- If you are not signed in, or the API is not running, the screens open in **preview mode** with a seeded demo profile for each role, and you can switch roles from the profile menu. Preview mode is labelled on every page, and the chart numbers in it are marked as sample data.
+- `/design-system` shows every shared component (buttons, forms, tables, dialogs, charts, report layout).
+- Frontend checks: `npm run lint`, `npm run typecheck`, `npm test`.
+
 ## Tests
 
 ```bash
@@ -217,7 +231,7 @@ npm run verify:db   # non-destructive checks against an existing database, e.g. 
 
 - **Where the tests run:** against a fresh, throwaway PostgreSQL 17 (or your own test database), never against Supabase or development data.
 - **Coverage:** the three completion conditions, permissions, payments, grading, publication history and more.
-- **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the type check, the tests and the build on every push.
+- **CI:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the type check, the tests and the build on every push, for the backend and for the frontend (which also runs lint).
 - **Details:** [docs/testing.md](docs/testing.md).
 
 ## API reference
@@ -263,7 +277,8 @@ See [docs/demo-data.md](docs/demo-data.md) for the full dataset.
 
 | Limitation | Notes |
 |---|---|
-| No frontend yet | The screens, the language switch on screen, the mobile layout, the charts and the screenshots come in the next stage. |
+| Frontend modules not built yet | Phase 1 only delivers the foundation. Sign-in, the dashboards with live data and the module screens (exams, grading, payments…) come in the next phases. Menu links to those modules open a "coming in a later phase" page. |
+| Somali texts | The Somali translations in `frontend/src/lib/i18n/messages/so.ts` should be reviewed by a native speaker. |
 | Campus network rule | It relies on the client IP address. Behind a reverse proxy, set `TRUST_PROXY=true`. |
 | Clock offset | The browser shows the time remaining from the server's timer. Network delay of a few hundred milliseconds isn't compensated, so the last-chance warnings appear slightly early. |
 | Short-answer matching | It ignores only case and extra spaces, as the brief says. Punctuation differences go to "Needs review". |
