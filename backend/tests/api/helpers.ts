@@ -64,3 +64,38 @@ export async function userAgent(role: RoleName) {
 }
 
 export { request, randomUUID };
+
+/** Creates a faculty + course taught by the lecturer (semester 2026-Fall). */
+export async function createCourse(lecturerId: string) {
+  const id = uid();
+  const faculty = await prisma.faculty.create({ data: { code: `F${id}`, name: `Faculty ${id}` } });
+  return prisma.course.create({ data: { facultyId: faculty.id, code: `C${id}`, name: `Course ${id}`, semester: "2026-Fall", lecturerId } });
+}
+
+/** Enrols students (ACTIVE) in a course. */
+export async function enrol(courseId: string, ...studentIds: string[]) {
+  await prisma.enrolment.createMany({ data: studentIds.map((studentId) => ({ studentId, courseId })) });
+}
+
+type Q = { type: "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY"; difficulty?: "EASY" | "MEDIUM" | "HARD"; marks?: number; topic?: string; text?: string };
+
+/** Request body for a valid question of the given type. */
+export function questionBody(q: Q) {
+  const marks = q.marks ?? (q.type === "ESSAY" ? 10 : 2);
+  const base = { type: q.type, text: q.text ?? `${q.type} question ${uid()}?`, marks, difficulty: q.difficulty ?? "EASY", topic: q.topic ?? "General" };
+  if (q.type === "MCQ") return { ...base, options: [{ text: "Alpha", isCorrect: true }, { text: "Beta", isCorrect: false }, { text: "Gamma", isCorrect: false }, { text: "Delta", isCorrect: false }] };
+  if (q.type === "TRUE_FALSE") return { ...base, options: [{ text: "True", isCorrect: false }, { text: "False", isCorrect: true }] };
+  if (q.type === "SHORT_ANSWER") return { ...base, acceptedAnswers: ["Structured Query Language", "S.Q.L."] };
+  return { ...base, rubric: [{ description: "Content", maxMarks: marks / 2 }, { description: "Clarity", maxMarks: marks / 2 }] };
+}
+
+/** Creates questions through the API as the lecturer. Returns the created questions. */
+export async function addQuestions(agent: ReturnType<typeof request.agent>, courseId: string, count: number, q: Q) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const res = await agent.post(`/api/courses/${courseId}/questions`).send(questionBody(q));
+    if (res.status !== 201) throw new Error(`question create failed: ${JSON.stringify(res.body)}`);
+    out.push(res.body.question);
+  }
+  return out;
+}

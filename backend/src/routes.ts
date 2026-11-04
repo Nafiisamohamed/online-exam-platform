@@ -9,6 +9,7 @@ import { authRouter } from "./modules/auth/auth.routes.ts";
 import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes.ts";
 import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.ts";
 import { importsRouter } from "./modules/imports/imports.routes.ts";
+import { questionsRouter } from "./modules/questions/questions.routes.ts";
 import { roomsRouter } from "./modules/rooms/rooms.routes.ts";
 import { staffRouter, usersRouter } from "./modules/users/users.routes.ts";
 
@@ -31,6 +32,9 @@ apiRouter.get("/health", async (_req, res) => {
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/users", usersRouter);
 apiRouter.use("/staff", staffRouter);
+// Question bank routes include /courses/:courseId/... and /imports/templates/...,
+// so they are mounted before the course and import routers.
+apiRouter.use(questionsRouter);
 apiRouter.use("/faculties", facultiesRouter);
 apiRouter.use("/courses", coursesRouter);
 apiRouter.use("/rooms", roomsRouter);

@@ -5,7 +5,8 @@
  * POST /api/imports/enrolments        (multipart)      ADMIN     file + semester -> preview
  * GET  /api/imports/:id                                uploader  the stored preview / result
  * POST /api/imports/:id/confirm                        uploader  save the valid rows
- * (question imports are added by the questions module)
+ * Question previews are uploaded with POST /api/courses/:courseId/question-imports
+ * (questions module) and confirmed here too.
  */
 import { Router } from "express";
 import { z } from "zod";
@@ -14,6 +15,7 @@ import { notFound } from "../../lib/errors.ts";
 import { csvUpload, toCsv } from "../../lib/uploads.ts";
 import { authenticate, currentUser, requireRole } from "../../middleware/auth.ts";
 import { idParams, validate } from "../../middleware/validate.ts";
+import { confirmQuestionImport } from "../questions/question-import.ts";
 import { confirmEnrolmentImport, ENROLMENT_COLUMNS, previewEnrolmentImport } from "./enrolment-import.ts";
 
 export const importsRouter = Router();
@@ -47,5 +49,5 @@ importsRouter.post("/:id/confirm", requireRole("ADMIN", "LECTURER"), validate({ 
     if (user.role !== "ADMIN") throw notFound("IMPORT_NOT_FOUND");
     return res.json(await confirmEnrolmentImport(batch.id, user.id, req));
   }
-  throw notFound("IMPORT_NOT_FOUND");
+  res.json(await confirmQuestionImport(batch.id, user, req));
 });
