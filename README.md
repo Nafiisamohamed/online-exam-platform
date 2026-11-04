@@ -39,7 +39,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | Simulated EVC Plus, Zaad and eDahab payments, with a receipt | 7 | ✅ Done (API) |
 | Simulated SMS outbox | 7 | ✅ Done |
 | Audit log of sensitive actions | 6.2 | ✅ Done |
-| Automated tests (one command) and CI | 6.4 | ✅ Done: 252 tests, GitHub Actions |
+| Automated tests (one command) and CI | 6.4 | ✅ Done: 257 tests, GitHub Actions |
 | Screens (Next.js, mobile layout, language switch) | 6.1, 6.8 | ⏳ Next stage |
 
 ## Architecture
@@ -49,12 +49,13 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
         │  HTTPS / JSON, HTTP-only session cookie
         ▼
  Express API  backend/src
-   routes      modules/*/*.routes.ts     validation (zod), role checks, HTTP shape
-   services    modules/*/*.service.ts,   business rules, ownership checks, transactions
-               services/*.ts
-   adapters    adapters/mobile-money.ts, simulated payment and SMS providers
-               adapters/sms-gateway.ts
-   data        db/prisma.ts              Prisma Client: the only database access
+   routes        modules/*/*.routes.ts     validation (zod), role checks, HTTP shape
+   services      modules/*/*.service.ts,   business rules, ownership checks, transactions
+                 services/*.ts
+   repositories  repositories/*.ts         the only code that queries the database (Prisma)
+   adapters      adapters/mobile-money.ts, simulated payment and SMS providers
+                 adapters/sms-gateway.ts
+   db            db/prisma.ts, db/clock.ts Prisma Client, transactions, clock sync, health check
    jobs        jobs/scheduler.ts         auto-submit at the deadline, payment expiry, SMS status
         │  restricted role exam_app (no owner rights), TLS for Supabase
         ▼
@@ -63,7 +64,9 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 ```
 
 **Layers**
-- Screens never touch the database. Route handlers call services, and only services use Prisma.
+- Screens never touch the database. Routes call services, and services call repositories. Only `src/repositories` and `src/db` use Prisma.
+- A service decides where a transaction starts and passes the transaction handle on to the repositories. That way, multi-step changes succeed or fail together.
+- `tests/unit/architecture.test.ts` fails if any other file uses Prisma.
 - Important rules are enforced twice: by the service and by the database. For example:
   - the answer deadline is also checked by a trigger;
   - used question versions are locked by a trigger;
@@ -118,7 +121,7 @@ You need **Node.js 20 or newer** and **Git**. Docker and a PostgreSQL installati
 git clone https://github.com/Nafiisamohamed/online-exam-platform.git
 cd online-exam-platform/backend
 npm install            # also generates the Prisma Client
-npm test               # 252 tests on a throwaway PostgreSQL 17, started automatically
+npm test               # 257 tests on a throwaway PostgreSQL 17, started automatically
 ```
 
 ## Database setup
@@ -133,7 +136,7 @@ npm test               # 252 tests on a throwaway PostgreSQL 17, started automat
 npm run db:migrate        # prisma migrate deploy: applies the 3 migrations
 npm run db:app-password   # enables the restricted exam_app login and writes DATABASE_URL
 npm run db:seed:demo      # optional demo data: Somali names, real cities, USD fees
-npm run db:seed:demo:analytics  # optional: 30 more students and a 38-student exam for analytics
+npm run db:seed:demo:analytics  # optional: 30 more students and a 38-student exam for analytics (loaded on Supabase)
 npm run db:check          # read-only health check: every line must say PASS
 ```
 
@@ -206,7 +209,7 @@ npm run build && npm start   # production build
 
 ```bash
 cd backend
-npm test            # everything: 150 database + 77 API + 25 unit tests
+npm test            # everything: 150 database + 80 API + 27 unit tests
 npm run test:api    # API only
 npm run test:unit   # pure logic only
 npm run verify:db   # non-destructive checks against an existing database, e.g. Supabase
@@ -236,7 +239,7 @@ Every endpoint, with method, path, roles, request, response and error codes: **[
 - Each account gets a random password, stored only as a bcrypt hash.
 - The plain passwords are written once, to `backend/demo-accounts.local.md` on the machine that ran the seed. Git ignores that file.
 - They are not published here, because the hosted demo database is reachable from the internet.
-- Judges receive them privately. An admin can also issue a new temporary password with `POST /api/users/:id/reset-password`.
+- Judges receive them privately. On demo day, `npm run demo:judge-credentials` issues fresh passwords for one account per role (plus a second lecturer and a second student) and writes them to a private, git-ignored sheet. Running it again after judging changes them, so the judges' passwords stop working. See [docs/demo-data.md](docs/demo-data.md#giving-the-judges-access).
 
 **Simulated payments:** the demo PIN is the `DEMO_PAYMENT_PIN` setting (`1234` in `.env.example`). It is not a real PIN.
 
@@ -264,5 +267,5 @@ See [docs/demo-data.md](docs/demo-data.md) for the full dataset.
 | Campus network rule | It relies on the client IP address. Behind a reverse proxy, set `TRUST_PROXY=true`. |
 | Clock offset | The browser shows the time remaining from the server's timer. Network delay of a few hundred milliseconds isn't compensated, so the last-chance warnings appear slightly early. |
 | Short-answer matching | It ignores only case and extra spaces, as the brief says. Punctuation differences go to "Needs review". |
-| Backup and restore | The procedure is documented in [docs/database-environments.md](docs/database-environments.md) but has not been rehearsed (no Docker or local PostgreSQL tools on the development machine). |
+| Backup and restore | The exact procedure is in [docs/backup-restore.md](docs/backup-restore.md). It has not been rehearsed yet: the development machine has no PostgreSQL client tools, and Docker and a local installation are excluded. Rehearse it on the campus server. |
 | Not built | Real payment and SMS gateways, webcam proctoring and plagiarism checking are out of scope, as the brief says. |

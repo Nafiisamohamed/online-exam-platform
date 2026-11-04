@@ -112,7 +112,7 @@ Every error has the same shape:
 | GET | `/api/courses/:id` | ADMIN, course lecturer, enrolled student | — | `{ course }` |
 | PATCH | `/api/courses/:id` | ADMIN | `{ name?, lecturerId?, facultyId? }` | `{ course }` |
 | GET | `/api/courses/:id/enrolments` | ADMIN, course lecturer | query: `status` | `{ items: [{ id, status, enrolledAt, droppedAt, student }] }` |
-| POST | `/api/courses/:id/enrolments` | ADMIN | `{ studentId }` or `{ studentNumber }` | `201 { enrolment }`. Also reactivates a dropped student. Error: `409 ALREADY_ENROLLED` |
+| POST | `/api/courses/:id/enrolments` | ADMIN | `{ studentId }` or `{ studentNumber }` | `201 { enrolment }`. Also reactivates a dropped student. Errors: `409 ALREADY_ENROLLED`, `409 ENROLMENT_SCHEDULE_CONFLICT { conflicts: [{ course, exam, otherCourse, otherExam }] }` |
 | POST | `/api/courses/:id/enrolments/:studentId/drop` | ADMIN | — | `{ enrolment }`. Status becomes `DROPPED`; past attempts and results are kept. |
 
 ## CSV imports
@@ -133,7 +133,8 @@ Both imports work the same way: **upload → preview → confirm**. Only valid r
   - `row` counts the header as row 1.
 - **Enrolment CSV columns:** `student_id, student_name, phone, course_codes`.
   - `course_codes` holds one or more codes, separated by `;`, `|` or spaces.
-  - Error codes: `STUDENT_ID_REQUIRED`, `STUDENT_ID_INVALID`, `STUDENT_NAME_REQUIRED`, `PHONE_INVALID`, `COURSE_CODES_REQUIRED`, `COURSE_NOT_FOUND`, `DUPLICATE_STUDENT_IN_FILE`, `STUDENT_NAME_MISMATCH`.
+  - Error codes: `STUDENT_ID_REQUIRED`, `STUDENT_ID_INVALID`, `STUDENT_NAME_REQUIRED`, `PHONE_INVALID`, `COURSE_CODES_REQUIRED`, `COURSE_NOT_FOUND`, `DUPLICATE_STUDENT_IN_FILE`, `STUDENT_NAME_MISMATCH`, `SCHEDULE_CONFLICT { course, exam, otherCourse, otherExam }`.
+  - `SCHEDULE_CONFLICT`: the new courses would give the student two overlapping upcoming exams. If a schedule changes between the preview and the confirm, the confirm is refused with `409 ENROLMENT_SCHEDULE_CONFLICT`.
 - **Question CSV columns:** `type, text, difficulty, marks, topic, option_1..option_5, correct_option, accepted_answers, rubric`.
   - `correct_option`: the option's number for MCQ; `True` or `False` for TRUE_FALSE.
   - `accepted_answers`: separated by `|`.
@@ -206,6 +207,11 @@ All of these are for the course's own lecturer only.
 | POST | `/api/schedules/:id/cancel` | ADMIN, owner lecturer | — | `{ schedule }`. Error: `409 SCHEDULE_HAS_ATTEMPTS` |
 
 Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the enrolled students.
+
+**Overlapping exams (4.5)** are blocked at both ends:
+- **Approval** is refused when the schedule overlaps another approved exam of any shared student, room or invigilator.
+- **Enrolment** is refused afterwards when a course's upcoming exam would overlap another upcoming exam of the student. This covers single enrolment, reactivation and CSV import.
+- **No race:** both take the same database lock, so they can't happen at the same moment.
 
 ## Taking an exam (students)
 

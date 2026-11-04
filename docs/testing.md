@@ -5,9 +5,9 @@ The test suite checks the whole backend against a real PostgreSQL database, usin
 | Group | Folder | Tests | What it covers |
 |---|---|---|---|
 | Database rules | `tests/db/` | 150 (+3 on Supabase only) | Constraints, triggers, indexes, roles and row-level security |
-| API | `tests/api/` | 77 | Every module through the real Express app and database, as the restricted `exam_app` role |
-| Unit | `tests/unit/` | 25 | Pure logic: exam generator, grading, analytics, validation, translations |
-| **Total** | | **252** (+3) | |
+| API | `tests/api/` | 80 | Every module through the real Express app and database, as the restricted `exam_app` role |
+| Unit | `tests/unit/` | 27 | Pure logic: exam generator, grading, analytics, validation, translations |
+| **Total** | | **257** (+3) | |
 
 The 3 extra tests run only on a Supabase test project, where Supabase's API roles exist.
 
@@ -160,10 +160,12 @@ API and unit tests:
 | `tests/api/grading.test.ts` | Essay grading, publishing, republishing history, CSV export, blind second grading | 4 |
 | `tests/api/payments.test.ts` | Simulated payments: PIN, failure, cancel, expiry, duplicates, privacy | 6 |
 | `tests/api/analytics-messages.test.ts` | Analytics, dashboard, notifications, SMS outbox, audit log | 5 |
+| `tests/api/enrolment-conflicts.test.ts` | No overlapping exams through enrolment, reactivation or CSV import; past exams ignored | 3 |
 | `tests/api/audit.test.ts` | Pre-frontend audit: topic rules, frozen attempts, client clocks ignored, timer never reset, invigilator limits, no password hashes, mass assignment, clean errors, headers and CORS, login rate limit | 10 |
 | `tests/unit/exam-generator.test.ts` | Fair randomisation: equal mix, different sets, shortages, shuffling | 7 |
 | `tests/unit/rules.test.ts` | Auto-grading, totals, question rules, phones, networks, CSV, translations, error mapping, Mogadishu time, no internal details in errors | 14 |
 | `tests/unit/analytics.test.ts` | Difficulty index, 27% discrimination, highlights | 4 |
+| `tests/unit/architecture.test.ts` | Layered architecture: only repositories and `src/db` use Prisma; routes never import repositories | 2 |
 
 Supporting files:
 

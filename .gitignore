@@ -13,8 +13,10 @@ node_modules/
 *.pfx
 secrets/
 
-# Demo account passwords written by `npm run db:seed:demo`
+# Demo account passwords (db:seed:demo, demo:judge-credentials): local only, never committed
 demo-accounts.local.md
+judges-credentials.local.md
+*.local.md
 
 # Database files and local data
 backend/.test-db/

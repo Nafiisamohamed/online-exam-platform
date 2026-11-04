@@ -21,6 +21,7 @@
     "db:app-password": "node scripts/set-app-password.mjs",
     "db:seed:demo": "node scripts/seed-demo-data.mjs",
     "db:seed:demo:analytics": "node scripts/seed-demo-analytics.mjs",
+    "demo:judge-credentials": "node scripts/judge-credentials.mjs",
     "db:check": "node scripts/check-database.mjs",
     "verify:db": "vitest run --config vitest.verify.config.mjs",
     "test": "vitest run",

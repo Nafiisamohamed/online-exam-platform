@@ -23,7 +23,28 @@
 - Each account gets a random 16-character password, stored in the database only as a bcrypt hash (cost 12).
 - The plain passwords are written once, to `backend/demo-accounts.local.md` on the machine that ran the seed.
 - That file is ignored by git. **Never commit or publish it.**
-- To give judges demo access, share the passwords privately, or give them a separate copy of the database with their own passwords. Don't put them in the README for a database that is reachable on the internet.
+- Don't put them in the README for a database that is reachable on the internet.
+
+### Giving the judges access
+
+On demo day, run from `backend/`:
+
+```bash
+npm run demo:judge-credentials -- --list   # shows the accounts it will use; changes nothing
+npm run demo:judge-credentials             # issues fresh passwords for them
+```
+
+**What the script does:**
+- **Accounts:** it picks one account for every role, plus a second lecturer (the blind second grader) and a second student (Demo 2). That's 6 accounts.
+- **Passwords:** new random ones, stored only as bcrypt hashes. Old sessions of these accounts end at once.
+- **Output:** a private sheet, `backend/judges-credentials.local.md`. It's ignored by git and nothing is printed on screen.
+- **Audit log:** it records that credentials were issued, never the passwords themselves.
+
+**Handing them over:**
+- Give the sheet to the judges directly: printed, or in a private message.
+- **Run the script again after judging.** That changes the passwords, so the ones the judges saw stop working.
+
+The script was rehearsed on an isolated database: the 6 new passwords work, the old ones stop working, and the audit entry contains no password.
 
 `.test` email addresses are reserved and can never receive mail.
 
@@ -58,6 +79,15 @@
 
 ## Larger dataset for analytics (optional)
 
+**Loaded in the Supabase main project on 2026-11-04.**
+
+Checked after the run:
+- **Nothing existing changed:** every existing row was fingerprinted before and after the run. The only changes were 6 existing CS105 question versions, which the database locked because the new exam drew them. This is the normal lock-on-use rule.
+- **Health checks:** `db:check` passes every check.
+- **Second run:** refused.
+- **Analytics:** all 21 questions show figures, both highlights appear, and the average is 70.8%.
+- **Logins:** all 30 new student logins work.
+
 `npm run db:seed:demo:analytics` adds a completed exam large enough for meaningful question analytics. Each question needs at least 5 answers (4.13), and the base data's midterm has only 5 students with different random question sets. The script needs the base demo data, adds rows only, refuses to run twice and runs in one transaction.
 
 | Adds | Contents |
@@ -67,7 +97,7 @@
 | Exam | **CS105 Practice Test 1**, held 3 days ago, 13:00–15:00. 38 students sat it (2 absent). Results are published and answer review is on. |
 | Analytics | Every question has 12–19 answers. One is answered correctly by everyone (over 95%) and one by about 10% (under 20%), so both highlights appear. The score distribution runs from 33% to 100%. |
 
-Rehearsed on an isolated local database: `npm run db:check` passes every check afterwards.
+Rehearsed first on an isolated local database: `npm run db:check` passed every check afterwards.
 
 ## Checking the data
 
