@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { prisma } from "./db/prisma.ts";
 import { now } from "./db/clock.ts";
+import { attemptsRouter } from "./modules/attempts/attempts.routes.ts";
 import { authRouter } from "./modules/auth/auth.routes.ts";
 import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes.ts";
 import { examsRouter, schedulesRouter } from "./modules/exams/exams.routes.ts";
@@ -41,5 +42,7 @@ apiRouter.use("/courses", coursesRouter);
 apiRouter.use("/rooms", roomsRouter);
 apiRouter.use("/grading-scale", gradingScaleRouter);
 apiRouter.use("/imports", importsRouter);
+// Student routes include /exams/:examId/attempts, so they come before the staff exam router.
+apiRouter.use(attemptsRouter);
 apiRouter.use("/exams", examsRouter);
 apiRouter.use("/schedules", schedulesRouter);

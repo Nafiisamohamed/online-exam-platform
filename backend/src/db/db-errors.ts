@@ -51,6 +51,13 @@ function inspect(error: unknown) {
     visit(e.cause, depth + 1);
   };
   visit(error, 0);
+  // Prisma sometimes only gives the constraint name inside the message text.
+  if (!constraint) {
+    for (const t of texts) {
+      const m = /constraint "([a-z0-9_]+)"/i.exec(t);
+      if (m) { constraint = m[1]; break; }
+    }
+  }
   return { texts, codes, constraint };
 }
 
@@ -66,7 +73,8 @@ export function mapDbError(error: unknown): AppError | null {
   const { texts, codes, constraint } = inspect(error);
   for (const text of texts) {
     for (const [code, status] of Object.entries(TRIGGER_CODES)) {
-      if (new RegExp(`\b${code}\b`).test(text)) return new AppError(status, code, `Rejected by the database: ${code}`);
+      // The code must stand alone, so PAYMENT_EXPIRED does not match PAYMENT_NOT_EXPIRED.
+      if (new RegExp(`(^|[^A-Z_])${code}([^A-Z_]|$)`).test(text)) return new AppError(status, code, `Rejected by the database: ${code}`);
     }
   }
   const has = (...c: string[]) => codes.some((x) => c.includes(x)) || texts.some((t) => c.some((x) => t.includes(x)));

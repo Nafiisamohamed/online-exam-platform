@@ -28,8 +28,9 @@ export function clockOffsetMs(): number {
  */
 export async function syncClock(db: Db): Promise<number> {
   const before = Date.now();
-  const rows = await db.$queryRaw<{ t: Date }[]>`SELECT clock_timestamp() AS t`;
+  // Epoch milliseconds, so the database time zone setting cannot affect the result.
+  const rows = await db.$queryRaw<{ ms: number }[]>`SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS ms`;
   const after = Date.now();
-  offsetMs = rows[0].t.getTime() - (before + after) / 2;
+  offsetMs = Number(rows[0].ms) - (before + after) / 2;
   return offsetMs;
 }
