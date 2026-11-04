@@ -1,21 +1,28 @@
 # Database
 
-PostgreSQL 13 or newer (`gen_random_uuid()` is built in from version 13). The schema is managed with Prisma 7.10.1.
+PostgreSQL 15 or newer. Development and testing use PostgreSQL 17. The schema is managed with Prisma 7.10.1.
+
+Version 15 is the minimum because, from version 15, ordinary roles can't create objects in the `public` schema by default. The access-security rules rely on that: `exam_app` must not be able to create tables or functions.
 
 | File | Contents |
 |---|---|
 | [backend/prisma/schema.prisma](../backend/prisma/schema.prisma) | Tables, columns, enums, keys, relations and ordinary indexes |
 | [backend/prisma/migrations/20261103000000_init/migration.sql](../backend/prisma/migrations/20261103000000_init/migration.sql) | First migration: the SQL Prisma generated from the schema, followed by a hand-written **RAW SQL SECTION** |
 | [backend/prisma/migrations/20261103120000_payment_guard_hardening/migration.sql](../backend/prisma/migrations/20261103120000_payment_guard_hardening/migration.sql) | Second migration: stricter payment rules (PIN attempt counter, 5-minute expiry, new payments must start at the beginning of the flow) |
+| [backend/prisma/migrations/20261103150000_database_access_security/migration.sql](../backend/prisma/migrations/20261103150000_database_access_security/migration.sql) | Third migration: the restricted application role `exam_app`, row-level security on all tables, Supabase API roles locked out (see [Access security](#access-security)) |
+
+Local PostgreSQL and Supabase are separate databases. See [database-environments.md](database-environments.md).
 
 ## Setup
 
 ```bash
 cd backend
-cp .env.example .env        # then set DATABASE_URL
+cp .env.example .env        # then set DATABASE_URL (exam_app) and MIGRATE_DATABASE_URL (owner)
 npm install
-npm run db:migrate          # applies all migrations (prisma migrate deploy)
+npm run db:migrate          # applies all migrations (prisma migrate deploy) as the owner
 ```
+
+The one-time role and database setup is described in [database-environments.md](database-environments.md#local-postgresql-17-setup).
 
 Every rule below is covered by the automated tests. See [testing.md](testing.md).
 
@@ -144,6 +151,49 @@ The database can't check the demo PIN itself, because the PIN is never stored. T
 | `answers (attempt_id, attempt_question_id, question_version_id)` | `attempt_questions (attempt_id, id, question_version_id)` | An answer belongs to a question of its own attempt | P8 |
 | `answers (question_version_id, selected_option_id)` | `question_options (question_version_id, id)` | A chosen option belongs to that same question version | P8 |
 
+## Access security
+
+Added by migration `20261103150000_database_access_security`.
+
+### Roles
+
+| Role | Used by | Can do |
+|---|---|---|
+| Owner (`exam_owner` locally, `postgres` on Supabase) | Prisma CLI only, through `MIGRATE_DATABASE_URL` | Owns every table, type, function and trigger, and applies migrations. Never used by the running application. |
+| `exam_app` | The Express application, through `DATABASE_URL` | See the privileges below. Not a superuser, can't skip RLS, can't create roles or databases, owns nothing. |
+| `anon`, `authenticated`, `service_role` (Supabase only) | Nobody | Nothing: all privileges on our tables, sequences and functions are removed, including privileges Supabase would grant to future objects |
+
+The migration creates `exam_app` without a password. Each environment enables login separately (`ALTER ROLE exam_app WITH LOGIN PASSWORD '...'`), so no password is ever stored in git.
+
+### exam_app privileges
+
+| Tables | Privileges |
+|---|---|
+| All 35 tables | SELECT, INSERT, UPDATE |
+| `audit_logs`, `grade_revisions`, `result_publications` | SELECT, INSERT only (the append-only triggers also block changes) |
+| `question_options`, `accepted_answers`, `rubric_criteria`, `exam_rules`, `exam_rule_topics`, `schedule_rooms`, `schedule_invigilators`, `grading_scale` | Also DELETE, for editing drafts. Locked versions and used rules stay protected by the triggers and foreign keys. |
+| `_prisma_migrations` | None |
+
+`exam_app` has no TRUNCATE, REFERENCES or TRIGGER privilege and owns no objects. It therefore **cannot switch off triggers, drop constraints or alter tables**, so the database rules hold even if the application had a bug or an SQL injection.
+
+### Row-level security
+
+- RLS is enabled on all 35 tables and on `_prisma_migrations`. The migration fails if any table in `public` is left without RLS.
+- Each of the 35 tables has exactly one policy, `<table>_exam_app_access`, applying **only to `exam_app`**, with `USING (true) WITH CHECK (true)`.
+- There is no policy for `PUBLIC`, `anon`, `authenticated` or `service_role`. A role without a policy sees no rows, even if it has been granted table privileges.
+- The owner is not restricted by RLS, so migrations and the Prisma CLI work as before.
+
+### Student-level authorization lives in Express
+
+The `exam_app` policy lets the application see **all rows**. The database can't tell which student, lecturer or invigilator is using the application. Every per-user rule is therefore enforced by the Express service layer, on every request, for example:
+
+- a student reads and changes only their own attempt, answers, payments and published results (a failed ownership check returns 404);
+- a lecturer works only with their own courses' question banks, exams and grading;
+- an invigilator sees only the sessions assigned to them;
+- correct answers are hidden until results are published and review is allowed.
+
+These rules will get their own automated tests when the backend is built. RLS here is a safety layer against outside access, not the application's permission system.
+
 ## Rules left to the service layer
 
 These rules span several rows or tables, so the service layer enforces them. Each will be covered by automated tests:
@@ -158,5 +208,5 @@ These rules span several rows or tables, so the service layer enforces them. Eac
 
 ## Known limits of the database protections
 
-- `TRUNCATE` and dropping the schema bypass the row triggers. They are only used in test resets (`prisma migrate reset`).
+- `TRUNCATE` and dropping tables bypass the row triggers. Only the owner can do either; `exam_app` can't. The test run's reset drops the application's tables, but only in a dedicated test database.
 - `sms_outbox_no_secrets_chk` checks the top-level keys of `params` only. Keeping passwords out of the message `body` is enforced by the message templates and by tests.
