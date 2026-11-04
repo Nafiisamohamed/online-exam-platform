@@ -127,7 +127,7 @@ Done for the main project on 2026-11-04. To set up another Supabase project, or 
 | Node `pg` and `sslmode=require` | ⚠️ `pg` treats `require` as "verify the certificate", and Supabase's certificates are signed by **Supabase Root 2021 CA**, which Node doesn't trust by default. **The CA certificate is required.** `backend/certs/supabase-ca-2021.crt` is Supabase's published root CA (SHA-256 `80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA`, valid until 2031-04-26). The pooler's chain verifies against it. All our Node code verifies Supabase hosts against it (`scripts/lib/pg-connection.mjs`); verification is never disabled. |
 | Prisma CLI TLS | Needs `sslcert=certs/supabase-ca-2021.crt&sslaccept=strict` (path relative to `backend/`) and `connect_timeout=30`. The TLS handshake to Frankfurt took about 9 seconds, longer than Prisma's 5-second default. |
 
-The Express application will use the same `pgClientConfig()` settings when it creates its `PrismaPg` adapter.
+The Express application uses the same `pgClientConfig()` settings for its `PrismaPg` adapter (`backend/src/db/prisma.ts`). It also switches every database session to UTC when the connection opens, because Prisma's pg adapter reads and writes timestamps as UTC without an offset: on a campus server running in local time (Africa/Mogadishu), deadlines would otherwise be 3 hours off. Supabase already runs in UTC; its pooler ignores a startup `TimeZone` option, so the setting is made with `SET TIME ZONE` instead.
 
 ## Backups and restoration (proposed process)
 

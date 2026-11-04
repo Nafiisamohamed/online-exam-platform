@@ -1,17 +1,38 @@
 # Automated tests
 
-The test suite checks the database rules (constraints, triggers, indexes, roles and row-level security) against a real PostgreSQL database, using the same migrations as development and production.
+The test suite checks the whole backend against a real PostgreSQL database, using the same migrations as development and production:
 
-- **150 tests** run everywhere.
-- **3 more** run only on the Supabase test project, where Supabase's API roles exist.
+| Group | Folder | Tests | What it covers |
+|---|---|---|---|
+| Database rules | `tests/db/` | 150 (+3 on Supabase only) | Constraints, triggers, indexes, roles and row-level security |
+| API | `tests/api/` | 67 | Every module through the real Express app and database, as the restricted `exam_app` role |
+| Unit | `tests/unit/` | 23 | Pure logic: exam generator, grading, analytics, validation, translations |
+| **Total** | | **240** (+3) | |
 
-## What you need
+The 3 extra tests run only on a Supabase test project, where Supabase's API roles exist.
 
-- Node.js 20 or newer
-- PostgreSQL 15 or newer, running locally. Use PostgreSQL 17, the version used for development and testing.
-- A test owner role that is **not** a superuser, with permission to create roles
+## Quick start
 
-## One-time setup
+```bash
+cd backend
+npm install
+npm test
+```
+
+That is all. With no test database configured, `npm test` starts its own throwaway **PostgreSQL 17** (the `embedded-postgres` dev dependency, which ships the official binaries for Windows, macOS and Linux), migrates it from scratch, runs every test and stops it again. No PostgreSQL installation, no Docker and no Supabase access are needed. Its data lives in `backend/.test-db/` (ignored by git) and it only listens on `localhost:54329`.
+
+The same command runs in CI (`.github/workflows/ci.yml`) on every push.
+
+To use your own PostgreSQL instead, follow the setup below.
+
+## Using your own PostgreSQL (optional)
+
+You need:
+- Node.js 20 or newer;
+- PostgreSQL 15 or newer, running locally (PostgreSQL 17 is the version used for development and testing);
+- a test owner role that is **not** a superuser, with permission to create roles.
+
+### One-time setup
 
 As a PostgreSQL superuser, create the test owner and a dedicated test database it owns:
 
@@ -42,9 +63,13 @@ TEST_DATABASE_URL="postgresql://exam_owner:<password>@localhost:5432/online_exam
 
 ```bash
 cd backend
-npm test             # run the whole suite once (local PostgreSQL)
+npm test             # the whole suite once
+npm run test:unit    # unit tests only
+npm run test:api     # API tests only
 npm run test:watch   # re-run tests when files change
 ```
+
+The test database is chosen in this order: `TEST_DATABASE_URL` in the shell, then `backend/.env.test`, then the embedded test server.
 
 You can also set `TEST_DATABASE_URL` in the shell instead of using `.env.test`. A value set in the shell takes priority.
 
@@ -90,6 +115,14 @@ In both modes, the test database must also differ from `DATABASE_URL` and `MIGRA
 
 The main Supabase project (`tzrhdwrswkfmqoriztrj`) is on a block list in `tests/helpers/env.mjs`. The tests refuse it in both modes, even if a marker table were added there by mistake.
 
+## How the API tests work
+
+- They call the real Express app in-process with supertest (no network port), with the real session cookies.
+- The app connects to the **test** database as the restricted `exam_app` role (`tests/setup-env.mjs` sets `DATABASE_URL` to the test database with `options=-c role=exam_app`), so every API test runs with exactly the application's database permissions. `backend/.env` and Supabase are never used; `tests/api/helpers.ts` refuses to load if `DATABASE_URL` points at Supabase.
+- They commit their rows, so builders use unique names and codes. The reset at the start of the next run removes them.
+- `tests/api/exam-fixtures.ts` builds a ready-to-sit exam: a question bank, enrolled students, a published exam and an approved schedule whose window is open now.
+- Background jobs are off in tests (`JOBS_ENABLED=false`); tests call the job functions directly, for example `autoSubmitExpired()`.
+
 ## How tests stay independent
 
 - Most tests run inside a transaction that is rolled back. Each test also runs inside a savepoint that is rolled back after it, so no test can see another test's rows.
@@ -112,15 +145,33 @@ The main Supabase project (`tzrhdwrswkfmqoriztrj`) is on a block list in `tests/
 | `tests/db/pin-attempts.test.mjs` | Demo PIN attempt counter | 15 |
 | `tests/db/cancellation-expiry.test.mjs` | 5-minute expiry, actions after expiry, cancellation, final outcomes | 29 |
 | `tests/db/access-security.test.mjs` | RLS, policies and exact grants on every table; the `exam_app` role's allowed and forbidden actions (including triggers, constraints, RLS, policies and migration history); roles without a policy | 32 (+3 Supabase only) |
-| **Total** | | **150 (+3)** |
+| **Total (database)** | | **150 (+3)** |
+
+API and unit tests:
+
+| File | Area | Tests |
+|---|---|---|
+| `tests/api/auth.test.ts` | Login, cookies, temporary passwords, sessions, language switch | 10 |
+| `tests/api/courses.test.ts` | Users, courses, enrolment, CSV student import, rooms, grading scale | 8 |
+| `tests/api/questions.test.ts` | Question types, duplicates, ownership, versioning, images, CSV question import | 8 |
+| `tests/api/exams.test.ts` | Exam rules and the enough-questions check, preview, publishing, scheduling and conflicts | 7 |
+| `tests/api/attempts.test.ts` | **The three completion conditions**, attempt security, tab switches, auto-grading | 13 |
+| `tests/api/invigilation.test.ts` | Live view, disconnected students, notes, time extensions | 6 |
+| `tests/api/grading.test.ts` | Essay grading, publishing, republishing history, CSV export, blind second grading | 4 |
+| `tests/api/payments.test.ts` | Simulated payments: PIN, failure, cancel, expiry, duplicates, privacy | 6 |
+| `tests/api/analytics-messages.test.ts` | Analytics, dashboard, notifications, SMS outbox, audit log | 5 |
+| `tests/unit/exam-generator.test.ts` | Fair randomisation: equal mix, different sets, shortages, shuffling | 7 |
+| `tests/unit/rules.test.ts` | Auto-grading, totals, question rules, phones, networks, CSV, translations, error mapping | 12 |
+| `tests/unit/analytics.test.ts` | Difficulty index, 27% discrimination, highlights | 4 |
 
 Supporting files:
 
 | File | Purpose |
 |---|---|
 | `vitest.config.mjs` | Test runner settings (Vitest 4.1.12) |
-| `tests/global-setup.mjs` | Safety checks, Supabase marker check, reset, migrations, roles |
-| `tests/setup-env.mjs` | Loads and checks the test settings in each test worker |
+| `tests/global-setup.mjs` | Safety checks, embedded test server, Supabase marker check, reset, migrations, roles |
+| `tests/support/embedded-postgres.mjs` | Starts the throwaway PostgreSQL 17 when no test database is configured |
+| `tests/setup-env.mjs` | Loads and checks the test settings in each test worker, and sets the API's test settings |
 | `tests/run-supabase.mjs` | Runs the suite with `backend/.env.supabase-test` (`npm run test:supabase`) |
 | `tests/helpers/env.mjs` | Settings loading and safety rules for both modes |
 | `tests/helpers/db.mjs` | Connections, rolled-back transactions, `expectDbError()` |
