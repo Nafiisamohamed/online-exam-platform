@@ -39,13 +39,20 @@ export async function viewableCourse(user: AuthUser, courseId: string, db: Db = 
 
 /**
  * Loads an exam the user may manage: admin, or the lecturer of its course.
- * With `allowSecondGrader`, the exam's assigned second grader is also allowed.
+ * - allowSecondGrader: the exam's assigned second grader is also allowed;
+ * - ownerOnly: only the course lecturer (not the admin), for changes that
+ *   belong to the lecturer such as building or grading the exam.
  */
-export async function manageableExam(user: AuthUser, examId: string, opts: { allowSecondGrader?: boolean } = {}, db: Db = prisma) {
+export async function manageableExam(
+  user: AuthUser,
+  examId: string,
+  opts: { allowSecondGrader?: boolean; ownerOnly?: boolean } = {},
+  db: Db = prisma,
+) {
   const exam = await db.exam.findUnique({ where: { id: examId }, include: { course: true } });
   const ok =
     exam &&
-    (user.role === "ADMIN" ||
+    ((user.role === "ADMIN" && !opts.ownerOnly) ||
       (user.role === "LECTURER" && (exam.course.lecturerId === user.id || (opts.allowSecondGrader && exam.secondGraderId === user.id))));
   if (!ok) throw notFound("EXAM_NOT_FOUND");
   return exam!;
