@@ -11,6 +11,7 @@ import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes
 import { examsRouter, schedulesRouter } from "./modules/exams/exams.routes.ts";
 import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.ts";
 import { importsRouter } from "./modules/imports/imports.routes.ts";
+import { invigilationRouter } from "./modules/invigilation/invigilation.routes.ts";
 import { questionsRouter } from "./modules/questions/questions.routes.ts";
 import { roomsRouter } from "./modules/rooms/rooms.routes.ts";
 import { staffRouter, usersRouter } from "./modules/users/users.routes.ts";
@@ -46,3 +47,4 @@ apiRouter.use("/imports", importsRouter);
 apiRouter.use(attemptsRouter);
 apiRouter.use("/exams", examsRouter);
 apiRouter.use("/schedules", schedulesRouter);
+apiRouter.use("/invigilation", invigilationRouter);
