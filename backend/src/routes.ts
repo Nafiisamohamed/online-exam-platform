@@ -9,6 +9,7 @@ import { attemptsRouter } from "./modules/attempts/attempts.routes.ts";
 import { authRouter } from "./modules/auth/auth.routes.ts";
 import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes.ts";
 import { examsRouter, schedulesRouter } from "./modules/exams/exams.routes.ts";
+import { gradingRouter } from "./modules/grading/grading.routes.ts";
 import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.ts";
 import { importsRouter } from "./modules/imports/imports.routes.ts";
 import { invigilationRouter } from "./modules/invigilation/invigilation.routes.ts";
@@ -45,6 +46,7 @@ apiRouter.use("/grading-scale", gradingScaleRouter);
 apiRouter.use("/imports", importsRouter);
 // Student routes include /exams/:examId/attempts, so they come before the staff exam router.
 apiRouter.use(attemptsRouter);
+apiRouter.use(gradingRouter);
 apiRouter.use("/exams", examsRouter);
 apiRouter.use("/schedules", schedulesRouter);
 apiRouter.use("/invigilation", invigilationRouter);
