@@ -20,6 +20,7 @@ import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
 import { prisma, transaction } from "../../db/prisma.ts";
+import type { ScheduleStatus } from "../../generated/prisma/enums.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { formatDateTime } from "../../i18n/messages.ts";
@@ -107,7 +108,7 @@ export async function requestSchedule(user: AuthUser, examId: string, input: Sch
 }
 
 /** Admin: all schedules. Lecturer: their exams. Invigilator: approved sessions assigned to them. */
-export async function listSchedules(user: AuthUser, q: { status?: string; from?: Date; to?: Date }) {
+export async function listSchedules(user: AuthUser, q: { status?: ScheduleStatus; from?: Date; to?: Date }) {
   const scope =
     user.role === "ADMIN" ? {} :
     user.role === "LECTURER" ? { exam: { course: { lecturerId: user.id } } } :
@@ -116,7 +117,7 @@ export async function listSchedules(user: AuthUser, q: { status?: string; from?:
   const rows = await prisma.examSchedule.findMany({
     where: {
       ...scope,
-      ...(q.status && user.role !== "INVIGILATOR" ? { status: q.status as never } : {}),
+      ...(q.status && user.role !== "INVIGILATOR" ? { status: q.status } : {}),
       ...(q.from ? { windowEnd: { gte: q.from } } : {}),
       ...(q.to ? { windowStart: { lte: q.to } } : {}),
     },

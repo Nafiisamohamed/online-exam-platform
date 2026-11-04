@@ -20,6 +20,7 @@ import type { Request } from "express";
 import { now } from "../../db/clock.ts";
 import type { Tx } from "../../db/prisma.ts";
 import { prisma, transaction } from "../../db/prisma.ts";
+import type { GradingStatus } from "../../generated/prisma/enums.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { num, num0 } from "../../lib/format.ts";
@@ -161,10 +162,10 @@ export async function getAnswerForGrading(user: AuthUser, answerId: string) {
 }
 
 /** Saves the final status/marks of an answer and recalculates the grade (inside a transaction). */
-async function setAnswerResult(tx: Tx, answerId: string, attemptId: string, status: string, marks: number | null, graderId: string) {
+async function setAnswerResult(tx: Tx, answerId: string, attemptId: string, status: GradingStatus, marks: number | null, graderId: string) {
   await tx.answer.update({
     where: { id: answerId },
-    data: { gradingStatus: status as never, marksAwarded: marks, gradedById: marks === null ? null : graderId, gradedAt: marks === null ? null : now() },
+    data: { gradingStatus: status, marksAwarded: marks, gradedById: marks === null ? null : graderId, gradedAt: marks === null ? null : now() },
   });
   await recalcGrade(tx, attemptId);
 }

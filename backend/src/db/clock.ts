@@ -17,11 +17,6 @@ export function now(): Date {
   return new Date(Date.now() + offsetMs);
 }
 
-/** Current offset in milliseconds (database clock minus API clock). */
-export function clockOffsetMs(): number {
-  return offsetMs;
-}
-
 /**
  * Measures the offset with one query. The round-trip time is split in half,
  * which is accurate to a few milliseconds on a campus network.

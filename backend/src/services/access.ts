@@ -57,8 +57,3 @@ export async function manageableExam(
   if (!ok) throw notFound("EXAM_NOT_FOUND");
   return exam!;
 }
-
-/** True when the user is the lecturer who owns the exam's course (or an admin). */
-export function isCourseOwner(user: AuthUser, exam: { course: { lecturerId: string } }): boolean {
-  return user.role === "ADMIN" || exam.course.lecturerId === user.id;
-}

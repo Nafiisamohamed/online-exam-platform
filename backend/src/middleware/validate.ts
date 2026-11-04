@@ -15,6 +15,9 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
+      // Each route's own zod schema decides the shape; `any` here lets handlers read the
+      // parsed values without repeating the schema type. Values only get here after validation.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       valid: { body?: any; query?: any; params?: any };
     }
   }

@@ -106,3 +106,33 @@ describe("database error mapping", () => {
     expect(mapDbError(e)).toMatchObject({ status: 400, code: "CONSTRAINT_VIOLATION", details: { constraint: "exam_attempts_base_deadline_chk" } });
   });
 });
+
+describe("campus time zone", () => {
+  it("prints UTC times in Mogadishu time (UTC+3) for SMS and PDFs", async () => {
+    const { formatDateTime } = await import("../../src/i18n/messages.ts");
+    expect(formatDateTime(new Date("2026-11-12T06:00:00Z"), "Africa/Mogadishu")).toBe("12/11/2026 09:00");
+    expect(formatDateTime(new Date("2026-11-12T22:30:00Z"), "Africa/Mogadishu")).toBe("13/11/2026 01:30");
+  });
+});
+
+describe("error responses", () => {
+  it("never send database constraint names or stack traces to the client", async () => {
+    const { errorHandler } = await import("../../src/middleware/error-handler.ts");
+    const capture = () => {
+      const res: { statusCode?: number; payload?: unknown; status: (n: number) => typeof res; json: (b: unknown) => void } = {
+        status(n) { this.statusCode = n; return this; },
+        json(b) { this.payload = b; },
+      };
+      return res;
+    };
+    const req = { method: "POST", path: "/x" } as never;
+    const check = capture();
+    errorHandler(new Error('violates check constraint "exam_attempts_base_deadline_chk"'), req, check as never, () => {});
+    expect(check.statusCode).toBe(400);
+    expect(JSON.stringify(check.payload)).not.toMatch(/exam_attempts|constraint"/);
+    const crash = capture();
+    errorHandler(new Error("SELECT * FROM secret_table failed at line 3"), req, crash as never, () => {});
+    expect(crash.statusCode).toBe(500);
+    expect(JSON.stringify(crash.payload)).toBe('{"error":{"code":"INTERNAL_ERROR","message":"Something went wrong on the server"}}');
+  });
+});

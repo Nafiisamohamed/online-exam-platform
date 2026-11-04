@@ -180,7 +180,7 @@ export async function gradesCsv(user: AuthUser, examId: string, lang: Language, 
   const data = await examResults(user, examId);
   const L = LABELS[lang];
   const header = [L.studentNumber, L.studentName, L.status, L.score, L.maxScore, L.percentage, L.grade, L.focusLosses, L.submissionType, L.publication];
-  const rows = data.students.map((s: any) => {
+  const rows = data.students.map((s) => {
     const g = s.published ?? s.working;
     return [s.student.studentNumber, s.student.fullName, s.status === "ABSENT" ? L.absent : s.status, g?.totalScore ?? "", g?.maxScore ?? "", g?.percentage ?? "", g?.letterGrade ?? "", s.countedFocusLosses ?? "", s.submissionType ?? "", s.published ? s.published.revisionNumber : ""];
   });

@@ -23,7 +23,7 @@ import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
 import { prisma, transaction } from "../../db/prisma.ts";
-import type { PaymentProvider } from "../../generated/prisma/enums.ts";
+import type { PaymentProvider, PaymentStatus } from "../../generated/prisma/enums.ts";
 import { formatDateTime, LABELS, PROVIDER_NAMES } from "../../i18n/messages.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
@@ -215,13 +215,13 @@ export async function getPayment(user: AuthUser, id: string) {
 }
 
 /** Student: own payments. Admin: all, with filters. */
-export async function listPayments(user: AuthUser, q: { examId?: string; status?: string; provider?: string }) {
+export async function listPayments(user: AuthUser, q: { examId?: string; status?: PaymentStatus; provider?: PaymentProvider }) {
   const rows = await prisma.payment.findMany({
     where: {
       ...(user.role === "ADMIN" ? {} : { studentId: user.id }),
       ...(q.examId ? { examId: q.examId } : {}),
-      ...(q.status ? { status: q.status as never } : {}),
-      ...(q.provider ? { provider: q.provider as never } : {}),
+      ...(q.status ? { status: q.status } : {}),
+      ...(q.provider ? { provider: q.provider } : {}),
     },
     include: { ...paymentInclude, student: { select: { id: true, studentNumber: true, fullName: true } } },
     orderBy: { createdAt: "desc" },

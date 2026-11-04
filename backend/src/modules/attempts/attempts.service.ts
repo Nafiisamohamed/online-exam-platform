@@ -199,6 +199,9 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
       // (as epoch milliseconds, so the database time zone setting cannot shift it).
       const [{ ms }] = await tx.$queryRaw<{ ms: number }[]>`SELECT floor(extract(epoch FROM now()) * 1000)::float8 AS ms`;
       const startedAt = new Date(Number(ms));
+      // Re-check the window with this authoritative time (the check above used the API's synced clock).
+      if (startedAt < schedule.windowStart) throw conflict("EXAM_NOT_OPEN_YET", "The exam window has not opened yet", { windowStart: schedule.windowStart });
+      if (startedAt >= schedule.windowEnd) throw conflict("EXAM_WINDOW_CLOSED", "The exam window has closed", { windowEnd: schedule.windowEnd });
       const pools = await rulesWithPools(tx, exam.courseId, await loadRuleSpecs(tx, examId), examId);
       const items = generateExam(pools, { shuffleQuestions: exam.shuffleQuestions, shuffleOptions: exam.shuffleOptions });
       const baseDeadline = new Date(Math.min(startedAt.getTime() + schedule.durationMinutes * 60_000, schedule.windowEnd.getTime()));

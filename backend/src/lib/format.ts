@@ -19,11 +19,6 @@ export function num0(value: DecimalLike): number {
   return num(value) ?? 0;
 }
 
-/** Decimal from a number or string (for writing). */
-export function dec(value: number | string | Prisma.Decimal): Prisma.Decimal {
-  return new Prisma.Decimal(value);
-}
-
 /** Lowercase, trim and collapse repeated spaces (D19 duplicate check, D20 short-answer matching). Punctuation is kept. */
 export function normalizeText(s: string): string {
   return s.trim().replace(/\s+/g, " ").toLowerCase();

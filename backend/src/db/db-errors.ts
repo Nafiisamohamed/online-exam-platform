@@ -32,9 +32,12 @@ function inspect(error: unknown) {
   const codes: string[] = [];
   let constraint: string | undefined;
   const seen = new Set<unknown>();
-  const visit = (e: any, depth: number) => {
-    if (!e || typeof e !== "object" || seen.has(e) || depth > 6) return;
-    seen.add(e);
+  // Prisma and the pg driver nest the useful fields at different depths, so walk the error loosely.
+  type Loose = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const visit = (value: unknown, depth: number) => {
+    if (!value || typeof value !== "object" || seen.has(value) || depth > 6) return;
+    seen.add(value);
+    const e = value as Loose;
     for (const k of ["message", "originalMessage"]) if (typeof e[k] === "string") texts.push(e[k]);
     for (const k of ["code", "originalCode"]) if (typeof e[k] === "string") codes.push(e[k]);
     if (typeof e.constraint === "string") constraint ??= e.constraint;
