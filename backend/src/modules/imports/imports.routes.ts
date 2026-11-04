@@ -10,13 +10,11 @@
  */
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../../db/prisma.ts";
-import { notFound } from "../../lib/errors.ts";
 import { csvUpload, toCsv } from "../../lib/uploads.ts";
 import { authenticate, currentUser, requireRole } from "../../middleware/auth.ts";
 import { idParams, validate } from "../../middleware/validate.ts";
-import { confirmQuestionImport } from "../questions/question-import.ts";
-import { confirmEnrolmentImport, ENROLMENT_COLUMNS, previewEnrolmentImport } from "./enrolment-import.ts";
+import { ENROLMENT_COLUMNS, previewEnrolmentImport } from "./enrolment-import.ts";
+import * as imports from "./imports.service.ts";
 
 export const importsRouter = Router();
 
@@ -33,21 +31,10 @@ importsRouter.post("/enrolments", requireRole("ADMIN"), csvUpload, validate({ bo
 
 /** The batch with every row's status and error codes. Only the uploader (or an admin) can read it. */
 importsRouter.get("/:id", requireRole("ADMIN", "LECTURER"), validate({ params: idParams }), async (req, res) => {
-  const user = currentUser(req);
-  const batch = await prisma.importBatch.findUnique({ where: { id: req.valid.params.id } });
-  if (!batch || (user.role !== "ADMIN" && batch.uploadedById !== user.id)) throw notFound("IMPORT_NOT_FOUND");
-  const { rowResults, ...rest } = batch;
-  res.json({ batch: rest, rows: rowResults });
+  res.json(await imports.getBatch(currentUser(req), req.valid.params.id));
 });
 
 /** Saves the valid rows. Enrolment imports also return { temporaryPasswords } once. */
 importsRouter.post("/:id/confirm", requireRole("ADMIN", "LECTURER"), validate({ params: idParams }), async (req, res) => {
-  const user = currentUser(req);
-  const batch = await prisma.importBatch.findUnique({ where: { id: req.valid.params.id } });
-  if (!batch || batch.uploadedById !== user.id) throw notFound("IMPORT_NOT_FOUND");
-  if (batch.type === "ENROLMENTS") {
-    if (user.role !== "ADMIN") throw notFound("IMPORT_NOT_FOUND");
-    return res.json(await confirmEnrolmentImport(batch.id, user.id, req));
-  }
-  res.json(await confirmQuestionImport(batch.id, user, req));
+  res.json(await imports.confirmBatch(currentUser(req), req.valid.params.id, req));
 });

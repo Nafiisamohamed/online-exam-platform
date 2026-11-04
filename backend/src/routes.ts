@@ -3,16 +3,18 @@
  * requests and responses is in docs/api.md.
  */
 import { Router } from "express";
-import { prisma } from "./db/prisma.ts";
+import { databaseReachable } from "./db/prisma.ts";
 import { now } from "./db/clock.ts";
+import { analyticsRouter } from "./modules/analytics/analytics.routes.ts";
 import { attemptsRouter } from "./modules/attempts/attempts.routes.ts";
 import { authRouter } from "./modules/auth/auth.routes.ts";
 import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes.ts";
 import { examsRouter, schedulesRouter } from "./modules/exams/exams.routes.ts";
 import { gradingRouter } from "./modules/grading/grading.routes.ts";
-import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.ts";
+import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.routes.ts";
 import { importsRouter } from "./modules/imports/imports.routes.ts";
 import { invigilationRouter } from "./modules/invigilation/invigilation.routes.ts";
+import { messagesRouter } from "./modules/messages/messages.routes.ts";
 import { paymentsRouter } from "./modules/payments/payments.routes.ts";
 import { questionsRouter } from "./modules/questions/questions.routes.ts";
 import { roomsRouter } from "./modules/rooms/rooms.routes.ts";
@@ -26,12 +28,8 @@ export const apiRouter = Router();
  * serverTime lets the frontend show the server clock (4.7).
  */
 apiRouter.get("/health", async (_req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: "ok", database: "ok", serverTime: now().toISOString() });
-  } catch {
-    res.status(503).json({ status: "error", database: "unreachable", serverTime: now().toISOString() });
-  }
+  const ok = await databaseReachable();
+  res.status(ok ? 200 : 503).json({ status: ok ? "ok" : "error", database: ok ? "ok" : "unreachable", serverTime: now().toISOString() });
 });
 
 apiRouter.use("/auth", authRouter);
@@ -48,7 +46,9 @@ apiRouter.use("/imports", importsRouter);
 // Student routes include /exams/:examId/attempts, so they come before the staff exam router.
 apiRouter.use(attemptsRouter);
 apiRouter.use(gradingRouter);
+apiRouter.use(analyticsRouter);
 apiRouter.use("/exams", examsRouter);
 apiRouter.use("/schedules", schedulesRouter);
 apiRouter.use("/invigilation", invigilationRouter);
 apiRouter.use("/payments", paymentsRouter);
+apiRouter.use(messagesRouter);

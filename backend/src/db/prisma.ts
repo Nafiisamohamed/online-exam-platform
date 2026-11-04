@@ -57,3 +57,13 @@ export type Db = typeof prisma | Tx;
 export function transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   return prisma.$transaction(fn, { maxWait: 15_000, timeout: 30_000 });
 }
+
+/** True when the database answers a trivial query (health check). */
+export async function databaseReachable(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
