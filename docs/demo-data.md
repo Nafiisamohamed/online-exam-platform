@@ -56,6 +56,19 @@
 
 **Dates are relative to the day the seed ran** (the midterm is the day before, the final 7 days after).
 
+## Larger dataset for analytics (optional)
+
+`npm run db:seed:demo:analytics` adds a completed exam large enough for meaningful question analytics. Each question needs at least 5 answers (4.13), and the base data's midterm has only 5 students with different random question sets. The script needs the base demo data, adds rows only, refuses to run twice and runs in one transaction.
+
+| Adds | Contents |
+|---|---|
+| Students | 30 more (`DEMO-2026-0011` … `DEMO-2026-0040`), 40 in total, all enrolled in CS105. Passwords are appended to `backend/demo-accounts.local.md`. |
+| Questions | 15 more CS105 questions (MCQ, True/False, short answer), 44 in total |
+| Exam | **CS105 Practice Test 1**, held 3 days ago, 13:00–15:00. 38 students sat it (2 absent). Results are published and answer review is on. |
+| Analytics | Every question has 12–19 answers. One is answered correctly by everyone (over 95%) and one by about 10% (under 20%), so both highlights appear. The score distribution runs from 33% to 100%. |
+
+Rehearsed on an isolated local database: `npm run db:check` passes every check afterwards.
+
 ## Checking the data
 
 `npm run db:check` runs read-only integrity checks on any migrated database, for example:
