@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Every colour in the app comes from these variables, so the
+ * light and dark themes stay consistent. Brand: navy + sky blue on white and
+ * soft cream. Semantic colours (success / warning / danger) are muted and used
+ * only for status.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --navy-950: #0b1a30;
+  --navy-900: #142d50;
+  --navy-800: #1d3b61;
+  --navy-700: #284d7a;
+  --navy-600: #3a6496;
+  --sky-500: #55b8e8;
+  --sky-600: #2f9bd3;
+  --sky-700: #1f7fb3;
+  --sky-300: #9fd6f2;
+  --sky-100: #d7eefa;
+  --sky-50: #eaf6fc;
+
+  --background: #ffffff;
+  --background-cream: #f7f4ec;
+  --surface: #ffffff;
+  --surface-muted: #fafbfd;
+  --surface-sunken: #f2f5f9;
+  --border: #e3e8ef;
+  --border-strong: #cdd6e2;
+  --foreground: #142d50;
+  --text: #22324a;
+  --text-muted: #5d6c82;
+  --text-subtle: #8693a6;
+
+  --primary: var(--navy-900);
+  --primary-hover: var(--navy-800);
+  --primary-foreground: #ffffff;
+  --accent: var(--sky-500);
+  --accent-strong: var(--sky-700);
+  --accent-soft: var(--sky-50);
+  --accent-soft-hover: var(--sky-100);
+  --accent-foreground: var(--navy-900);
+  --ring: rgb(85 184 232 / 0.45);
+
+  --success: #2f8f6b;
+  --success-soft: #e7f5ef;
+  --warning: #a7741b;
+  --warning-soft: #fbf3e2;
+  --danger: #b4423b;
+  --danger-soft: #fbecea;
+
+  --sidebar: #142d50;
+  --sidebar-foreground: #dbe7f5;
+  --sidebar-muted: #8ea7c6;
+  --sidebar-active: rgb(85 184 232 / 0.16);
+  --sidebar-border: rgb(255 255 255 / 0.08);
+
+  --chart-1: #142d50;
+  --chart-2: #55b8e8;
+  --chart-3: #3a6496;
+  --chart-4: #9fd6f2;
+  --chart-5: #1f7fb3;
+  --chart-grid: #e8edf3;
+
+  --shadow-sm: 0 1px 2px rgb(20 45 80 / 0.06);
+  --shadow-md: 0 4px 16px -4px rgb(20 45 80 / 0.1), 0 2px 4px -2px rgb(20 45 80 / 0.06);
+  --shadow-lg: 0 18px 40px -12px rgb(20 45 80 / 0.22);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0a1628;
+  --background-cream: #0d1c31;
+  --surface: #11233b;
+  --surface-muted: #152a46;
+  --surface-sunken: #0c192d;
+  --border: #213955;
+  --border-strong: #2d4a6d;
+  --foreground: #eef4fb;
+  --text: #d5e1ef;
+  --text-muted: #9bb0c9;
+  --text-subtle: #6f87a5;
+
+  /* Navy buttons would vanish on navy surfaces, so primary actions use sky blue in dark mode. */
+  --primary: var(--sky-500);
+  --primary-hover: #74c6ee;
+  --primary-foreground: #0a1628;
+  --accent: var(--sky-500);
+  --accent-strong: #7ccbf0;
+  --accent-soft: rgb(85 184 232 / 0.12);
+  --accent-soft-hover: rgb(85 184 232 / 0.2);
+  --accent-foreground: #cbeafa;
+  --ring: rgb(85 184 232 / 0.5);
+
+  --success: #5cc49b;
+  --success-soft: rgb(92 196 155 / 0.12);
+  --warning: #e0b157;
+  --warning-soft: rgb(224 177 87 / 0.12);
+  --danger: #ec8a84;
+  --danger-soft: rgb(236 138 132 / 0.12);
+
+  --sidebar: #0c1a2e;
+  --sidebar-foreground: #d5e1ef;
+  --sidebar-muted: #7f97b6;
+  --sidebar-active: rgb(85 184 232 / 0.14);
+  --sidebar-border: rgb(255 255 255 / 0.06);
+
+  --chart-1: #55b8e8;
+  --chart-2: #9fd6f2;
+  --chart-3: #3a7cc0;
+  --chart-4: #d7eefa;
+  --chart-5: #2f9bd3;
+  --chart-grid: #1d3350;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 6px 18px -6px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-cream: var(--background-cream);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-hover: var(--accent-soft-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-navy: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-sky: var(--sky-500);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow-md);
+  --shadow-overlay: var(--shadow-lg);
+
+  --radius-card: 1rem;
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-pop-in: pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-left: slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--background);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+  *:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--sky-100);
+    color: var(--navy-900);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

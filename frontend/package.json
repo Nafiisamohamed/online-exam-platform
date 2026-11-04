@@ -1,0 +1,45 @@
+{
+  "name": "online-exam-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "1.3.1",
+    "@radix-ui/react-dropdown-menu": "2.2.1",
+    "@radix-ui/react-popover": "1.3.1",
+    "@radix-ui/react-tabs": "1.2.1",
+    "@radix-ui/react-tooltip": "1.4.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.68.0",
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.7.0"
+  },
+  "description": "Online Exam Platform (Project 18) - Next.js frontend",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "4.3.4",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.5",
+    "jsdom": "30.1.3",
+    "tailwindcss": "4.3.4",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

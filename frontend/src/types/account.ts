@@ -1,0 +1,18 @@
+/** Account types, matching the API's user profile (GET /api/auth/me, see docs/api.md). */
+export type Role = "ADMIN" | "LECTURER" | "STUDENT" | "INVIGILATOR";
+export const ROLES: readonly Role[] = ["ADMIN", "LECTURER", "STUDENT", "INVIGILATOR"];
+
+export interface Profile {
+  id: string;
+  role: Role;
+  fullName: string;
+  email: string | null;
+  studentNumber: string | null;
+  phone: string;
+  preferredLanguage: "so" | "en";
+  mustChangePassword: boolean;
+  /** Not part of /auth/me yet; shown when known (e.g. preview accounts). */
+  faculty?: string;
+  /** Photo upload arrives with the profile module; until then initials are shown. */
+  avatarUrl?: string | null;
+}
