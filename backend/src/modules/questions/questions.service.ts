@@ -265,11 +265,13 @@ export async function bankSummary(user: AuthUser, courseId: string) {
   return rows.map((r) => ({ type: r.type, difficulty: r.difficulty, marks: Number(r.marks), count: Number(r.count) }));
 }
 
+/** Topics of the lecturer's course. @throws 404 COURSE_NOT_FOUND */
 export async function listTopics(user: AuthUser, courseId: string) {
   await ownCourse(user, courseId);
   return prisma.topic.findMany({ where: { courseId }, orderBy: { name: "asc" }, select: { id: true, name: true } });
 }
 
+/** Adds a topic (or returns the existing one with the same name). @throws 404 COURSE_NOT_FOUND */
 export async function createTopic(user: AuthUser, courseId: string, name: string) {
   await ownCourse(user, courseId);
   return transaction(async (tx) => {

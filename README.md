@@ -39,7 +39,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | Simulated EVC Plus, Zaad and eDahab payments, with a receipt | 7 | ✅ Done (API) |
 | Simulated SMS outbox | 7 | ✅ Done |
 | Audit log of sensitive actions | 6.2 | ✅ Done |
-| Automated tests (one command) and CI | 6.4 | ✅ Done: 240 tests, GitHub Actions |
+| Automated tests (one command) and CI | 6.4 | ✅ Done: 252 tests, GitHub Actions |
 | Screens (Next.js, mobile layout, language switch) | 6.1, 6.8 | ⏳ Next stage |
 
 ## Architecture
@@ -118,7 +118,7 @@ You need **Node.js 20 or newer** and **Git**. Docker and a PostgreSQL installati
 git clone https://github.com/Nafiisamohamed/online-exam-platform.git
 cd online-exam-platform/backend
 npm install            # also generates the Prisma Client
-npm test               # 240 tests on a throwaway PostgreSQL 17, started automatically
+npm test               # 252 tests on a throwaway PostgreSQL 17, started automatically
 ```
 
 ## Database setup
@@ -133,6 +133,7 @@ npm test               # 240 tests on a throwaway PostgreSQL 17, started automat
 npm run db:migrate        # prisma migrate deploy: applies the 3 migrations
 npm run db:app-password   # enables the restricted exam_app login and writes DATABASE_URL
 npm run db:seed:demo      # optional demo data: Somali names, real cities, USD fees
+npm run db:seed:demo:analytics  # optional: 30 more students and a 38-student exam for analytics
 npm run db:check          # read-only health check: every line must say PASS
 ```
 
@@ -205,7 +206,7 @@ npm run build && npm start   # production build
 
 ```bash
 cd backend
-npm test            # everything: 150 database + 67 API + 23 unit tests
+npm test            # everything: 150 database + 77 API + 25 unit tests
 npm run test:api    # API only
 npm run test:unit   # pure logic only
 npm run verify:db   # non-destructive checks against an existing database, e.g. Supabase

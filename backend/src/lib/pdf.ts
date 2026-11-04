@@ -19,6 +19,7 @@ export interface PdfContent {
   footer?: string;
 }
 
+/** Renders the content as an A4 PDF. @returns the file bytes. */
 export function buildPdf(c: PdfContent): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 50, info: { Title: c.title, Producer: "Online Exam Platform" } });

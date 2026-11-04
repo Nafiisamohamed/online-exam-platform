@@ -14,10 +14,12 @@ import { env } from "../config/env.ts";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
+/** Hashes a password with bcrypt (BCRYPT_ROUNDS). */
 export function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, env.BCRYPT_ROUNDS);
 }
 
+/** True when the password matches the bcrypt hash. */
 export function verifyPassword(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash);
 }
@@ -27,12 +29,14 @@ export function verifyPassword(plain: string, hash: string): Promise<boolean> {
  * time whether or not the account exists. Created once at startup.
  */
 let dummyHash: string | null = null;
+/** Runs a bcrypt comparison that always fails, so unknown login names take as long as real ones. */
 export async function dummyVerify(plain: string): Promise<false> {
   dummyHash ??= await bcrypt.hash("dummy-password-for-timing", env.BCRYPT_ROUNDS);
   await bcrypt.compare(plain, dummyHash);
   return false;
 }
 
+/** Random temporary password (default 12 characters) with at least one letter and one digit. */
 export function generateTempPassword(length = 12): string {
   let out = "";
   for (let i = 0; i < length; i++) out += ALPHABET[randomInt(ALPHABET.length)];

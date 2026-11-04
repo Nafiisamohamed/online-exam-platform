@@ -5,6 +5,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { logger } from "../lib/logger.ts";
 
+/** Express middleware: logs the request when the response has been sent. */
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const started = process.hrtime.bigint();
   res.on("finish", () => {

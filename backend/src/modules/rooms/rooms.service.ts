@@ -8,6 +8,7 @@ import { prisma, transaction } from "../../db/prisma.ts";
 import { conflict, notFound } from "../../lib/errors.ts";
 import { audit } from "../../services/audit.ts";
 
+/** All rooms, by name. */
 export function listRooms() {
   return prisma.room.findMany({ orderBy: { name: "asc" } });
 }

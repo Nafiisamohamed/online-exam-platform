@@ -127,6 +127,7 @@ export async function listSchedules(user: AuthUser, q: { status?: ScheduleStatus
   return rows.map(serialize);
 }
 
+/** One schedule for the admin, its lecturer or an assigned invigilator. @throws 404 SCHEDULE_NOT_FOUND */
 export async function getSchedule(user: AuthUser, id: string) {
   const s = await load(id);
   const ok =

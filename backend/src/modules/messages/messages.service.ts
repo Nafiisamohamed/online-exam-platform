@@ -33,10 +33,12 @@ export async function listNotifications(user: AuthUser, unreadOnly: boolean) {
   }));
 }
 
+/** Number of the user's unread notifications. */
 export function unreadCount(user: AuthUser) {
   return prisma.notification.count({ where: { userId: user.id, readAt: null } });
 }
 
+/** Marks all of the user's notifications read. @returns how many changed. */
 export async function markAllRead(user: AuthUser) {
   return (await prisma.notification.updateMany({ where: { userId: user.id, readAt: null }, data: { readAt: now() } })).count;
 }
@@ -66,6 +68,7 @@ export async function listSms(q: { status?: "QUEUED" | "SENT" | "DELIVERED" | "F
   return { ...paged(rows, total, q.page, q.pageSize), counts: Object.fromEntries(byStatus.map((s) => [s.status, s._count._all])), simulated: true };
 }
 
+/** One outbox message. @throws 404 SMS_NOT_FOUND */
 export async function getSms(id: string) {
   const m = await prisma.smsOutbox.findUnique({ where: { id }, include: { recipient: { select: { id: true, fullName: true, studentNumber: true } } } });
   if (!m) throw notFound("SMS_NOT_FOUND");

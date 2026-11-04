@@ -52,7 +52,7 @@ Every error has the same shape:
 
 | Applies to | Limit |
 |---|---|
-| All of `/api` | 600 requests per minute per IP address |
+| All of `/api` | 300 requests per minute per login session, and 3000 per IP address (an exam room behind one router shares one address) |
 | Login | 10 attempts per 15 minutes per IP address and login name |
 | Demo PIN | 10 tries per 15 minutes per user |
 

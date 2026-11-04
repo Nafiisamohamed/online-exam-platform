@@ -164,6 +164,7 @@ export async function addNote(user: AuthUser, scheduleId: string, text: string, 
   });
 }
 
+/** Notes of a session, newest first. @throws 404 SCHEDULE_NOT_FOUND */
 export async function listNotes(user: AuthUser, scheduleId: string) {
   await watchableSchedule(user, scheduleId);
   return prisma.invigilatorNote.findMany({

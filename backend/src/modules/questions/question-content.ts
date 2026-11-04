@@ -33,6 +33,7 @@ const TYPES = ["MCQ", "TRUE_FALSE", "SHORT_ANSWER", "ESSAY"];
 const DIFFICULTIES = ["EASY", "MEDIUM", "HARD"];
 const twoDecimals = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6;
 
+/** Checks one question against the rules above. @returns error codes; empty when valid. */
 export function validateQuestion(q: QuestionInput): ContentError[] {
   const errors: ContentError[] = [];
   if (!TYPES.includes(q.type)) errors.push({ code: "TYPE_INVALID" });

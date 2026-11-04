@@ -204,6 +204,7 @@ export async function cancelPayment(user: AuthUser, id: string, req: Request) {
   return serializePayment((await find(id))!);
 }
 
+/** One payment: the admin sees any, a student only their own. @throws 404 PAYMENT_NOT_FOUND */
 export async function getPayment(user: AuthUser, id: string) {
   if (user.role === "ADMIN") {
     const p = await find(id);

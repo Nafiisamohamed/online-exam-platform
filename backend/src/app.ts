@@ -22,6 +22,7 @@ import { apiLimiter } from "./middleware/rate-limits.ts";
 import { requestLogger } from "./middleware/request-log.ts";
 import { apiRouter } from "./routes.ts";
 
+/** Creates the configured Express app (security middleware, /api routes, error handling). Does not listen. */
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");

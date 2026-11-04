@@ -11,6 +11,7 @@ export function clientIp(req: Request): string {
   return normalizeIp(raw);
 }
 
+/** Shortens an IPv4-mapped IPv6 address ("::ffff:10.0.0.5") to plain IPv4; other values are returned unchanged. */
 export function normalizeIp(raw: string): string {
   return raw.startsWith("::ffff:") && isIP(raw.slice(7)) === 4 ? raw.slice(7) : raw;
 }

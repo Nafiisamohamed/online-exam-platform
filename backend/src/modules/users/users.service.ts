@@ -39,6 +39,7 @@ export interface NewUser {
   preferredLanguage?: Language;
 }
 
+/** When a temporary password issued now expires (TEMP_PASSWORD_DAYS). */
 export function tempPasswordExpiry(): Date {
   return new Date(now().getTime() + env.TEMP_PASSWORD_DAYS * 86_400_000);
 }
@@ -108,6 +109,7 @@ export async function listUsers(q: { role?: RoleName; search?: string; active?: 
   return paged(rows.map(toUser), total, q.page, q.pageSize);
 }
 
+/** One user (no password hash). @throws 404 USER_NOT_FOUND */
 export async function getUser(id: string) {
   const u = await prisma.user.findUnique({ where: { id }, select: userSelect });
   if (!u) throw notFound("USER_NOT_FOUND");

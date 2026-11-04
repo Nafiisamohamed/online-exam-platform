@@ -14,6 +14,7 @@ import { mapDbError } from "../db/db-errors.ts";
 import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 
+/** 404 ROUTE_NOT_FOUND for any path no router handled. */
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction) {
   next(new AppError(404, "ROUTE_NOT_FOUND", `No endpoint ${req.method} ${req.path}`));
 }
@@ -28,6 +29,7 @@ function frameworkError(err: FrameworkError): AppError | null {
   return null;
 }
 
+/** Express error middleware: converts any error into the standard JSON error response. */
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   const fe = (err && typeof err === "object" ? err : {}) as FrameworkError;
   let appError = mapDbError(err) ?? frameworkError(fe);

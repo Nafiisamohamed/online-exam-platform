@@ -36,6 +36,7 @@ export async function createFaculty(data: { code: string; name: string }, actorI
   }
 }
 
+/** Renames a faculty. @throws 404 FACULTY_NOT_FOUND */
 export async function updateFaculty(id: string, data: { name?: string }, actorId: string, req: Request) {
   if (!(await prisma.faculty.findUnique({ where: { id } }))) throw notFound("FACULTY_NOT_FOUND");
   return transaction(async (tx) => {
@@ -65,6 +66,7 @@ export async function listCourses(user: AuthUser, q: { semester?: string; facult
   return rows.map(({ _count, ...c }) => ({ ...c, activeStudents: _count.enrolments }));
 }
 
+/** One course with its faculty, lecturer and active student count. @throws 404 COURSE_NOT_FOUND */
 export async function getCourse(user: AuthUser, id: string) {
   await viewableCourse(user, id);
   const { _count, ...c } = await prisma.course.findUniqueOrThrow({ where: { id }, include: courseInclude });
@@ -92,6 +94,7 @@ export async function createCourse(data: { facultyId: string; code: string; name
   }
 }
 
+/** Changes a course's name, lecturer or faculty. @throws 404 COURSE_NOT_FOUND, 400 LECTURER_INVALID */
 export async function updateCourse(id: string, data: { name?: string; lecturerId?: string; facultyId?: string }, actorId: string, req: Request) {
   if (!(await prisma.course.findUnique({ where: { id } }))) throw notFound("COURSE_NOT_FOUND");
   if (data.lecturerId) await assertLecturer(data.lecturerId);

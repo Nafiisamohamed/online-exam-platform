@@ -17,6 +17,7 @@ export function normalizeSomaliPhone(input: string): string | null {
   return SOMALI_MOBILE.test(digits) ? digits : null;
 }
 
+/** True for a normalised Somali mobile number (+2526XXXXXXXX or +2527XXXXXXXX). */
 export function isSomaliMobile(phone: string): boolean {
   return SOMALI_MOBILE.test(phone);
 }

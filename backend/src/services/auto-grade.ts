@@ -28,6 +28,7 @@ export interface GradeInput {
   acceptedNormalized?: string[];
 }
 
+/** Grades one answer at submission. @returns the grading status and marks (null while a lecturer must decide). */
 export function autoGrade(a: GradeInput): { status: AutoStatus; marksAwarded: number | null } {
   if (a.type === "MCQ" || a.type === "TRUE_FALSE") {
     if (!a.selectedOptionId) return { status: "NOT_ANSWERED", marksAwarded: 0 };

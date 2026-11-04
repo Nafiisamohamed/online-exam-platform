@@ -11,6 +11,7 @@ import type { Db } from "../db/prisma.ts";
 import { num0 } from "../lib/format.ts";
 import { letterFor, loadScale } from "../modules/grading-scale/grading-scale.ts";
 
+/** Total, maximum and percentage (2 decimals) of a list of question marks. */
 export function computeTotals(items: { marks: number; awarded: number | null }[]) {
   const total = Math.round(items.reduce((s, i) => s + (i.awarded ?? 0), 0) * 100) / 100;
   const max = Math.round(items.reduce((s, i) => s + i.marks, 0) * 100) / 100;

@@ -14,6 +14,7 @@ import { num, num0 } from "../../lib/format.ts";
 import { manageableExam } from "../../services/access.ts";
 import { type AnswerFact, type AttemptScore, examStatistics, HIGH_THRESHOLD, LOW_THRESHOLD, MIN_STUDENTS, questionStatistics } from "../../services/analytics.ts";
 
+/** Statistics and per-question analytics of one exam (admin or course lecturer). @throws 404 EXAM_NOT_FOUND */
 export async function examAnalytics(user: AuthUser, examId: string) {
   const exam = await manageableExam(user, examId);
   const attempts = await prisma.examAttempt.findMany({

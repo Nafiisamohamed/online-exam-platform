@@ -172,6 +172,7 @@ async function writeRules(tx: Parameters<Parameters<typeof transaction>[0]>[0], 
   }
 }
 
+/** Staff view of one exam. @throws 404 EXAM_NOT_FOUND */
 export async function getExam(user: AuthUser, id: string) {
   await manageableExam(user, id, { allowSecondGrader: true });
   return serializeExam((await loadExam(id))!);

@@ -25,6 +25,7 @@ declare global {
 
 type Schemas = { body?: z.ZodType; query?: z.ZodType; params?: z.ZodType };
 
+/** Returns middleware that validates params, query and body with the given zod schemas (400 VALIDATION_ERROR). */
 export function validate(schemas: Schemas) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const valid: Request["valid"] = req.valid ?? {};

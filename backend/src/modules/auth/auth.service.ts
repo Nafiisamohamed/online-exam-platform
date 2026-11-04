@@ -78,6 +78,7 @@ export async function login(identifier: string, password: string, req: Request) 
   return { profile: toProfile({ ...user, role: user.role }), tokenVersion: user.tokenVersion };
 }
 
+/** The user's public profile (no password hash). */
 export async function getProfile(userId: string): Promise<Profile> {
   const u = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: profileSelect });
   return toProfile(u);
