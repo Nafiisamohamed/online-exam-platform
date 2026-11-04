@@ -6,6 +6,11 @@ import { Router } from "express";
 import { prisma } from "./db/prisma.ts";
 import { now } from "./db/clock.ts";
 import { authRouter } from "./modules/auth/auth.routes.ts";
+import { coursesRouter, facultiesRouter } from "./modules/courses/courses.routes.ts";
+import { gradingScaleRouter } from "./modules/grading-scale/grading-scale.ts";
+import { importsRouter } from "./modules/imports/imports.routes.ts";
+import { roomsRouter } from "./modules/rooms/rooms.routes.ts";
+import { staffRouter, usersRouter } from "./modules/users/users.routes.ts";
 
 export const apiRouter = Router();
 
@@ -24,3 +29,10 @@ apiRouter.get("/health", async (_req, res) => {
 });
 
 apiRouter.use("/auth", authRouter);
+apiRouter.use("/users", usersRouter);
+apiRouter.use("/staff", staffRouter);
+apiRouter.use("/faculties", facultiesRouter);
+apiRouter.use("/courses", coursesRouter);
+apiRouter.use("/rooms", roomsRouter);
+apiRouter.use("/grading-scale", gradingScaleRouter);
+apiRouter.use("/imports", importsRouter);

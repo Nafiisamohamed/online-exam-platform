@@ -1,0 +1,57 @@
+/**
+ * Record-level access checks shared by the modules (baseline 6.2 and the
+ * "Student-level authorization lives in Express" rule in docs/database.md).
+ *
+ * The database role exam_app can see every row, so these checks are the
+ * application's permission system:
+ * - ADMIN: every course and exam;
+ * - LECTURER: only courses they teach (and exams of those courses), plus
+ *   essay grading for exams where they are the assigned second grader;
+ * - STUDENT: only courses they are actively enrolled in;
+ * - INVIGILATOR: only exam sessions they are assigned to.
+ * A failed check throws 404, so other people's records are not revealed.
+ */
+import type { AuthUser } from "../middleware/auth.ts";
+import type { Db } from "../db/prisma.ts";
+import { prisma } from "../db/prisma.ts";
+import { notFound } from "../lib/errors.ts";
+
+/** Loads a course the user may manage (admin, or the course's lecturer). */
+export async function manageableCourse(user: AuthUser, courseId: string, db: Db = prisma) {
+  const course = await db.course.findUnique({ where: { id: courseId } });
+  if (!course || (user.role !== "ADMIN" && !(user.role === "LECTURER" && course.lecturerId === user.id))) {
+    throw notFound("COURSE_NOT_FOUND");
+  }
+  return course;
+}
+
+/** Loads a course the user may view (managers, or an actively enrolled student). */
+export async function viewableCourse(user: AuthUser, courseId: string, db: Db = prisma) {
+  const course = await db.course.findUnique({ where: { id: courseId } });
+  if (!course) throw notFound("COURSE_NOT_FOUND");
+  if (user.role === "ADMIN" || (user.role === "LECTURER" && course.lecturerId === user.id)) return course;
+  if (user.role === "STUDENT") {
+    const e = await db.enrolment.findUnique({ where: { studentId_courseId: { studentId: user.id, courseId } } });
+    if (e?.status === "ACTIVE") return course;
+  }
+  throw notFound("COURSE_NOT_FOUND");
+}
+
+/**
+ * Loads an exam the user may manage: admin, or the lecturer of its course.
+ * With `allowSecondGrader`, the exam's assigned second grader is also allowed.
+ */
+export async function manageableExam(user: AuthUser, examId: string, opts: { allowSecondGrader?: boolean } = {}, db: Db = prisma) {
+  const exam = await db.exam.findUnique({ where: { id: examId }, include: { course: true } });
+  const ok =
+    exam &&
+    (user.role === "ADMIN" ||
+      (user.role === "LECTURER" && (exam.course.lecturerId === user.id || (opts.allowSecondGrader && exam.secondGraderId === user.id))));
+  if (!ok) throw notFound("EXAM_NOT_FOUND");
+  return exam!;
+}
+
+/** True when the user is the lecturer who owns the exam's course (or an admin). */
+export function isCourseOwner(user: AuthUser, exam: { course: { lecturerId: string } }): boolean {
+  return user.role === "ADMIN" || exam.course.lecturerId === user.id;
+}

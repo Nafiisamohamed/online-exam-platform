@@ -1,0 +1,88 @@
+/**
+ * User endpoints. See docs/api.md#users.
+ *
+ * GET   /api/users                      ADMIN  list (role, search, active, page, pageSize)
+ * POST  /api/users                      ADMIN  create account -> { user, temporaryPassword }
+ * GET   /api/users/:id                  ADMIN  one user
+ * PATCH /api/users/:id                  ADMIN  update name, phone, language, active
+ * POST  /api/users/:id/reset-password   ADMIN  new temporary password -> { temporaryPassword }
+ * GET   /api/staff?role=LECTURER|INVIGILATOR   ADMIN, LECTURER  names for pickers
+ */
+import { Router } from "express";
+import { z } from "zod";
+import { authenticate, currentUser, requireRole } from "../../middleware/auth.ts";
+import { idParams, pageQuery, trimmed, validate } from "../../middleware/validate.ts";
+import { normalizeSomaliPhone } from "../../lib/phone.ts";
+import * as users from "./users.service.ts";
+
+export const usersRouter = Router();
+export const staffRouter = Router();
+
+const roleEnum = z.enum(["ADMIN", "LECTURER", "STUDENT", "INVIGILATOR"]);
+/** Somali mobile number, normalised to +252XXXXXXXXX. */
+export const phoneField = z
+  .string()
+  .trim()
+  .transform((v, ctx) => {
+    const p = normalizeSomaliPhone(v);
+    if (!p) ctx.addIssue({ code: "custom", message: "must be a Somali mobile number (+252 6X/7X XXX XXXX)" });
+    return p ?? v;
+  });
+export const studentNumberField = z.string().trim().regex(/^[A-Za-z0-9-]{3,30}$/, "use 3-30 letters, digits or dashes");
+
+const createBody = z.object({
+  role: roleEnum,
+  fullName: trimmed(150),
+  phone: phoneField,
+  email: z.email().max(200).optional(),
+  studentNumber: studentNumberField.optional(),
+  preferredLanguage: z.enum(["so", "en"]).optional(),
+});
+
+const updateBody = z
+  .object({
+    fullName: trimmed(150).optional(),
+    phone: phoneField.optional(),
+    preferredLanguage: z.enum(["so", "en"]).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, "send at least one field");
+
+const listQuery = pageQuery.extend({
+  role: roleEnum.optional(),
+  search: z.string().trim().max(100).optional(),
+  active: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+});
+
+usersRouter.use(authenticate(), requireRole("ADMIN"));
+
+usersRouter.get("/", validate({ query: listQuery }), async (req, res) => {
+  res.json(await users.listUsers(req.valid.query));
+});
+
+/** Response 201: { user, temporaryPassword }. Errors: 409 STUDENT_NUMBER_TAKEN, 409 EMAIL_TAKEN. */
+usersRouter.post("/", validate({ body: createBody }), async (req, res) => {
+  res.status(201).json(await users.createUser(req.valid.body, currentUser(req).id, req));
+});
+
+usersRouter.get("/:id", validate({ params: idParams }), async (req, res) => {
+  res.json({ user: await users.getUser(req.valid.params.id) });
+});
+
+usersRouter.patch("/:id", validate({ params: idParams, body: updateBody }), async (req, res) => {
+  res.json({ user: await users.updateUser(req.valid.params.id, req.valid.body, currentUser(req).id, req) });
+});
+
+usersRouter.post("/:id/reset-password", validate({ params: idParams }), async (req, res) => {
+  res.json(await users.resetPassword(req.valid.params.id, currentUser(req).id, req));
+});
+
+staffRouter.get(
+  "/",
+  authenticate(),
+  requireRole("ADMIN", "LECTURER"),
+  validate({ query: z.object({ role: z.enum(["LECTURER", "INVIGILATOR"]) }) }),
+  async (req, res) => {
+    res.json({ items: await users.listStaff(req.valid.query.role) });
+  },
+);
