@@ -1,0 +1,69 @@
+# Demo data
+
+`npm run db:seed:demo` (from `backend/`) loads fictional demo data for demonstrations and manual testing. It is loaded in the hosted Supabase project.
+
+- **Fictional:** Somali names, real cities (Muqdisho, Hargeysa), USD amounts and a fictional university, "Jaamacadda Demo".
+- **Connects as `exam_app`**, so the data is created with exactly the application's permissions.
+- **Safe:** it never changes or deletes existing data, refuses to run twice, and runs in one transaction. If any step fails, nothing is saved.
+- **Script:** [backend/scripts/seed-demo-data.mjs](../backend/scripts/seed-demo-data.mjs).
+
+## Demo accounts
+
+| Role | Name | Login |
+|---|---|---|
+| ADMIN (registrar) | Sahra Cabdirashiid Mire | `registrar@uni-demo.test` |
+| LECTURER | Dr. Axmed Xirsi Samatar (CS201) | `axmed.samatar@uni-demo.test` |
+| LECTURER | Dr. Mustafe Cabdi Jibriil (CS105, blind second grader for CS201) | `mustafe.jibriil@uni-demo.test` |
+| LECTURER | Dr. Khadra Maxamuud Cilmi (BA110) | `khadra.cilmi@uni-demo.test` |
+| INVIGILATOR | Cabdiraxmaan Nuur Faarax | `cabdiraxmaan.faarax@uni-demo.test` |
+| INVIGILATOR | Deeqa Xuseen Aadan | `deeqa.aadan@uni-demo.test` |
+| STUDENT | Hodan Maxamed Cali … Yaasiin Ibraahim Guuleed (10 students) | `DEMO-2026-0001` … `DEMO-2026-0010` |
+
+**Passwords**
+- Each account gets a random 16-character password, stored in the database only as a bcrypt hash (cost 12).
+- The plain passwords are written once, to `backend/demo-accounts.local.md` on the machine that ran the seed.
+- That file is ignored by git. **Never commit or publish it.**
+- To give judges demo access, share the passwords privately, or give them a separate copy of the database with their own passwords. Don't put them in the README for a database that is reachable on the internet.
+
+`.test` email addresses are reserved and can never receive mail.
+
+## What is in the data
+
+| Area | Contents |
+|---|---|
+| Faculties and courses | Faculty of Computing (CS201 Database Systems, CS105 Introduction to Programming) and Faculty of Economics and Management (BA110 Principles of Accounting), semester `2026-Fall` |
+| Enrolments | 23. Student `DEMO-2026-0005` dropped CS201 **after** sitting the midterm, and their result is kept. |
+| Question banks | 29 questions: MCQ (4 and 5 options), True/False, short answer with accepted answers, and essays with rubrics. One CS201 question was edited after use and has a version 2, while the midterm keeps version 1. 2 import batches show a CSV import with one invalid and one duplicate row. |
+| Rooms | Lab A (Mogadishu campus, `10.10.4.0/24`) and Hall 2 (Hargeisa campus, `10.20.1.0/24`) |
+| CS201 Midterm | Held **yesterday**, 09:00–11:00 Mogadishu time, 60 minutes, approved. 5 students sat it, each with a **different random set of 9 questions with the same difficulty and marks mix** (24 marks), and 3 enrolled students were absent. Also included: a 10-minute time extension (power cut) for one student, tab-switch events (one student with 3 counted switches and an invigilator note), and one unanswered question. |
+| Grading | Auto-graded MCQ/TF/short answers, short answers needing review graded by the lecturer, and essays marked by the first and blind second graders (final mark = average). Results were **published twice**: publication 2 is a regrade after a review request, and every grade revision is kept. |
+| CS201 Final | In 7 days, 5.00 USD fee, two rooms, approved after an earlier rejected request (room clash) |
+| Simulated payments | EVC Plus, Zaad and eDahab: 4 successful (one after a wrong PIN), 1 failed after 3 wrong PINs and then paid on retry, 1 cancelled, 1 left open (expires after 5 minutes). All receipts are `DEMO-…`. |
+| Other exams | CS105 Quiz 1 (schedule requested, waiting for approval) and BA110 Midterm (draft) |
+| Messages | 27 simulated SMS messages (`[DEMO]`, Somali or English per user, delivered/sent/queued/failed), 13 in-app notifications, 10 audit log entries |
+
+**Midterm results:**
+
+| Student | Score |
+|---|---|
+| `DEMO-2026-0001` | 21.5/24 (B) |
+| `DEMO-2026-0002` | 20.5/24 (B) |
+| `DEMO-2026-0003` | 18.5/24 (C) |
+| `DEMO-2026-0004` | 13.5/24 (F) |
+| `DEMO-2026-0005` | 17.5/24 (C) |
+
+`DEMO-2026-0004`'s result changed in the regrade, from 12.5 to 13.5.
+
+**Dates are relative to the day the seed ran** (the midterm is the day before, the final 7 days after).
+
+## Checking the data
+
+`npm run db:check` runs read-only integrity checks on any migrated database, for example:
+- one attempt per student per exam;
+- no answer saved after its deadline;
+- extensions of at most 15 minutes;
+- locked question versions;
+- complete publications;
+- grade totals;
+- simulated payments and messages only;
+- bcrypt-hashed passwords.

@@ -50,8 +50,9 @@ describe("question locking", () => {
   });
 
   // These tests need two real connections, so their rows are committed.
-  // The next run rebuilds the test database, which removes them.
-  describe("locking within the question-selection transaction", () => {
+  // The next run rebuilds the test database, which removes them. They are
+  // skipped in verification mode (npm run verify:db), which must not commit.
+  describe.skipIf(process.env.TEST_VERIFY_MODE)("locking within the question-selection transaction", () => {
     let a, b, w;
     beforeAll(async () => {
       a = wrap(await connect());

@@ -8,6 +8,25 @@ The platform uses two separate database environments. Both run the same migratio
 | **Hosted** | Supabase PostgreSQL, a separate project | Remote access, staging and shared demos. Never used to run live examinations. |
 | **Tests** | A dedicated `*_test` database on local PostgreSQL 17, and optionally a separate Supabase test project | Automated tests only (see [testing.md](testing.md)) |
 
+## Supabase projects
+
+These details are not secret. Passwords and full connection strings are never written here.
+
+| | Main project (hosted environment) | Test project |
+|---|---|---|
+| Name | `online exam platform` | Not created yet (e.g. `online-exam-test`) |
+| Project ref | `tzrhdwrswkfmqoriztrj` | — |
+| Region | Frankfurt (`eu-central-1`) | Should be the same region |
+| PostgreSQL | 17.11 | — |
+| Connection | Session Pooler | Session Pooler |
+| Pooler host | `aws-1-eu-central-1.pooler.supabase.com`, port `5432` | — |
+| Database | `postgres` | `postgres` |
+| Owner user (pooler) | `postgres.tzrhdwrswkfmqoriztrj` | `postgres.<test-project-ref>` |
+| App user (pooler) | `exam_app.tzrhdwrswkfmqoriztrj` (verified: logs in through the pooler) | `exam_app.<test-project-ref>` |
+| Status | **Migrated and populated (2026-11-04).** All 3 migrations applied, `exam_app` login enabled, demo data loaded (see [demo-data.md](demo-data.md)). Every health check and verification test passed. | Not created (optional) |
+
+The main project is on the test runner's block list (`BLOCKED_SUPABASE_PROJECT_REFS` in `backend/tests/helpers/env.mjs`), so the tests refuse it even if a marker table were ever added there by mistake.
+
 ## They are separate databases
 
 **Local PostgreSQL and Supabase are completely separate databases. There is no automatic synchronization between them.**
@@ -35,8 +54,9 @@ Each environment has two database roles. See [database.md](database.md#access-se
 | Setting | Role | Where it is set |
 |---|---|---|
 | `DATABASE_URL` | `exam_app`, the restricted application role | The application server's `backend/.env` |
-| `MIGRATE_DATABASE_URL` | The database owner (`exam_owner` locally, `postgres` on Supabase) | Only on the administrator's machine, and only while running migrations. **Never on the application server.** |
+| `MIGRATE_DATABASE_URL` | The database owner (`exam_owner` locally, `postgres` on Supabase) | Only on the administrator's machine, in `backend/.env` or the shell. **Never on the application server.** |
 
+- `backend/.env` is ignored by git. `backend/.env.example` shows every variable, with placeholders only.
 - Passwords are kept in a password manager, never in git.
 - The Supabase `anon` and `service_role` API keys are not used by this project.
 
@@ -63,31 +83,51 @@ ALTER ROLE exam_app WITH LOGIN PASSWORD '<application password>';
 
 Finally, set `DATABASE_URL` in `backend/.env` to `exam_app` with that password.
 
+### Creating new migrations
+
+Run `npm run db:migrate:dev -- --name <change>` against **local** PostgreSQL only.
+
+- The command goes through `backend/scripts/require-local-db.mjs`, which refuses to run unless `MIGRATE_DATABASE_URL` points at `localhost`, `127.0.0.1` or `::1`.
+- `prisma migrate dev` may offer to reset the database. Never run it against Supabase.
+- It also needs a temporary "shadow" database. The owner role therefore needs `CREATEDB` while creating migrations, or a separate shadow database must be configured.
+
+There is no `db:reset` script. Wiping a database is never a one-word command in this project.
+
 ## Supabase setup (hosted environment)
 
-Not done yet. When approved:
+Done for the main project on 2026-11-04. To set up another Supabase project, or to repeat it, run these from `backend/`:
 
-1. Create the production project in the region closest to Somalia, and confirm PostgreSQL 17 under **Settings → Infrastructure**.
-2. Turn off the Data API under **Project Settings → Data API**, before any table exists.
-3. Make sure all tests pass locally, and that `prisma migrate diff` shows no drift.
-4. Set `MIGRATE_DATABASE_URL` in the shell (not in a file) to the owner connection:
-   - the direct connection, port 5432 (requires IPv6);
-   - or the session pooler, port 5432, if your network has no IPv6.
-5. Run `npx prisma migrate status` and confirm no migrations are applied yet.
-6. Run `npx prisma migrate deploy`. Only `deploy`; never `migrate dev` or `migrate reset` on Supabase.
-7. Verify:
-   - `migrate status` reports the database is up to date;
-   - `migrate diff` reports no drift;
-   - **Advisors → Security Advisor** shows no "RLS disabled" errors.
-8. In the SQL editor, enable login for the app role: `ALTER ROLE exam_app WITH LOGIN PASSWORD '<generated>';`
-9. On the server that connects to Supabase, set `DATABASE_URL` to the `exam_app` pooler connection:
-   - user `exam_app.<project-ref>`;
-   - session pooler, port 5432;
-   - add `sslmode=require`.
+1. Turn off the Data API under **Project Settings → Data API**, before any table exists.
+2. Set the owner connection, either:
+   - by running `npm run db:supabase-login`, which asks for the password with hidden typing and encodes it; or
+   - by writing this line in `backend/.env` yourself, with the password URL-encoded:
 
-   Then remove `MIGRATE_DATABASE_URL` from the shell.
+   ```
+   MIGRATE_DATABASE_URL="postgresql://postgres.<project-ref>:<password>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require&sslcert=certs/supabase-ca-2021.crt&sslaccept=strict&connect_timeout=30"
+   ```
 
-Before step 1 is done for production, the same procedure is run on a separate Supabase **test** project (see [testing.md](testing.md#supabase-test-project)).
+3. `npx prisma migrate status`: read-only; lists the migrations not yet applied.
+4. `npm run db:migrate` (`prisma migrate deploy`). Only `deploy`; never `migrate dev`, `db push` or `migrate reset` on Supabase.
+5. `npm run db:app-password`: enables the `exam_app` login with a random password. The password is sent only as a SCRAM-SHA-256 hash, and the script writes `DATABASE_URL` (user `exam_app.<project-ref>`) into `backend/.env`.
+6. `npm run db:seed:demo`: optional demo data (see [demo-data.md](demo-data.md)).
+7. `npm run db:check`: read-only health check. Every line must say PASS.
+8. `npm run verify:db`: the test suite in non-destructive verification mode (see [testing.md](testing.md#verification-mode-existing-databases)).
+9. `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` must print "This is an empty migration" (no drift).
+10. Check **Advisors → Security Advisor**: no "RLS disabled" errors. An informational note that `_prisma_migrations` has RLS but no policy is expected.
+
+### Verified on Supabase (main project, PostgreSQL 17.11)
+
+| Question | Result |
+|---|---|
+| Can Supabase's `postgres` owner create `exam_app`, grant itself membership and set grants? | ✅ Yes. The security migration applied without errors. |
+| Do the revokes for `anon`, `authenticated` and `service_role` (including default privileges) work? | ✅ Yes. None of the three has any privilege on any application table. |
+| Do the migrations apply with `prisma migrate deploy` through the Session Pooler? | ✅ Yes, all 3. Status is up to date, with no drift. |
+| Does the pooler accept `exam_app.<project-ref>`? | ✅ Yes |
+| Prisma Client 7.10.1 with `@prisma/adapter-pg` | ✅ Connects as `exam_app`, reads, and writes inside a transaction |
+| Node `pg` and `sslmode=require` | ⚠️ `pg` treats `require` as "verify the certificate", and Supabase's certificates are signed by **Supabase Root 2021 CA**, which Node doesn't trust by default. **The CA certificate is required.** `backend/certs/supabase-ca-2021.crt` is Supabase's published root CA (SHA-256 `80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA`, valid until 2031-04-26). The pooler's chain verifies against it. All our Node code verifies Supabase hosts against it (`scripts/lib/pg-connection.mjs`); verification is never disabled. |
+| Prisma CLI TLS | Needs `sslcert=certs/supabase-ca-2021.crt&sslaccept=strict` (path relative to `backend/`) and `connect_timeout=30`. The TLS handshake to Frankfurt took about 9 seconds, longer than Prisma's 5-second default. |
+
+The Express application will use the same `pgClientConfig()` settings when it creates its `PrismaPg` adapter.
 
 ## Backups and restoration (proposed process)
 

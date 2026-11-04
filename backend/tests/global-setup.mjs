@@ -16,18 +16,18 @@
  */
 import { execSync } from "node:child_process";
 import pg from "pg";
-import { backendDir, loadTestEnv, pgConnectionString } from "./helpers/env.mjs";
+import { backendDir, loadTestEnv, pgConfig } from "./helpers/env.mjs";
 
 async function ensureDatabaseExists(url, dbName) {
-  const probe = new pg.Client({ connectionString: pgConnectionString(url) });
+  const probe = new pg.Client(pgConfig(url));
   try {
     await probe.connect();
     await probe.end();
   } catch (error) {
     if (error.code !== "3D000") throw error; // 3D000 = database does not exist
-    const adminUrl = new URL(pgConnectionString(url));
+    const adminUrl = new URL(url);
     adminUrl.pathname = "/postgres";
-    const admin = new pg.Client({ connectionString: adminUrl.toString() });
+    const admin = new pg.Client(pgConfig(adminUrl.toString()));
     await admin.connect();
     await admin.query(`CREATE DATABASE "${dbName.replace(/"/g, '""')}"`);
     await admin.end();
@@ -77,7 +77,7 @@ export default async function setup() {
   const { url, dbName, mode, supabaseRef } = loadTestEnv();
   if (mode === "local") await ensureDatabaseExists(url, dbName);
 
-  const client = new pg.Client({ connectionString: pgConnectionString(url) });
+  const client = new pg.Client(pgConfig(url));
   await client.connect();
   try {
     if (mode === "supabase") await assertSupabaseTestMarker(client, supabaseRef);
@@ -103,7 +103,7 @@ export default async function setup() {
     throw new Error("prisma migrate deploy failed on the test database:\n" + (error.stderr?.toString() || error.message));
   }
 
-  const seed = new pg.Client({ connectionString: pgConnectionString(url) });
+  const seed = new pg.Client(pgConfig(url));
   await seed.connect();
   await seed.query(`INSERT INTO roles(name) VALUES ('ADMIN'), ('LECTURER'), ('STUDENT'), ('INVIGILATOR')`);
   await seed.end();

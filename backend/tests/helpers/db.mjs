@@ -12,7 +12,7 @@
  */
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
-import { pgConnectionString } from "./env.mjs";
+import { pgConfig } from "./env.mjs";
 
 /** A minimal query interface used by the fixture builders. */
 export function wrap(client) {
@@ -25,7 +25,7 @@ export function wrap(client) {
 
 /** Opens a new connection to the test database. Caller must end() it. */
 export async function connect() {
-  const client = new pg.Client({ connectionString: pgConnectionString() });
+  const client = new pg.Client(pgConfig());
   await client.connect();
   return client;
 }

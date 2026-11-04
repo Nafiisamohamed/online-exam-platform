@@ -13,6 +13,9 @@ node_modules/
 *.pfx
 secrets/
 
+# Demo account passwords written by `npm run db:seed:demo`
+demo-accounts.local.md
+
 # Database files and local data
 *.db
 *.sqlite

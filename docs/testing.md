@@ -48,6 +48,27 @@ npm run test:watch   # re-run tests when files change
 
 You can also set `TEST_DATABASE_URL` in the shell instead of using `.env.test`. A value set in the shell takes priority.
 
+## Verification mode (existing databases)
+
+```bash
+cd backend
+npm run verify:db    # checks the database in MIGRATE_DATABASE_URL, without changing it
+npm run db:check     # read-only structure, security and data-integrity report
+```
+
+`npm run verify:db` runs the same test files against an **already migrated** database: local, the Supabase main project, or a restored copy. It is non-destructive:
+
+- **No reset and no migrations.** Before any test runs, it only checks, read-only, that every migration is applied and the four roles exist.
+- **Every write is rolled back.** All writes happen inside transactions, and the row counts are the same before and after.
+- **4 tests are skipped.** These are the locking tests that need two connections and must commit rows.
+- **The 3 Supabase-only checks run automatically** when the host is a Supabase host.
+
+It connects as the owner (`MIGRATE_DATABASE_URL`), because some tests switch to `exam_app` or briefly switch off a trigger, always inside a rolled-back transaction.
+
+**Last results:** Supabase main project, 2026-11-04:
+- `verify:db`: 149 passed, 4 skipped, row counts unchanged;
+- `db:check`: every check passed.
+
 ## What a test run does
 
 1. **Safety checks.** The run stops before deleting anything if any rule below fails.
@@ -66,6 +87,8 @@ Each run starts from a freshly migrated database, so the suite can be run any nu
 | Supabase test project | `npm run test:supabase` | `backend/.env.supabase-test` | `TEST_SUPABASE_PROJECT_REF` is set and appears in `TEST_DATABASE_URL`, **and** the database contains `test_guard.marker` holding that same project ref |
 
 In both modes, the test database must also differ from `DATABASE_URL` and `MIGRATE_DATABASE_URL` in `backend/.env`.
+
+The main Supabase project (`tzrhdwrswkfmqoriztrj`) is on a block list in `tests/helpers/env.mjs`. The tests refuse it in both modes, even if a marker table were added there by mistake.
 
 ## How tests stay independent
 

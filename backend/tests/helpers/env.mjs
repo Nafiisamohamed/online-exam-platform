@@ -17,15 +17,24 @@
  *     deleted). Only the dedicated test project has this marker.
  *
  * In both modes the test database must differ from DATABASE_URL and
- * MIGRATE_DATABASE_URL in backend/.env.
+ * MIGRATE_DATABASE_URL in backend/.env, and must not belong to a project in
+ * BLOCKED_SUPABASE_PROJECT_REFS (the main project), even if it has a marker.
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import { pgClientConfig } from "../../scripts/lib/pg-connection.mjs";
 
 export const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const SUPABASE_ENV_FILE = ".env.supabase-test";
+
+/**
+ * Supabase projects the tests must NEVER run against, whatever the settings
+ * or marker say. Project refs are not secret.
+ *   tzrhdwrswkfmqoriztrj  main project "online exam platform" (eu-central-1)
+ */
+export const BLOCKED_SUPABASE_PROJECT_REFS = ["tzrhdwrswkfmqoriztrj"];
 
 /** Returns "host:port/database" so two URLs can be compared. */
 function databaseKey(url) {
@@ -55,6 +64,12 @@ export function loadTestEnv() {
   const dbName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
   const supabaseRef = process.env.TEST_SUPABASE_PROJECT_REF?.trim() || null;
   const isSupabaseHost = parsed.hostname.toLowerCase().includes("supabase");
+
+  // Checked first, in both modes: never touch a blocked (main/production) project.
+  const blocked = BLOCKED_SUPABASE_PROJECT_REFS.find((ref) => url.includes(ref) || supabaseRef === ref);
+  if (blocked) {
+    throw new Error(`Refusing to run tests: Supabase project "${blocked}" is the main project and is blocked for tests.`);
+  }
 
   if (mode === "supabase") {
     if (!supabaseRef || !/^[a-z0-9]+$/.test(supabaseRef)) {
@@ -92,9 +107,11 @@ export function loadTestEnv() {
   return { url, dbName, mode, supabaseRef };
 }
 
-/** Connection string for the pg driver (drops Prisma's ?schema= parameter). */
-export function pgConnectionString(url = process.env.TEST_DATABASE_URL) {
-  const u = new URL(url);
-  u.searchParams.delete("schema");
-  return u.toString();
+/**
+ * pg client settings for a test URL: Prisma-only parameters removed and TLS set
+ * up (Supabase hosts are verified against Supabase's root CA). See
+ * scripts/lib/pg-connection.mjs.
+ */
+export function pgConfig(url = process.env.TEST_DATABASE_URL) {
+  return pgClientConfig(url);
 }

@@ -58,15 +58,17 @@ describe("access security", () => {
         if (DELETABLE_TABLES.includes(table)) p.push("DELETE");
         return p;
       };
-      const mismatches = [];
-      for (const table of [...APP_TABLES, "_prisma_migrations"]) {
-        const actual = [];
-        for (const privilege of ALL) {
-          const { has } = await db.one(`SELECT has_table_privilege('exam_app', format('public.%I', $1::text), $2) AS has`, [table, privilege]);
-          if (has) actual.push(privilege);
-        }
-        if (actual.join() !== expected(table).join()) mismatches.push(`${table}: expected [${expected(table)}] got [${actual}]`);
-      }
+      // One query for all tables and privileges (fast over a remote connection too).
+      const { rows } = await db.q(
+        `SELECT t AS table_name,
+                array_remove(ARRAY(SELECT p FROM unnest($2::text[]) WITH ORDINALITY AS x(p, i)
+                                    WHERE has_table_privilege('exam_app', format('public.%I', t), p) ORDER BY i), NULL) AS actual
+           FROM unnest($1::text[]) AS t`,
+        [[...APP_TABLES, "_prisma_migrations"], ALL],
+      );
+      const mismatches = rows
+        .filter((r) => r.actual.join() !== expected(r.table_name).join())
+        .map((r) => `${r.table_name}: expected [${expected(r.table_name)}] got [${r.actual}]`);
       expect(mismatches).toEqual([]);
       const schema = await db.one(`SELECT has_schema_privilege('exam_app', 'public', 'USAGE') AS usage, has_schema_privilege('exam_app', 'public', 'CREATE') AS create`);
       expect(schema).toEqual({ usage: true, create: false });
@@ -202,7 +204,7 @@ describe("access security", () => {
   // Only meaningful on Supabase, where these API roles exist. Skipped on local PostgreSQL.
   describe("Supabase API roles have no access", () => {
     for (const apiRole of ["anon", "authenticated", "service_role"]) {
-      it.skipIf(!process.env.TEST_SUPABASE_PROJECT_REF)(`${apiRole} has no privileges on any application table`, async () => {
+      it.skipIf(!process.env.TEST_SUPABASE_PROJECT_REF && !process.env.TEST_EXPECT_SUPABASE_ROLES)(`${apiRole} has no privileges on any application table`, async () => {
         const { rows } = await db.q(
           `SELECT t AS table_name FROM unnest($1::text[]) AS t
             WHERE has_table_privilege($2, format('public.%I', t), 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')`,

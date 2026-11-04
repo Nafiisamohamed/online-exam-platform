@@ -10,10 +10,14 @@
   "scripts": {
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate deploy",
-    "db:migrate:dev": "prisma migrate dev",
-    "db:reset": "prisma migrate reset",
+    "db:migrate:dev": "node scripts/require-local-db.mjs migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
+    "db:supabase-login": "node scripts/set-supabase-owner-url.mjs",
+    "db:app-password": "node scripts/set-app-password.mjs",
+    "db:seed:demo": "node scripts/seed-demo-data.mjs",
+    "db:check": "node scripts/check-database.mjs",
+    "verify:db": "vitest run --config vitest.verify.config.mjs",
     "test": "vitest run",
     "test:supabase": "node tests/run-supabase.mjs",
     "test:watch": "vitest"
@@ -25,6 +29,7 @@
   },
   "dependencies": {
     "@prisma/client": "7.10.1",
+    "bcryptjs": "3.0.3",
     "dotenv": "16.4.7"
   }
 }

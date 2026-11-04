@@ -17,12 +17,29 @@ Local PostgreSQL and Supabase are separate databases. See [database-environments
 
 ```bash
 cd backend
-cp .env.example .env        # then set DATABASE_URL (exam_app) and MIGRATE_DATABASE_URL (owner)
+cp .env.example .env        # set MIGRATE_DATABASE_URL (owner); see .env.example for formats
 npm install
+npx prisma migrate status   # read-only: which migrations are not applied yet
 npm run db:migrate          # applies all migrations (prisma migrate deploy) as the owner
+npm run db:app-password     # enables exam_app login and writes DATABASE_URL into .env
+npm run db:seed:demo        # optional demo data (docs/demo-data.md)
+npm run db:check            # read-only health check: every line must say PASS
 ```
 
-The one-time role and database setup is described in [database-environments.md](database-environments.md#local-postgresql-17-setup).
+| Script | What it does |
+|---|---|
+| `db:supabase-login` | Asks for the Supabase password (hidden typing) and writes `MIGRATE_DATABASE_URL` |
+| `db:migrate` | `prisma migrate deploy`: the only migration command for Supabase and campus databases |
+| `db:migrate:dev` | Creates a new migration. **Local PostgreSQL only**; it refuses any other host. |
+| `db:app-password` | New random `exam_app` password, sent to the server only as a SCRAM-SHA-256 hash; writes `DATABASE_URL` |
+| `db:seed:demo` | Demo data as `exam_app`. One transaction, refuses to run twice, never deletes. |
+| `db:check` | Read-only structure, security and data-integrity checks |
+| `verify:db` | Test suite in non-destructive verification mode against the configured database |
+| `db:generate` / `db:validate` | Prisma Client generation and schema validation (no database needed) |
+
+The one-time setup is described in [database-environments.md](database-environments.md): local roles in [Local PostgreSQL 17 setup](database-environments.md#local-postgresql-17-setup), and Supabase in [Supabase setup](database-environments.md#supabase-setup-hosted-environment).
+
+**TLS:** Supabase connections verify the server against Supabase's root CA, `backend/certs/supabase-ca-2021.crt`.
 
 Every rule below is covered by the automated tests. See [testing.md](testing.md).
 
