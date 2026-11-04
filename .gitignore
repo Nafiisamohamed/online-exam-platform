@@ -17,6 +17,8 @@ secrets/
 demo-accounts.local.md
 
 # Database files and local data
+backend/.test-db/
+backend/.test-uploads/
 *.db
 *.sqlite
 *.sqlite3

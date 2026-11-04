@@ -1,0 +1,35 @@
+/**
+ * Data access layer: the single Prisma Client used by every service.
+ *
+ * Connects with DATABASE_URL (the restricted exam_app role) through the
+ * node-postgres driver adapter. The pg settings come from the shared helper
+ * scripts/lib/pg-connection.mjs, which verifies Supabase's TLS certificate
+ * against the bundled Supabase root CA and removes Prisma-CLI-only URL
+ * parameters.
+ *
+ * Route handlers never use this client directly; only services do.
+ */
+import { PrismaPg } from "@prisma/adapter-pg";
+import { env } from "../config/env.ts";
+import { PrismaClient } from "../generated/prisma/client.ts";
+import { pgClientConfig } from "../../scripts/lib/pg-connection.mjs";
+
+export { Prisma } from "../generated/prisma/client.ts";
+export type { PrismaClient } from "../generated/prisma/client.ts";
+
+const adapter = new PrismaPg({ ...pgClientConfig(env.DATABASE_URL), max: 10 });
+
+export const prisma = new PrismaClient({ adapter });
+
+/** The client type inside an interactive transaction. */
+export type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+/** Either the main client or a transaction client. */
+export type Db = typeof prisma | Tx;
+
+/**
+ * Runs `fn` in one database transaction with limits suited to a remote
+ * database (Supabase adds network latency to every statement).
+ */
+export function transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return prisma.$transaction(fn, { maxWait: 15_000, timeout: 30_000 });
+}

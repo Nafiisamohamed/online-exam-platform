@@ -11,12 +11,16 @@
  * 4. Applies every Prisma migration (prisma migrate deploy).
  * 5. Inserts the four official roles (reference data the tests build on).
  *
+ * 0. Local mode with no test database configured: starts the embedded
+ *    PostgreSQL 17 test server first, and stops it at the end of the run.
+ *
  * Every run therefore starts from a freshly migrated database. Development
  * and production data are never touched.
  */
 import { execSync } from "node:child_process";
 import pg from "pg";
 import { backendDir, loadTestEnv, pgConfig } from "./helpers/env.mjs";
+import { startEmbeddedPostgres } from "./support/embedded-postgres.mjs";
 
 async function ensureDatabaseExists(url, dbName) {
   const probe = new pg.Client(pgConfig(url));
@@ -74,7 +78,8 @@ BEGIN
 END $$;`;
 
 export default async function setup() {
-  const { url, dbName, mode, supabaseRef } = loadTestEnv();
+  const { url, dbName, mode, supabaseRef, embedded } = loadTestEnv();
+  const stopEmbedded = embedded ? await startEmbeddedPostgres(backendDir) : async () => {};
   if (mode === "local") await ensureDatabaseExists(url, dbName);
 
   const client = new pg.Client(pgConfig(url));
@@ -107,4 +112,7 @@ export default async function setup() {
   await seed.connect();
   await seed.query(`INSERT INTO roles(name) VALUES ('ADMIN'), ('LECTURER'), ('STUDENT'), ('INVIGILATOR')`);
   await seed.end();
+
+  // Vitest calls this when the whole run has finished.
+  return stopEmbedded;
 }

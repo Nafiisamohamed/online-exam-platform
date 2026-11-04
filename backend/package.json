@@ -2,12 +2,16 @@
   "name": "online-exam-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Online Exam Platform (Project 18) - Express API and database",
-  "type": "commonjs",
+  "description": "Online Exam Platform (Project 18) - Express API (TypeScript) and database",
+  "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
     "db:validate": "prisma validate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "node scripts/require-local-db.mjs migrate dev",
@@ -20,16 +24,43 @@
     "verify:db": "vitest run --config vitest.verify.config.mjs",
     "test": "vitest run",
     "test:supabase": "node tests/run-supabase.mjs",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:api": "vitest run tests/api",
+    "postinstall": "prisma generate"
   },
   "devDependencies": {
-    "pg": "8.19.0",
+    "@types/cookie-parser": "1.4.10",
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/multer": "2.3.0",
+    "@types/node": "24.19.2",
+    "@types/pdfkit": "0.17.7",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "embedded-postgres": "17.11.0-beta.19",
     "prisma": "7.10.1",
+    "supertest": "7.3.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
     "vitest": "4.1.12"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "bcryptjs": "3.0.3",
-    "dotenv": "16.4.7"
+    "cookie-parser": "1.4.7",
+    "cors": "2.8.6",
+    "csv-parse": "7.0.3",
+    "dotenv": "16.4.7",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.3",
+    "helmet": "8.3.0",
+    "jsonwebtoken": "9.0.3",
+    "multer": "2.5.0",
+    "pdfkit": "0.20.2",
+    "pg": "8.19.0",
+    "zod": "4.6.7"
   }
 }

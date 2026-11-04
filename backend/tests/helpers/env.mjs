@@ -5,7 +5,9 @@
  * database on every run, so it must never point at real data. There are two
  * modes, and each refuses to start unless its rules are met.
  *
- * Local mode (npm test, file backend/.env.test) - the default:
+ * Local mode (npm test, file backend/.env.test) - the default. Without
+ * backend/.env.test or TEST_DATABASE_URL, the tests start their own embedded
+ * PostgreSQL 17 (tests/support/embedded-postgres.mjs):
  *   - the database name must end with "_test";
  *   - the host must not be a Supabase host;
  *   - TEST_SUPABASE_PROJECT_REF must not be set.
@@ -25,6 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { pgClientConfig } from "../../scripts/lib/pg-connection.mjs";
+import { EMBEDDED_TEST_URL } from "../support/embedded-postgres.mjs";
 
 export const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const SUPABASE_ENV_FILE = ".env.supabase-test";
@@ -44,7 +47,7 @@ function databaseKey(url) {
 
 /**
  * Loads the test env file (values already set in the shell win) and validates it.
- * @returns {{ url: string, dbName: string, mode: "local" | "supabase", supabaseRef: string | null }}
+ * @returns {{ url: string, dbName: string, mode: "local" | "supabase", supabaseRef: string | null, embedded: boolean }}
  * @throws {Error} when the settings are missing or could point at non-test data.
  */
 export function loadTestEnv() {
@@ -52,6 +55,13 @@ export function loadTestEnv() {
   const mode = envFile === SUPABASE_ENV_FILE ? "supabase" : "local";
   dotenv.config({ path: path.join(backendDir, envFile) });
 
+  // Local mode with nothing configured: use the embedded test server
+  // (tests/support/embedded-postgres.mjs), started by global-setup.
+  let embedded = false;
+  if (!process.env.TEST_DATABASE_URL && mode === "local") {
+    process.env.TEST_DATABASE_URL = EMBEDDED_TEST_URL;
+    embedded = true;
+  }
   const url = process.env.TEST_DATABASE_URL;
   if (!url) {
     throw new Error(
@@ -104,7 +114,7 @@ export function loadTestEnv() {
     }
   }
 
-  return { url, dbName, mode, supabaseRef };
+  return { url, dbName, mode, supabaseRef, embedded: embedded || url === EMBEDDED_TEST_URL };
 }
 
 /**
