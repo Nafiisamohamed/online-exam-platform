@@ -4,7 +4,8 @@
  * The shared application frame for all four roles: sidebar, top bar and the
  * page area. Pages only render their own content inside it.
  */
-import { Menu } from "lucide-react";
+import { LogIn, Menu } from "lucide-react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/lib/i18n/i18n";
@@ -25,6 +26,9 @@ function PreviewBanner() {
     <div className="border-b border-border bg-accent-soft px-4 py-2 text-center text-xs text-accent-foreground sm:px-6">
       <Badge tone="navy" className="mr-2 align-middle">{t("preview.badge")}</Badge>
       <span className="align-middle">{t("preview.banner")}</span>
+      <Link href="/sign-in" className="ml-2 inline-flex items-center gap-1 align-middle font-semibold text-accent-strong underline-offset-2 hover:underline">
+        <LogIn className="h-3.5 w-3.5" aria-hidden /> {t("preview.signIn")}
+      </Link>
     </div>
   );
 }

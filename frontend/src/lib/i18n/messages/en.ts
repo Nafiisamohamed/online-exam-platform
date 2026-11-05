@@ -3,6 +3,8 @@
  * provide exactly the same keys (checked by TypeScript and by a test).
  * Use {name} placeholders for values.
  */
+import { adminEn, authEn, errorsEn, importErrorsEn, validationEn } from "./admin.en";
+
 export const en = {
   app: {
     name: "Online Exam Platform",
@@ -38,6 +40,10 @@ export const en = {
     liveView: "Live monitoring",
     profile: "My profile",
     designSystem: "Design system",
+    faculties: "Faculties",
+    examOversight: "Examinations",
+    reports: "Reports & analytics",
+    signIn: "Sign in",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",
     openMenu: "Open menu",
@@ -89,7 +95,8 @@ export const en = {
   },
   preview: {
     badge: "Preview",
-    banner: "Design preview: you are not signed in, so the profile below is a seeded demo account. Sign-in arrives in a later phase.",
+    banner: "Preview: you are not signed in, so the menu is shown for a demo account. Administration pages show live data only after you sign in.",
+    signIn: "Sign in",
     viewAs: "View as",
     sampleData: "Sample data",
     sampleDataHint: "Illustrative numbers to show the chart design. Real figures will come from the API.",
@@ -173,6 +180,11 @@ export const en = {
     generated: "Generated {date}",
   },
   table: { noRows: "No records match your filters.", actions: "Actions" },
+  auth: authEn,
+  errors: errorsEn,
+  validation: validationEn,
+  importErrors: importErrorsEn,
+  admin: adminEn,
   designSystem: {
     title: "Design system",
     subtitle: "Shared components, colours and patterns used across the platform.",

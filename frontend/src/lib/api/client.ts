@@ -24,6 +24,22 @@ interface ErrorBody {
   error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }
 
+/** Fired when the API says the session is missing or has ended, so the shell can sign the user out. */
+export const SESSION_ENDED_EVENT = "oe:session-ended";
+
+/** Absolute path of an API endpoint, for downloads opened by the browser itself (CSV templates, exports). */
+export function apiUrl(path: string) {
+  return `/api${path}`;
+}
+
+/** Builds "?a=1&b=2" from the defined, non-empty values. */
+export function query(params: Record<string, string | number | boolean | undefined | null>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   const { json, headers, ...rest } = init;
   let res: Response;
@@ -40,6 +56,10 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   if (res.status === 204) return undefined as T;
   const body = (await res.json().catch(() => ({}))) as ErrorBody & T;
   if (!res.ok) {
+    const code = body.error?.code;
+    if (res.status === 401 && (code === "UNAUTHENTICATED" || code === "SESSION_EXPIRED") && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+    }
     throw new ApiError(res.status, body.error?.code ?? "HTTP_" + res.status, body.error?.message ?? res.statusText, body.error?.details);
   }
   return body;

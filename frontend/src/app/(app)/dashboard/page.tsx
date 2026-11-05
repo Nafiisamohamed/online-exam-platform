@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Dashboard foundation shared by the four roles. The layout, stat cards and
- * chart cards are final; the numbers are clearly marked sample data until the
- * analytics module connects them to GET /api/analytics/dashboard.
+ * The dashboard. The registrar sees the live admin overview (Phase 2). The
+ * other roles still see the Phase 1 layout with clearly marked sample data,
+ * until their own dashboards are built.
  */
 import { Award, BookOpenCheck, ClipboardCheck, Users } from "lucide-react";
+import { AdminGate } from "@/components/admin/admin-gate";
+import { AdminOverview } from "@/components/admin/admin-overview";
 import { BarChartView, DonutChartView, HorizontalBarChartView, TrendChartView } from "@/components/charts/charts";
 import { ChartCard } from "@/components/charts/chart-card";
 import { PageHeader } from "@/components/layout/app-shell";
@@ -18,6 +20,19 @@ import { SAMPLE_DIFFICULTY, SAMPLE_GRADES, SAMPLE_SCORE_BANDS, SAMPLE_STATS, SAM
 import { useSession } from "@/lib/session/session";
 
 export default function DashboardPage() {
+  const { role } = useSession();
+  if (role === "ADMIN") {
+    return (
+      <AdminGate>
+        <AdminOverview />
+      </AdminGate>
+    );
+  }
+  return <SampleDashboard />;
+}
+
+/** Phase 1 dashboard for the lecturer, student and invigilator roles (sample data, labelled). */
+function SampleDashboard() {
   const { t } = useI18n();
   const { profile, role } = useSession();
   const sample = { label: t("preview.sampleData"), hint: t("preview.sampleDataHint") };

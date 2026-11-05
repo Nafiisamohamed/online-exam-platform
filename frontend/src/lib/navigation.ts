@@ -2,10 +2,13 @@
  * Sidebar navigation for each role. Modules are added here as they are built;
  * links to modules that do not exist yet open the "coming in a later phase"
  * page, so the structure can be reviewed now.
+ *
+ * The registrar's modules live under /admin/*, so they never clash with the
+ * lecturer and student pages that use the same names (courses, exams…).
  */
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3, BookOpenCheck, CalendarClock, ClipboardCheck, CreditCard, DoorOpen, FileQuestion,
+  BarChart3, BookOpenCheck, Building2, CalendarClock, ClipboardCheck, CreditCard, DoorOpen, FileQuestion,
   GraduationCap, LayoutDashboard, MessageSquareText, MonitorPlay, Palette, ScrollText, ShieldCheck,
   UserRound, Users, Award, NotebookPen,
 } from "lucide-react";
@@ -33,17 +36,19 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
     {
       title: "nav.sections.academics",
       items: [
-        { label: "nav.courses", href: "/courses", icon: BookOpenCheck },
-        { label: "nav.students", href: "/enrolment", icon: GraduationCap },
-        { label: "nav.users", href: "/users", icon: Users },
+        { label: "nav.faculties", href: "/admin/faculties", icon: Building2 },
+        { label: "nav.courses", href: "/admin/courses", icon: BookOpenCheck },
+        { label: "nav.students", href: "/admin/enrolment", icon: GraduationCap },
+        { label: "nav.users", href: "/admin/users", icon: Users },
         { label: "nav.rooms", href: "/rooms", icon: DoorOpen },
       ],
     },
     {
       title: "nav.sections.examinations",
       items: [
+        { label: "nav.examOversight", href: "/admin/exams", icon: NotebookPen },
         { label: "nav.schedules", href: "/schedules", icon: CalendarClock },
-        { label: "nav.analytics", href: "/analytics", icon: BarChart3 },
+        { label: "nav.reports", href: "/admin/reports", icon: BarChart3 },
       ],
     },
     {

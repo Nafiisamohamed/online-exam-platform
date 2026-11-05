@@ -1,7 +1,8 @@
 /**
  * Data table. On wide screens it is a normal table; on phones every row turns
  * into a compact card (label + value pairs), so nothing needs horizontal
- * scrolling. Columns marked `primary` are used as the card's title.
+ * scrolling. Columns marked `primary` are used as the card's title. A wide
+ * table in a narrow card scrolls sideways inside the card, never the page.
  */
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -43,7 +44,9 @@ export function DataTable<T>({ columns, rows, rowKey, loading, emptyTitle, empty
 
   return (
     <>
-      <div className="hidden md:block">
+      {/* relative + overflow-x-auto: a table wider than its card scrolls inside the card,
+          and screen-reader-only labels (position: absolute) cannot widen the page. */}
+      <div className="relative hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>

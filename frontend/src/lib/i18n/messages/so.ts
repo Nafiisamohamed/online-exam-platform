@@ -2,6 +2,7 @@
  * Somali interface text (default language). Must have exactly the same keys
  * as en.ts. Wording should be reviewed by a native speaker before the demo.
  */
+import { adminSo, authSo, errorsSo, importErrorsSo, validationSo } from "./admin.so";
 import type { Messages } from "./en";
 
 export const so: Messages = {
@@ -39,6 +40,10 @@ export const so: Messages = {
     liveView: "La socodka tooska ah",
     profile: "Xogtayda",
     designSystem: "Nidaamka naqshadda",
+    faculties: "Kulliyadaha",
+    examOversight: "Imtixaannada",
+    reports: "Warbixinno iyo falanqeyn",
+    signIn: "Gal",
     collapse: "Yaree liiska dhinaca",
     expand: "Ballaari liiska dhinaca",
     openMenu: "Fur liiska",
@@ -90,7 +95,8 @@ export const so: Messages = {
   },
   preview: {
     badge: "Tijaabo",
-    banner: "Muuqaal tijaabo ah: ma aadan soo gelin, sidaa darteed xogta hoose waa akoon tijaabo ah oo la diyaariyay. Gelitaanku wuxuu imaanayaa marxalad dambe.",
+    banner: "Tijaabo: ma aadan soo gelin, sidaa darteed liiska waxaa loo muujiyay akoon tijaabo ah. Bogagga maamulku waxay muujiyaan xog toos ah marka aad soo gasho oo keliya.",
+    signIn: "Gal",
     viewAs: "U eeg sida",
     sampleData: "Xog tusaale ah",
     sampleDataHint: "Tirooyin tusaale ah oo muujinaya naqshadda shaxda. Tirooyinka dhabta ah waxay ka iman doonaan API-ga.",
@@ -174,6 +180,11 @@ export const so: Messages = {
     generated: "La sameeyay {date}",
   },
   table: { noRows: "Wax diiwaan ah oo la mid ah shaandheyntaada ma jiro.", actions: "Ficillo" },
+  auth: authSo,
+  errors: errorsSo,
+  validation: validationSo,
+  importErrors: importErrorsSo,
+  admin: adminSo,
   designSystem: {
     title: "Nidaamka naqshadda",
     subtitle: "Qaybaha la wadaago, midabada iyo qaababka loo isticmaalo madasha oo dhan.",

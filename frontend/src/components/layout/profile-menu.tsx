@@ -5,7 +5,7 @@
  * with quick links and sign-out in the dropdown. In preview mode it also lets
  * the reviewer switch the role the shell is shown for.
  */
-import { ChevronDown, Eye, LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, Eye, LogIn, LogOut, Settings, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -55,9 +55,15 @@ export function ProfileMenu() {
             </>
           )}
           <DropdownSeparator />
-          <DropdownItem icon={<LogOut className="h-4 w-4" />} onSelect={() => void signOut()} disabled={isPreview}>
-            {t("profile.signOut")}
-          </DropdownItem>
+          {isPreview ? (
+            <DropdownItem icon={<LogIn className="h-4 w-4" />} onSelect={() => router.push("/sign-in")}>
+              {t("nav.signIn")}
+            </DropdownItem>
+          ) : (
+            <DropdownItem icon={<LogOut className="h-4 w-4" />} onSelect={() => void signOut().then(() => router.push("/sign-in"))}>
+              {t("profile.signOut")}
+            </DropdownItem>
+          )}
         </div>
       </DropdownContent>
     </Dropdown>

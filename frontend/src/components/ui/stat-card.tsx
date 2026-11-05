@@ -1,4 +1,4 @@
-/** A key figure with an icon and an optional change versus a previous period. */
+/** A key figure with an icon, an optional short hint and an optional change versus a previous period. */
 import type { LucideIcon } from "lucide-react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -9,11 +9,13 @@ export interface StatCardProps {
   value: string | number;
   icon: LucideIcon;
   change?: { value: string; direction: "up" | "down"; caption?: string };
+  /** One short line under the value, e.g. what the figure includes. */
+  hint?: string;
   emphasis?: boolean;
   className?: string;
 }
 
-export function StatCard({ label, value, icon: Icon, change, emphasis, className }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, change, hint, emphasis, className }: StatCardProps) {
   return (
     <Card
       interactive
@@ -32,6 +34,7 @@ export function StatCard({ label, value, icon: Icon, change, emphasis, className
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       </div>
+      {hint && <p className={cn("mt-2 text-xs", emphasis ? "text-white/70" : "text-subtle")}>{hint}</p>}
       {change && (
         <p className={cn("mt-3 flex items-center gap-1 text-xs font-medium", emphasis ? "text-white/80" : "text-muted")}>
           <span className={cn("inline-flex items-center gap-0.5 font-semibold", change.direction === "up" ? (emphasis ? "text-sky" : "text-accent-strong") : "text-danger")}>

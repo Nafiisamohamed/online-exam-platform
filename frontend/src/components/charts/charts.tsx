@@ -69,7 +69,8 @@ export function BarChartView({ data, xKey, series, valueSuffix, stacked }: { dat
       <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }} barCategoryGap="22%">
         <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
         <XAxis dataKey={xKey} {...axis} />
-        <YAxis {...axis} width={44} />
+        {/* Counts and percentages: whole-number ticks only (no "0.75 students"). */}
+        <YAxis {...axis} width={44} allowDecimals={false} />
         <Tooltip cursor={{ fill: "var(--accent-soft)" }} content={(p) => <ChartTooltip {...p} valueSuffix={valueSuffix} />} />
         {series.length > 1 && <Legend iconType="circle" iconSize={8} formatter={LegendLabel} />}
         {series.map((s, i) => (
@@ -87,7 +88,7 @@ export function HorizontalBarChartView({ data, yKey, series, valueSuffix, domain
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barCategoryGap="28%">
         <CartesianGrid horizontal={false} stroke="var(--chart-grid)" />
-        <XAxis type="number" {...axis} domain={[0, domainMax ?? "auto"]} />
+        <XAxis type="number" {...axis} domain={[0, domainMax ?? "auto"]} allowDecimals={false} />
         <YAxis type="category" dataKey={yKey} {...axis} width={64} />
         <Tooltip cursor={{ fill: "var(--accent-soft)" }} content={(p) => <ChartTooltip {...p} valueSuffix={valueSuffix} />} />
         {series.map((s, i) => (
