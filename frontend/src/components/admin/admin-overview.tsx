@@ -123,7 +123,7 @@ export function AdminOverview() {
 
       {failed && <Card className="mb-6"><QueryError state={failed} className="py-8" /></Card>}
 
-      <section aria-label={t("admin.liveData")} className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label={t("admin.liveData")} className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0">
         <StatCard emphasis label={t("admin.overview.stats.students")} value={v(accountsWithRole(dashboard.data, "STUDENT"), !!dashboard.data)} icon={GraduationCap} hint={t("admin.overview.stats.accountsHint")} />
         <StatCard label={t("admin.overview.stats.lecturers")} value={v(accountsWithRole(dashboard.data, "LECTURER"), !!dashboard.data)} icon={Users} hint={t("admin.overview.stats.accountsHint")} />
         <StatCard label={t("admin.overview.stats.invigilators")} value={v(accountsWithRole(dashboard.data, "INVIGILATOR"), !!dashboard.data)} icon={Eye} hint={t("admin.overview.stats.accountsHint")} />
@@ -134,7 +134,8 @@ export function AdminOverview() {
         <StatCard label={t("admin.overview.stats.completed")} value={v(stages?.COMPLETED, !!stages)} icon={CalendarCheck2} hint={t("admin.overview.stats.completedHint")} />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      {/* min-w-0 on grid items: long real names truncate instead of widening the page on phones. */}
+      <div className="grid gap-6 xl:grid-cols-3 [&>*]:min-w-0">
         <ChartCard title={t("admin.overview.charts.usersByRole")} description={t("admin.overview.charts.usersByRoleHint")}>
           {!dashboard.data ? <Skeleton className="h-full w-full" /> : roleData.length === 0 ? <EmptyState title={t("admin.noData")} /> : (
             <DonutChartView data={roleData} nameKey="role" valueKey="count" centerValue={roleData.reduce((s, r) => s + r.count, 0)} centerLabel={t("admin.overview.charts.accounts")} />
@@ -164,7 +165,7 @@ export function AdminOverview() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card className="flex flex-col">
           <CardHeader title={t("admin.overview.upcomingTitle")} action={<Link href="/admin/exams" className="text-sm font-semibold text-accent-strong hover:underline">{t("common.seeAll")}</Link>} />
           <CardContent className="flex-1 pt-3">

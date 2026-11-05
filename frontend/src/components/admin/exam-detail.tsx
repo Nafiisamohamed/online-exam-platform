@@ -60,7 +60,7 @@ function ExamView({ exam }: { exam: Exam }) {
         <span className="inline-flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" aria-hidden />{t("admin.exams.readOnlyNote")}</span>
       </Alert>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader title={t("admin.details")} />
           <CardContent className="pt-2">

@@ -87,7 +87,7 @@ function InstitutionReport() {
   return (
     <div className="space-y-6">
       {failed && <Card><QueryError state={failed} className="py-8" /></Card>}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 [&>*]:min-w-0">
         <StatCard emphasis label={t("admin.reports.participationRate")} value={part ? formatPercent(totalParticipation, locale) : "…"} icon={Users} hint={t("admin.reports.participation")} />
         <StatCard label={t("admin.reports.completionRate")} value={subs ? formatPercent(subs.completionRate, locale) : "…"} icon={CheckCircle2} hint={t("admin.reports.submissionsHint")} />
         <StatCard label={t("admin.reports.attemptsLabel")} value={subs ? subs.total : "…"} icon={Activity} />
@@ -99,7 +99,7 @@ function InstitutionReport() {
         />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <ChartCard title={t("admin.reports.studentsByFaculty")} description={t("admin.reports.studentsByFacultyHint")}>
           {!perFaculty ? <Loading /> : perFaculty.length === 0 ? <EmptyState title={t("admin.noData")} /> : (
             <BarChartView data={perFaculty.map((f) => ({ faculty: f.code, enrolments: f.enrolments }))} xKey="faculty" series={[{ key: "enrolments", label: t("admin.faculties.activeStudents") }]} />

@@ -215,6 +215,12 @@ npm run build && npm start   # production build
 ```
 
 - The browser talks only to the Next.js server. Requests to `/api/*` are forwarded to the API at `BACKEND_URL` (default `http://localhost:4000`), so the session cookie stays on one origin.
+- **If port 4000 is already used by another program**, run the API on another port for that session and point the frontend at it, without editing either config file:
+  ```bash
+  cd backend  && PORT=4100 npm run dev
+  cd frontend && BACKEND_URL=http://localhost:4100 npm run dev   # or: npm run build && npm start
+  ```
+  For `npm run build`, `BACKEND_URL` must be set when building: Next.js fixes the forwarding address at build time. Check with `curl http://localhost:3000/api/health`; it should return `{"status":"ok","database":"ok",…}`.
 - Sign in at `/sign-in` (student number or staff email). Accounts with a temporary password must choose a new one first.
 - The registrar pages are under `/admin/*`, and the registrar overview is at `/dashboard`. They show live API data only. When nobody is signed in they ask the user to sign in, and they never show sample numbers.
 - If you are not signed in, or the API is not running, the other roles' screens open in **preview mode**: a demo profile for each role, chosen from the profile menu. Preview mode is labelled on every page, and its chart numbers are marked as sample data.

@@ -123,7 +123,7 @@ function UserView({ user }: { user: AdminUser }) {
       {actionError ? <Alert tone="danger" className="mb-4" title={errorText(t, actionError)} /> : null}
       {isSelf && <Alert tone="info" className="mb-4">{t("admin.users.selfNote")}</Alert>}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader title={t("admin.users.accountSection")} />
           <CardContent className="pt-2">
