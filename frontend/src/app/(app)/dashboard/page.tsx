@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * The dashboard. The registrar sees the live admin overview (Phase 2). The
- * other roles still see the Phase 1 layout with clearly marked sample data,
- * until their own dashboards are built.
+ * The dashboard. The registrar (Phase 2) and the lecturer (Phase 3) see their
+ * live overviews. The student and invigilator still see the Phase 1 layout
+ * with clearly marked sample data, until their own dashboards are built.
  */
 import { Award, BookOpenCheck, ClipboardCheck, Users } from "lucide-react";
-import { AdminGate } from "@/components/admin/admin-gate";
+import { AdminGate, LecturerGate } from "@/components/layout/role-gate";
+import { LecturerOverview } from "@/components/lecturer/lecturer-overview";
 import { AdminOverview } from "@/components/admin/admin-overview";
 import { BarChartView, DonutChartView, HorizontalBarChartView, TrendChartView } from "@/components/charts/charts";
 import { ChartCard } from "@/components/charts/chart-card";
@@ -28,10 +29,17 @@ export default function DashboardPage() {
       </AdminGate>
     );
   }
+  if (role === "LECTURER") {
+    return (
+      <LecturerGate>
+        <LecturerOverview />
+      </LecturerGate>
+    );
+  }
   return <SampleDashboard />;
 }
 
-/** Phase 1 dashboard for the lecturer, student and invigilator roles (sample data, labelled). */
+/** Phase 1 dashboard for the student and invigilator roles (sample data, labelled). */
 function SampleDashboard() {
   const { t } = useI18n();
   const { profile, role } = useSession();

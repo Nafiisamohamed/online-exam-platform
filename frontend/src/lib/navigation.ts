@@ -3,8 +3,9 @@
  * links to modules that do not exist yet open the "coming in a later phase"
  * page, so the structure can be reviewed now.
  *
- * The registrar's modules live under /admin/*, so they never clash with the
- * lecturer and student pages that use the same names (courses, exams…).
+ * The registrar's modules live under /admin/* and the lecturer's under
+ * /lecturer/*, so they never clash with the student pages that use the same
+ * names (courses, exams…).
  */
 import type { LucideIcon } from "lucide-react";
 import {
@@ -66,18 +67,18 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
     {
       title: "nav.sections.academics",
       items: [
-        { label: "nav.courses", href: "/courses", icon: BookOpenCheck },
-        { label: "nav.questionBank", href: "/question-bank", icon: FileQuestion },
+        { label: "nav.courses", href: "/lecturer/courses", icon: BookOpenCheck },
+        { label: "nav.questionBank", href: "/lecturer/questions", icon: FileQuestion },
       ],
     },
     {
       title: "nav.sections.examinations",
       items: [
-        { label: "nav.exams", href: "/exams", icon: NotebookPen },
-        { label: "nav.schedules", href: "/schedules", icon: CalendarClock },
-        { label: "nav.grading", href: "/grading", icon: ClipboardCheck },
-        { label: "nav.results", href: "/results", icon: Award },
-        { label: "nav.analytics", href: "/analytics", icon: BarChart3 },
+        { label: "nav.exams", href: "/lecturer/exams", icon: NotebookPen },
+        { label: "nav.schedules", href: "/lecturer/schedules", icon: CalendarClock },
+        { label: "nav.grading", href: "/lecturer/grading", icon: ClipboardCheck },
+        { label: "nav.results", href: "/lecturer/results", icon: Award },
+        { label: "nav.analytics", href: "/lecturer/analytics", icon: BarChart3 },
       ],
     },
     { title: "nav.sections.system", items: [profile, designSystem] },

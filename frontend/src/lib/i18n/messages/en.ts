@@ -4,6 +4,7 @@
  * Use {name} placeholders for values.
  */
 import { adminEn, authEn, errorsEn, importErrorsEn, validationEn } from "./admin.en";
+import { lecturerEn, lecturerErrorsEn, questionErrorsEn } from "./lecturer.en";
 
 export const en = {
   app: {
@@ -181,10 +182,12 @@ export const en = {
   },
   table: { noRows: "No records match your filters.", actions: "Actions" },
   auth: authEn,
-  errors: errorsEn,
+  errors: { ...errorsEn, ...lecturerErrorsEn },
   validation: validationEn,
   importErrors: importErrorsEn,
   admin: adminEn,
+  questionErrors: questionErrorsEn,
+  lecturer: lecturerEn,
   designSystem: {
     title: "Design system",
     subtitle: "Shared components, colours and patterns used across the platform.",

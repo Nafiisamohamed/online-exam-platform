@@ -6,6 +6,9 @@
 import { ApiError } from "@/lib/api/client";
 import type { MessageKey } from "./i18n";
 import { errorsEn, importErrorsEn } from "./messages/admin.en";
+import { lecturerErrorsEn, questionErrorsEn } from "./messages/lecturer.en";
+
+const ERROR_CODES = { ...errorsEn, ...lecturerErrorsEn };
 
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
@@ -19,8 +22,8 @@ function vars(details: Record<string, unknown> | undefined) {
   return out;
 }
 
-export function hasErrorText(code: string): code is keyof typeof errorsEn {
-  return Object.hasOwn(errorsEn, code);
+export function hasErrorText(code: string): code is keyof typeof ERROR_CODES {
+  return Object.hasOwn(ERROR_CODES, code);
 }
 
 export function errorText(t: T, error: unknown): string {
@@ -35,4 +38,14 @@ export function errorText(t: T, error: unknown): string {
 /** One CSV preview row error, e.g. COURSE_NOT_FOUND { code: "CS999" }. */
 export function importErrorText(t: T, e: { code: string; params?: Record<string, string | number> }): string {
   return Object.hasOwn(importErrorsEn, e.code) ? t(`importErrors.${e.code as keyof typeof importErrorsEn}`, e.params) : e.code;
+}
+
+/**
+ * One question content problem (QUESTION_INVALID details.errors, or a question
+ * CSV row error). DUPLICATE_QUESTION says whether the copy is in the bank or
+ * on an earlier row of the file.
+ */
+export function questionErrorText(t: T, e: { code: string; params?: Record<string, string | number> }): string {
+  if (e.code === "DUPLICATE_QUESTION") return e.params?.existingRow !== undefined ? t("questionErrors.DUPLICATE_QUESTION_ROW", e.params) : t("questionErrors.DUPLICATE_QUESTION_BANK");
+  return Object.hasOwn(questionErrorsEn, e.code) ? t(`questionErrors.${e.code as keyof typeof questionErrorsEn}`, e.params) : e.code;
 }

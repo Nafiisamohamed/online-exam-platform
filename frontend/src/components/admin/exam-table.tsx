@@ -13,7 +13,7 @@ import { useI18n } from "@/lib/i18n/i18n";
 import type { Course, ExamListItem } from "@/types/admin";
 import { ExamStateBadge, ResultsBadge } from "./admin-ui";
 
-export function ExamTable({ exams, courses, now, loading, hideCourse }: { exams: ExamListItem[]; courses: Map<string, Course>; now: number; loading?: boolean; hideCourse?: boolean }) {
+export function ExamTable({ exams, courses, now, loading, hideCourse, hideLecturer, basePath = "/admin/exams" }: { exams: ExamListItem[]; courses: Map<string, Course>; now: number; loading?: boolean; hideCourse?: boolean; hideLecturer?: boolean; basePath?: string }) {
   const { t, locale } = useI18n();
   const columns: Column<ExamListItem>[] = [
     {
@@ -21,18 +21,18 @@ export function ExamTable({ exams, courses, now, loading, hideCourse }: { exams:
       header: t("admin.exams.examination"),
       primary: true,
       cell: (e) => (
-        <Link href={`/admin/exams/${e.id}`} className="group block min-w-0">
+        <Link href={`${basePath}/${e.id}`} className="group block min-w-0">
           <span className="block font-semibold text-foreground group-hover:text-accent-strong">{e.title}</span>
           {!hideCourse && <span className="block truncate text-xs text-muted">{e.course.code} · {e.course.name}</span>}
         </Link>
       ),
     },
-    {
+    ...(hideLecturer ? [] : [{
       key: "lecturer",
       header: t("admin.exams.lecturer"),
-      cell: (e) => courses.get(e.course.id)?.lecturer.fullName ?? "—",
+      cell: (e: ExamListItem) => courses.get(e.course.id)?.lecturer.fullName ?? "—",
       className: "hidden lg:table-cell",
-    },
+    }]),
     {
       key: "scheduled",
       header: t("admin.exams.scheduled"),

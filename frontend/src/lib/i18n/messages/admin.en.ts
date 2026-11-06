@@ -22,6 +22,8 @@ export const authEn = {
   requiredHint: "Administration pages show live data from the server, so they need a signed-in registrar account.",
   notAllowedTitle: "This page is for the registrar",
   notAllowedHint: "Your account does not have access to the administration pages.",
+  lecturerOnlyTitle: "This page is for lecturers",
+  lecturerOnlyHint: "Your account does not have access to the lecturer pages.",
   goSignIn: "Sign in",
   backToApp: "Back to the platform",
   sessionEnded: "Your session has ended. Please sign in again.",

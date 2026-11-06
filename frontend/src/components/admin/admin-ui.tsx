@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { ExamState } from "@/lib/admin/exam-state";
 import { cn } from "@/lib/cn";
-import { errorText } from "@/lib/i18n/error-text";
+import { errorText, questionErrorText } from "@/lib/i18n/error-text";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { EnrolmentConflict, EnrolmentStatus, ResultsStatus, ScheduleStatus } from "@/types/admin";
 import type { Role } from "@/types/account";
@@ -86,11 +86,18 @@ export function DetailList({ items, className }: { items: { label: ReactNode; va
 
 // --- Forms --------------------------------------------------------------------------
 
-/** The server's answer to a failed form, translated; exam clashes are listed one per line. */
+/**
+ * The server's answer to a failed form, translated. Lists from the error's
+ * details are shown one per line: exam clashes, question content problems
+ * (QUESTION_INVALID) and rules without enough questions (EXAM_NOT_ENOUGH_QUESTIONS).
+ */
 export function FormError({ error }: { error: unknown }) {
   const { t } = useI18n();
   if (!error) return null;
-  const conflicts = error instanceof ApiError ? (error.details?.conflicts as EnrolmentConflict[] | undefined) : undefined;
+  const details = error instanceof ApiError ? error.details : undefined;
+  const conflicts = details?.conflicts as EnrolmentConflict[] | undefined;
+  const contentErrors = details?.errors as { code: string; params?: Record<string, string | number> }[] | undefined;
+  const shortages = details?.rules as { position: number; required: number; available: number }[] | undefined;
   return (
     <Alert tone="danger" title={errorText(t, error)}>
       {conflicts?.length ? (
@@ -100,6 +107,16 @@ export function FormError({ error }: { error: unknown }) {
             {conflicts.map((c, i) => <li key={i}>{t("admin.enrolment.conflictLine", { ...c })}</li>)}
           </ul>
         </>
+      ) : null}
+      {contentErrors?.length ? (
+        <ul className="mt-1 list-disc pl-5">
+          {contentErrors.map((e, i) => <li key={i}>{questionErrorText(t, e)}</li>)}
+        </ul>
+      ) : null}
+      {shortages?.length ? (
+        <ul className="mt-1 list-disc pl-5">
+          {shortages.map((s) => <li key={s.position}>{t("lecturer.exams.notEnough", { ...s })}</li>)}
+        </ul>
       ) : null}
     </Alert>
   );

@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Wraps every admin page. Admin pages show live data only, so:
+ * Wraps every page of one role (registrar or lecturer). These pages show live data only, so:
  * - while the session loads, a skeleton is shown;
  * - when nobody is signed in (preview mode), the page asks the user to sign in
  *   instead of showing sample numbers;
  * - a signed-in user who still has a temporary password is sent to change it
  *   (the API refuses everything else until then);
- * - other roles see a "registrar only" message.
+ * - other roles see a "this page is for …" message.
  * The server checks the role on every request as well; this only avoids
  * showing a page the API would refuse.
  */
@@ -20,9 +20,18 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/states";
 import { useI18n } from "@/lib/i18n/i18n";
+import type { MessageKey } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
+import type { Role } from "@/types/account";
 
-export function AdminGate({ children }: { children: ReactNode }) {
+type GatedRole = Extract<Role, "ADMIN" | "LECTURER">;
+
+const NOT_ALLOWED: Record<GatedRole, { title: MessageKey; hint: MessageKey }> = {
+  ADMIN: { title: "auth.notAllowedTitle", hint: "auth.notAllowedHint" },
+  LECTURER: { title: "auth.lecturerOnlyTitle", hint: "auth.lecturerOnlyHint" },
+};
+
+export function RoleGate({ role: required, children }: { role: GatedRole; children: ReactNode }) {
   const { t } = useI18n();
   const { isLoading, isPreview, role, profile } = useSession();
   const router = useRouter();
@@ -58,13 +67,14 @@ export function AdminGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (role !== "ADMIN") {
+  if (role !== required) {
+    const text = NOT_ALLOWED[required];
     return (
       <Card className="mt-4">
         <EmptyState
           icon={ShieldAlert}
-          title={t("auth.notAllowedTitle")}
-          description={t("auth.notAllowedHint")}
+          title={t(text.title)}
+          description={t(text.hint)}
           className="py-20"
           action={<Link href="/dashboard" className={buttonClasses("primary")}>{t("states.goHome")}</Link>}
         />
@@ -73,4 +83,14 @@ export function AdminGate({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+/** Registrar pages. */
+export function AdminGate({ children }: { children: ReactNode }) {
+  return <RoleGate role="ADMIN">{children}</RoleGate>;
+}
+
+/** Lecturer pages. */
+export function LecturerGate({ children }: { children: ReactNode }) {
+  return <RoleGate role="LECTURER">{children}</RoleGate>;
 }

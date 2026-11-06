@@ -48,3 +48,14 @@ export function formatRelative(iso: string, now: number, locale: string) {
   if (Math.abs(minutes) < 60 * 24) return rtf.format(-Math.round(minutes / 60), "hour");
   return rtf.format(-Math.round(minutes / 1440), "day");
 }
+
+/**
+ * A <input type="datetime-local"> value read as campus time (Mogadishu, UTC+3,
+ * no daylight saving) and returned as UTC ISO, so the lecturer's own device
+ * clock or time zone cannot shift an exam window.
+ */
+export function campusInputToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}:00+03:00`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}

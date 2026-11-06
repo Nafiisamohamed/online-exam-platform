@@ -7,7 +7,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { Course } from "@/types/admin";
 
-export function CourseTable({ rows, loading, hideFaculty, empty, actions }: { rows: Course[]; loading?: boolean; hideFaculty?: boolean; empty?: ReactNode; actions?: (c: Course) => ReactNode }) {
+export function CourseTable({ rows, loading, hideFaculty, hideLecturer, empty, actions, basePath = "/admin/courses" }: { rows: Course[]; loading?: boolean; hideFaculty?: boolean; hideLecturer?: boolean; empty?: ReactNode; actions?: (c: Course) => ReactNode; basePath?: string }) {
   const { t } = useI18n();
   const columns: Column<Course>[] = [
     {
@@ -15,7 +15,7 @@ export function CourseTable({ rows, loading, hideFaculty, empty, actions }: { ro
       header: t("admin.courses.name"),
       primary: true,
       cell: (c) => (
-        <Link href={`/admin/courses/${c.id}`} className="group block min-w-0">
+        <Link href={`${basePath}/${c.id}`} className="group block min-w-0">
           <span className="block font-semibold text-foreground group-hover:text-accent-strong">{c.code}</span>
           <span className="block truncate text-sm text-muted">{c.name}</span>
         </Link>
@@ -23,7 +23,7 @@ export function CourseTable({ rows, loading, hideFaculty, empty, actions }: { ro
     },
     ...(hideFaculty ? [] : [{ key: "faculty", header: t("admin.courses.faculty"), cell: (c: Course) => <span title={c.faculty.name}>{c.faculty.code}</span> }]),
     { key: "semester", header: t("admin.courses.semester"), cell: (c) => <span className="whitespace-nowrap">{c.semester}</span> },
-    { key: "lecturer", header: t("admin.courses.lecturer"), cell: (c) => <Link href={`/admin/users/${c.lecturer.id}`} className="hover:text-accent-strong">{c.lecturer.fullName}</Link> },
+    ...(hideLecturer ? [] : [{ key: "lecturer", header: t("admin.courses.lecturer"), cell: (c: Course) => <Link href={`/admin/users/${c.lecturer.id}`} className="hover:text-accent-strong">{c.lecturer.fullName}</Link> }]),
     { key: "students", header: t("admin.courses.students"), align: "right", cell: (c) => <span className="tabular-nums">{c.activeStudents}</span> },
     ...(actions ? [{ key: "actions", header: <span className="sr-only">{t("table.actions")}</span>, align: "right" as const, cell: actions }] : []),
   ];

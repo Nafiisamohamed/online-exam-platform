@@ -179,6 +179,8 @@ export interface ExamRule {
   marksPerQuestion: number;
   questionCount: number;
   available?: number;
+  /** Topics the rule is limited to (empty = any topic). */
+  topics?: { id: string; name: string }[];
 }
 
 /** GET /api/exams/:id (exams.service serializeExam). Only the fields shown are typed. */

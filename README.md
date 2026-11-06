@@ -9,7 +9,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 - invigilators can watch the session live;
 - lecturers get question analytics.
 
-> **Status:** the database and the **backend API are complete and tested**. The **frontend foundation** (design system, app shell for the four roles, light and dark mode, Somali/English, profile page and chart components) is in place, and the **registrar (admin) dashboard** is built on the live API: overview, users, faculties, courses, enrolment with CSV import, examination oversight, and reports. The lecturer, student and invigilator screens come in the next phases.
+> **Status:** the database and the **backend API are complete and tested**. The **frontend foundation** (design system, app shell for the four roles, light and dark mode, Somali/English, profile page and chart components) is in place, and the **registrar (admin) dashboard** is built on the live API: overview, users, faculties, courses, enrolment with CSV import, examination oversight, and reports. The **lecturer dashboard** is built too: question bank with CSV import, exam builder, schedule requests, grading (including blind second grading), results publication and analytics. The student and invigilator screens come in the next phases.
 
 ![CI](https://github.com/Nafiisamohamed/online-exam-platform/actions/workflows/ci.yml/badge.svg)
 
@@ -222,7 +222,8 @@ npm run build && npm start   # production build
   ```
   For `npm run build`, `BACKEND_URL` must be set when building: Next.js fixes the forwarding address at build time. Check with `curl http://localhost:3000/api/health`; it should return `{"status":"ok","database":"ok",…}`.
 - Sign in at `/sign-in` (student number or staff email). Accounts with a temporary password must choose a new one first.
-- The registrar pages are under `/admin/*`, and the registrar overview is at `/dashboard`. They show live API data only. When nobody is signed in they ask the user to sign in, and they never show sample numbers.
+- The registrar pages are under `/admin/*` and the lecturer pages under `/lecturer/*`; each role's overview is at `/dashboard`. They show live API data only. When nobody is signed in they ask the user to sign in, and they never show sample numbers.
+- Lecturers build exams from **question rules** (N questions of a type, difficulty and mark value, optionally from topics). Each student gets their own random draw, as the backend's exam generator works; questions are not hand-picked. A schedule request goes to the registrar for approval.
 - If you are not signed in, or the API is not running, the other roles' screens open in **preview mode**: a demo profile for each role, chosen from the profile menu. Preview mode is labelled on every page, and its chart numbers are marked as sample data.
 - `/design-system` shows every shared component (buttons, forms, tables, dialogs, charts, report layout).
 - Frontend checks: `npm run lint`, `npm run typecheck`, `npm test`.
@@ -285,7 +286,8 @@ See [docs/demo-data.md](docs/demo-data.md) for the full dataset.
 
 | Limitation | Notes |
 |---|---|
-| Frontend modules not built yet | Built so far: the foundation, sign-in, and the registrar dashboard. Still to come: the lecturer, student and invigilator screens, and the registrar's schedule approval, rooms, payments, SMS outbox and audit log pages. Their menu links open a "coming in a later phase" page. |
+| Frontend modules not built yet | Built so far: the foundation, sign-in, the registrar dashboard and the lecturer dashboard. Still to come: the student and invigilator screens, and the registrar's schedule approval, rooms, payments, SMS outbox and audit log pages. Their menu links open a "coming in a later phase" page. |
+| Lecturer dashboard limits (from the API) | Lecturers see enrolled students per course (read-only) and per-exam results; there is no per-student profile endpoint for them. The audit log is registrar-only, so the lecturer overview shows the lecturer's own notifications as recent activity. |
 | Registrar dashboard limits (from the API) | The backend has no faculty delete or deactivate, no course status, and no list of all enrolments (they are listed per course). Reports have no date filter, and PDF export exists only for students. The screens say so instead of offering these. |
 | Somali texts | The Somali translations in `frontend/src/lib/i18n/messages/so.ts` should be reviewed by a native speaker. |
 | Campus network rule | It relies on the client IP address. Behind a reverse proxy, set `TRUST_PROXY=true`. |

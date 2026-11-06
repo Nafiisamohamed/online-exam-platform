@@ -3,6 +3,7 @@
  * as en.ts. Wording should be reviewed by a native speaker before the demo.
  */
 import { adminSo, authSo, errorsSo, importErrorsSo, validationSo } from "./admin.so";
+import { lecturerErrorsSo, lecturerSo, questionErrorsSo } from "./lecturer.so";
 import type { Messages } from "./en";
 
 export const so: Messages = {
@@ -181,10 +182,12 @@ export const so: Messages = {
   },
   table: { noRows: "Wax diiwaan ah oo la mid ah shaandheyntaada ma jiro.", actions: "Ficillo" },
   auth: authSo,
-  errors: errorsSo,
+  errors: { ...errorsSo, ...lecturerErrorsSo },
   validation: validationSo,
   importErrors: importErrorsSo,
   admin: adminSo,
+  questionErrors: questionErrorsSo,
+  lecturer: lecturerSo,
   designSystem: {
     title: "Nidaamka naqshadda",
     subtitle: "Qaybaha la wadaago, midabada iyo qaababka loo isticmaalo madasha oo dhan.",
