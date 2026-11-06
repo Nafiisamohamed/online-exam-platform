@@ -24,6 +24,8 @@ export const authEn = {
   notAllowedHint: "Your account does not have access to the administration pages.",
   lecturerOnlyTitle: "This page is for lecturers",
   lecturerOnlyHint: "Your account does not have access to the lecturer pages.",
+  studentOnlyTitle: "This page is for students",
+  studentOnlyHint: "Your account does not have access to the student pages.",
   goSignIn: "Sign in",
   backToApp: "Back to the platform",
   sessionEnded: "Your session has ended. Please sign in again.",

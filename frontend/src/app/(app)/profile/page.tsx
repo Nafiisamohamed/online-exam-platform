@@ -8,10 +8,14 @@ import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
+import { AccountPanel, useStudentFaculties } from "@/components/student/account-panel";
 
 export default function ProfilePage() {
   const { t } = useI18n();
-  const { profile } = useSession();
+  const { profile: account } = useSession();
+  // Students: the faculties of their courses (the profile endpoint has no faculty field).
+  const faculties = useStudentFaculties();
+  const profile = faculties ? { ...account, faculty: faculties } : account;
   return (
     <>
       <PageHeader
@@ -27,6 +31,7 @@ export default function ProfilePage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <ProfileDetails profile={profile} />
           <ProfileSettings />
+          <AccountPanel />
         </div>
       </div>
     </>

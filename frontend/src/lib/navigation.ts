@@ -3,9 +3,9 @@
  * links to modules that do not exist yet open the "coming in a later phase"
  * page, so the structure can be reviewed now.
  *
- * The registrar's modules live under /admin/* and the lecturer's under
- * /lecturer/*, so they never clash with the student pages that use the same
- * names (courses, exams…).
+ * Each role's modules live under their own prefix (/admin/*, /lecturer/*,
+ * /student/*), so pages with the same names (courses, exams…) never clash.
+ * The exam itself runs at /exam/:attemptId, outside the shell.
  */
 import type { LucideIcon } from "lucide-react";
 import {
@@ -99,10 +99,10 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
     {
       title: "nav.sections.examinations",
       items: [
-        { label: "nav.courses", href: "/courses", icon: BookOpenCheck },
-        { label: "nav.myExams", href: "/my-exams", icon: ScrollText },
-        { label: "nav.myResults", href: "/my-results", icon: Award },
-        { label: "nav.payments", href: "/payments", icon: CreditCard },
+        { label: "nav.courses", href: "/student/courses", icon: BookOpenCheck },
+        { label: "nav.myExams", href: "/student/exams", icon: ScrollText },
+        { label: "nav.myResults", href: "/student/results", icon: Award },
+        { label: "nav.payments", href: "/student/payments", icon: CreditCard },
       ],
     },
     { title: "nav.sections.system", items: [profile, designSystem] },

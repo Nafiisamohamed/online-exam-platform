@@ -5,6 +5,7 @@
  */
 import { adminEn, authEn, errorsEn, importErrorsEn, validationEn } from "./admin.en";
 import { lecturerEn, lecturerErrorsEn, questionErrorsEn } from "./lecturer.en";
+import { studentEn, studentErrorsEn } from "./student.en";
 
 export const en = {
   app: {
@@ -182,12 +183,13 @@ export const en = {
   },
   table: { noRows: "No records match your filters.", actions: "Actions" },
   auth: authEn,
-  errors: { ...errorsEn, ...lecturerErrorsEn },
+  errors: { ...errorsEn, ...lecturerErrorsEn, ...studentErrorsEn },
   validation: validationEn,
   importErrors: importErrorsEn,
   admin: adminEn,
   questionErrors: questionErrorsEn,
   lecturer: lecturerEn,
+  student: studentEn,
   designSystem: {
     title: "Design system",
     subtitle: "Shared components, colours and patterns used across the platform.",

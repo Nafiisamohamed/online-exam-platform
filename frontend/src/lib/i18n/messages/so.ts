@@ -4,6 +4,7 @@
  */
 import { adminSo, authSo, errorsSo, importErrorsSo, validationSo } from "./admin.so";
 import { lecturerErrorsSo, lecturerSo, questionErrorsSo } from "./lecturer.so";
+import { studentErrorsSo, studentSo } from "./student.so";
 import type { Messages } from "./en";
 
 export const so: Messages = {
@@ -182,12 +183,13 @@ export const so: Messages = {
   },
   table: { noRows: "Wax diiwaan ah oo la mid ah shaandheyntaada ma jiro.", actions: "Ficillo" },
   auth: authSo,
-  errors: { ...errorsSo, ...lecturerErrorsSo },
+  errors: { ...errorsSo, ...lecturerErrorsSo, ...studentErrorsSo },
   validation: validationSo,
   importErrors: importErrorsSo,
   admin: adminSo,
   questionErrors: questionErrorsSo,
   lecturer: lecturerSo,
+  student: studentSo,
   designSystem: {
     title: "Nidaamka naqshadda",
     subtitle: "Qaybaha la wadaago, midabada iyo qaababka loo isticmaalo madasha oo dhan.",

@@ -29,6 +29,8 @@ export const authSo: Widen<typeof authEn> = {
   notAllowedHint: "Akoonkaagu ma laha fasax uu ku galo bogagga maamulka.",
   lecturerOnlyTitle: "Boggani waxa uu u gaar yahay macallimiinta",
   lecturerOnlyHint: "Akoonkaagu ma laha fasax uu ku galo bogagga macallimiinta.",
+  studentOnlyTitle: "Boggani waxa uu u gaar yahay ardayda",
+  studentOnlyHint: "Akoonkaagu ma laha fasax uu ku galo bogagga ardayda.",
   goSignIn: "Gal",
   backToApp: "Ku noqo madasha",
   sessionEnded: "Fadhigaagu wuu dhammaaday. Fadlan mar kale gal.",
