@@ -34,6 +34,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const collapsed = usePersisted(collapsedStore) === "true";
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // While the session loads (always so during the server prerender) the page itself is rendered:
+  // every page sits behind a RoleGate, which shows its own skeleton until the user is known.
+  if (isLoading) {
+    return <div className="min-h-dvh bg-background"><main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">{children}</main></div>;
+  }
   if (!allowed) {
     return <div className="min-h-dvh bg-background p-8" aria-busy><Skeleton className="h-10 w-64" /><Skeleton className="mt-6 h-72 w-full max-w-4xl" /></div>;
   }

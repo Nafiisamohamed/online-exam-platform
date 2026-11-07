@@ -32,7 +32,8 @@ const NOT_ALLOWED: Record<GatedRole, { title: MessageKey; hint: MessageKey }> = 
   INVIGILATOR: { title: "auth.invigilatorOnlyTitle", hint: "auth.invigilatorOnlyHint" },
 };
 
-export function RoleGate({ role: required, children }: { role: GatedRole; children: ReactNode }) {
+/** Without a role: any signed-in user (pages shared by all roles, such as the profile). */
+export function RoleGate({ role: required, children }: { role?: GatedRole; children: ReactNode }) {
   const { t } = useI18n();
   const { isLoading, isSignedIn, role, profile } = useSession();
   const router = useRouter();
@@ -70,7 +71,7 @@ export function RoleGate({ role: required, children }: { role: GatedRole; childr
     );
   }
 
-  if (role !== required) {
+  if (required && role !== required) {
     const text = NOT_ALLOWED[required];
     return (
       <Card className="mt-4">

@@ -6,9 +6,14 @@ import { ProfileDetails, ProfileHeader, ProfileSettings } from "@/components/pro
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
+import { RoleGate } from "@/components/layout/role-gate";
 import { AccountPanel, useStudentFaculties } from "@/components/student/account-panel";
 
 export default function ProfilePage() {
+  return <RoleGate><ProfileContent /></RoleGate>;
+}
+
+function ProfileContent() {
   const { t } = useI18n();
   const { profile: account } = useSession();
   // Students: the faculties of their courses (the profile endpoint has no faculty field).

@@ -11,8 +11,10 @@
  * Without a session the status is "signed-out" and the shell sends the visitor
  * to the sign-in page. If the API answers 401 later (session expired, account
  * deactivated, password reset), the client fires SESSION_ENDED_EVENT and the
- * shell returns to the signed-out state with an explanation. Cached API data is
- * cleared whenever the user changes.
+ * shell returns to the signed-out state with an explanation. So that this also
+ * happens on a page that is only being looked at, the session is re-checked
+ * every SESSION_CHECK_MS and whenever the tab or window comes back into view.
+ * Cached API data is cleared whenever the user changes.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, SESSION_ENDED_EVENT } from "@/lib/api/client";
@@ -36,6 +38,9 @@ interface SessionValue {
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
+
+/** How often an idle signed-in page asks the server whether the session is still valid. */
+export const SESSION_CHECK_MS = 30_000;
 
 /** Placeholder so consumers always get a Profile; never displayed while signed out. */
 const NO_PROFILE: Profile = { id: "", role: "STUDENT", fullName: "", email: null, studentNumber: null, phone: "", preferredLanguage: "so", mustChangePassword: false };
@@ -64,6 +69,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
     };
   }, []);
+
+  // Re-check the session while signed in: a 401 fires SESSION_ENDED_EVENT (handled above);
+  // network errors are ignored here, the pages report those themselves.
+  const signedInNow = state.status === "signed-in";
+  useEffect(() => {
+    if (!signedInNow) return;
+    let last = Date.now(); // the session was just confirmed by the sign-in or GET /auth/me
+    const recheck = () => {
+      if (Date.now() - last < 5_000) return; // focus and visibility events often come in pairs
+      last = Date.now();
+      void api("/auth/me").catch(() => undefined);
+    };
+    const onVisible = () => document.visibilityState === "visible" && recheck();
+    const timer = setInterval(recheck, SESSION_CHECK_MS);
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [signedInNow]);
 
   const signedIn = useCallback((user: Profile) => {
     clearApiCache();
