@@ -22,5 +22,4 @@ export const STORAGE_KEYS = {
   theme: "oe-theme",
   locale: "oe-locale",
   sidebarCollapsed: "oe-sidebar-collapsed",
-  previewRole: "oe-preview-role",
 } as const;

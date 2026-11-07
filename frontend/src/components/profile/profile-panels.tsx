@@ -2,26 +2,29 @@
 
 /**
  * Profile page building blocks:
- * - ProfileHeader: banner, photo (with change-photo control), name, role and identifiers;
+ * - ProfileHeader: banner, initials avatar, name, role and identifiers (the API has no photo upload);
  * - ProfileDetails: account information as label/value rows;
  * - ProfileSettings: language and theme preferences, and the security section.
- * They take a Profile, so they work the same for preview and signed-in users.
+ * They take a Profile and work the same for every role.
  */
 import { BadgeCheck, Building2, KeyRound, Languages, Mail, MonitorSmartphone, Phone, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Modal } from "@/components/ui/overlays";
+import { useToast } from "@/components/ui/toast";
+import { ChangePasswordForm } from "@/components/auth/password-forms";
+import { useSession } from "@/lib/session/session";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useTheme } from "@/lib/theme";
 import type { Profile } from "@/types/account";
 import { LanguageSwitch } from "@/components/layout/header-controls";
-import { AvatarPicker } from "./avatar-picker";
+import { Avatar } from "@/components/ui/avatar";
 import { loginIdentifier } from "./profile-identity";
 
 export function ProfileHeader({ profile, actions }: { profile: Profile; actions?: ReactNode }) {
   const { t } = useI18n();
-  const [photoError, setPhotoError] = useState<string | null>(null);
   return (
     <Card className="overflow-hidden">
       <div className="relative h-32 bg-[linear-gradient(120deg,var(--navy-900)_0%,var(--navy-700)_55%,var(--sky-500)_120%)] sm:h-40">
@@ -31,14 +34,7 @@ export function ProfileHeader({ profile, actions }: { profile: Profile; actions?
         </svg>
       </div>
       <div className="flex flex-col gap-4 px-5 pb-6 sm:flex-row sm:items-end sm:px-8">
-        <AvatarPicker
-          name={profile.fullName}
-          src={profile.avatarUrl}
-          label={t("profile.changePhoto")}
-          className="-mt-16 self-start sm:-mt-14"
-          onError={() => setPhotoError(t("profile.photoHint"))}
-          onSelect={() => setPhotoError(null)}
-        />
+        <Avatar name={profile.fullName} size="xl" className="-mt-16 self-start ring-4 ring-surface sm:-mt-14" />
         <div className="min-w-0 flex-1 sm:pb-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight text-foreground">{profile.fullName}</h2>
@@ -57,7 +53,6 @@ export function ProfileHeader({ profile, actions }: { profile: Profile; actions?
               </span>
             )}
           </div>
-          <p className="mt-2 text-xs text-subtle">{photoError ?? t("profile.photoHint")}</p>
         </div>
         {actions && <div className="flex flex-wrap gap-2 sm:pb-1">{actions}</div>}
       </div>
@@ -104,6 +99,9 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
 
 export function ProfileSettings() {
   const { t } = useI18n();
+  const toast = useToast();
+  const { signedIn } = useSession();
+  const [changing, setChanging] = useState(false);
   const { choice, setChoice } = useTheme();
   return (
     <Card id="settings" className="scroll-mt-24">
@@ -144,9 +142,12 @@ export function ProfileSettings() {
               <p className="mt-0.5 text-sm text-muted">{t("profile.passwordHint")}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" className="mt-3" disabled title={t("states.comingSoonTitle")}>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => setChanging(true)}>
             {t("profile.changePassword")}
           </Button>
+          <Modal open={changing} onOpenChange={setChanging} title={t("profile.changePassword")} closeLabel={t("common.close")}>
+            <ChangePasswordForm onCancel={() => setChanging(false)} onChanged={(user) => { signedIn(user); setChanging(false); toast(t("auth.passwordChanged")); }} />
+          </Modal>
         </div>
       </CardContent>
     </Card>

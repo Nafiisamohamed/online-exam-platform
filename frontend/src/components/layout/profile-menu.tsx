@@ -2,23 +2,21 @@
 
 /**
  * Header account menu: avatar, name and role on the button; a profile card
- * with quick links and sign-out in the dropdown. In preview mode it also lets
- * the reviewer switch the role the shell is shown for.
+ * with quick links and sign-out in the dropdown.
  */
-import { ChevronDown, Eye, LogIn, LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/avatar";
 import {
-  Dropdown, DropdownContent, DropdownItem, DropdownLabel, DropdownRadioGroup, DropdownRadioItem, DropdownSeparator, DropdownTrigger,
+  Dropdown, DropdownContent, DropdownItem, DropdownSeparator, DropdownTrigger,
 } from "@/components/ui/overlays";
 import { ProfileIdentity } from "@/components/profile/profile-identity";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
-import { ROLES, type Role } from "@/types/account";
 
 export function ProfileMenu() {
   const { t } = useI18n();
-  const { profile, role, isPreview, setPreviewRole, signOut } = useSession();
+  const { profile, role, signOut } = useSession();
   const router = useRouter();
 
   return (
@@ -41,29 +39,10 @@ export function ProfileMenu() {
         <div className="p-1.5">
           <DropdownItem icon={<UserRound className="h-4 w-4" />} onSelect={() => router.push("/profile")}>{t("profile.viewProfile")}</DropdownItem>
           <DropdownItem icon={<Settings className="h-4 w-4" />} onSelect={() => router.push("/profile#settings")}>{t("profile.settings")}</DropdownItem>
-          {isPreview && (
-            <>
-              <DropdownSeparator />
-              <DropdownLabel className="flex items-center gap-1.5">
-                <Eye className="h-3.5 w-3.5" aria-hidden /> {t("preview.viewAs")}
-              </DropdownLabel>
-              <DropdownRadioGroup value={role} onValueChange={(v) => setPreviewRole(v as Role)}>
-                {ROLES.map((r) => (
-                  <DropdownRadioItem key={r} value={r}>{t(`roles.${r}`)}</DropdownRadioItem>
-                ))}
-              </DropdownRadioGroup>
-            </>
-          )}
           <DropdownSeparator />
-          {isPreview ? (
-            <DropdownItem icon={<LogIn className="h-4 w-4" />} onSelect={() => router.push("/sign-in")}>
-              {t("nav.signIn")}
-            </DropdownItem>
-          ) : (
-            <DropdownItem icon={<LogOut className="h-4 w-4" />} onSelect={() => void signOut().then(() => router.push("/sign-in"))}>
-              {t("profile.signOut")}
-            </DropdownItem>
-          )}
+          <DropdownItem icon={<LogOut className="h-4 w-4" />} onSelect={() => void signOut().then(() => router.replace("/sign-in"))}>
+            {t("profile.signOut")}
+          </DropdownItem>
         </div>
       </DropdownContent>
     </Dropdown>

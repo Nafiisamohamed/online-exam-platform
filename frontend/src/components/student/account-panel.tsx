@@ -21,8 +21,8 @@ import type { Course } from "@/types/admin";
 
 /** Faculty names of the student's active courses, or undefined while loading / for other roles. */
 export function useStudentFaculties(): string | undefined {
-  const { role, isPreview } = useSession();
-  const courses = useApi<{ items: Course[] }>(role === "STUDENT" && !isPreview ? studentPaths.courses : null);
+  const { role, isSignedIn } = useSession();
+  const courses = useApi<{ items: Course[] }>(role === "STUDENT" && isSignedIn ? studentPaths.courses : null);
   if (!courses.data) return undefined;
   return [...new Set(courses.data.items.map((c) => c.faculty.name))].join(", ") || "—";
 }
@@ -30,11 +30,11 @@ export function useStudentFaculties(): string | undefined {
 export function AccountPanel() {
   const { t } = useI18n();
   const toast = useToast();
-  const { profile, isPreview } = useSession();
+  const { profile, isSignedIn } = useSession();
   const [language, setLanguage] = useState<"so" | "en">(profile.preferredLanguage);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  if (isPreview) return null;
+  if (!isSignedIn) return null;
 
   const save = async () => {
     setBusy(true);

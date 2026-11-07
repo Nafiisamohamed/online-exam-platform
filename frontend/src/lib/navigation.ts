@@ -1,7 +1,5 @@
 /**
- * Sidebar navigation for each role. Modules are added here as they are built;
- * links to modules that do not exist yet open the "coming in a later phase"
- * page, so the structure can be reviewed now.
+ * Sidebar navigation for each role. Every entry opens a finished page.
  *
  * Each role's modules live under their own prefix (/admin/*, /lecturer/*,
  * /student/*, /invigilator/*), so pages with the same names (courses, exams…) never clash.
@@ -9,8 +7,8 @@
  */
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3, BookOpenCheck, Building2, CalendarClock, ClipboardCheck, CreditCard, DoorOpen, FileQuestion,
-  GraduationCap, LayoutDashboard, MessageSquareText, MonitorPlay, Palette, ScrollText, ShieldCheck,
+  BarChart3, BookOpenCheck, Building2, CalendarClock, ClipboardCheck, CreditCard, FileQuestion,
+  GraduationCap, LayoutDashboard, MonitorPlay, ScrollText,
   UserRound, Users, Award, NotebookPen,
 } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n/i18n";
@@ -29,7 +27,6 @@ export interface NavSection {
 
 const dashboard: NavItem = { label: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard };
 const profile: NavItem = { label: "nav.profile", href: "/profile", icon: UserRound };
-const designSystem: NavItem = { label: "nav.designSystem", href: "/design-system", icon: Palette };
 
 export const NAVIGATION: Record<Role, NavSection[]> = {
   ADMIN: [
@@ -41,26 +38,16 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
         { label: "nav.courses", href: "/admin/courses", icon: BookOpenCheck },
         { label: "nav.students", href: "/admin/enrolment", icon: GraduationCap },
         { label: "nav.users", href: "/admin/users", icon: Users },
-        { label: "nav.rooms", href: "/rooms", icon: DoorOpen },
       ],
     },
     {
       title: "nav.sections.examinations",
       items: [
         { label: "nav.examOversight", href: "/admin/exams", icon: NotebookPen },
-        { label: "nav.schedules", href: "/schedules", icon: CalendarClock },
         { label: "nav.reports", href: "/admin/reports", icon: BarChart3 },
       ],
     },
-    {
-      title: "nav.sections.records",
-      items: [
-        { label: "nav.payments", href: "/payments", icon: CreditCard },
-        { label: "nav.smsOutbox", href: "/sms-outbox", icon: MessageSquareText },
-        { label: "nav.auditLog", href: "/audit-log", icon: ShieldCheck },
-      ],
-    },
-    { title: "nav.sections.system", items: [profile, designSystem] },
+    { title: "nav.sections.system", items: [profile] },
   ],
   LECTURER: [
     { title: "nav.sections.main", items: [dashboard] },
@@ -81,7 +68,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
         { label: "nav.analytics", href: "/lecturer/analytics", icon: BarChart3 },
       ],
     },
-    { title: "nav.sections.system", items: [profile, designSystem] },
+    { title: "nav.sections.system", items: [profile] },
   ],
   INVIGILATOR: [
     { title: "nav.sections.main", items: [dashboard] },
@@ -92,7 +79,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
         { label: "nav.liveView", href: "/invigilator/live", icon: MonitorPlay },
       ],
     },
-    { title: "nav.sections.system", items: [profile, designSystem] },
+    { title: "nav.sections.system", items: [profile] },
   ],
   STUDENT: [
     { title: "nav.sections.main", items: [dashboard] },
@@ -105,7 +92,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
         { label: "nav.payments", href: "/student/payments", icon: CreditCard },
       ],
     },
-    { title: "nav.sections.system", items: [profile, designSystem] },
+    { title: "nav.sections.system", items: [profile] },
   ],
 };
 

@@ -18,6 +18,9 @@ export const authEn = {
   passwordRule: "At least 8 characters, with a letter and a digit.",
   mismatch: "The two passwords are not the same.",
   savePassword: "Save password",
+  currentPasswordRegular: "Current password",
+  changeOthersNote: "After the change you stay signed in here; any other device is signed out.",
+  passwordChanged: "Your password was changed.",
   requiredTitle: "Sign in to open this page",
   requiredHint: "Administration pages show live data from the server, so they need a signed-in registrar account.",
   notAllowedTitle: "This page is for the registrar",
@@ -29,7 +32,6 @@ export const authEn = {
   invigilatorOnlyTitle: "This page is for invigilators",
   invigilatorOnlyHint: "Your account does not have access to the invigilator pages.",
   goSignIn: "Sign in",
-  backToApp: "Back to the platform",
   sessionEnded: "Your session has ended. Please sign in again.",
   campusNote: "Your session is kept in a secure cookie on this device only.",
 } as const;

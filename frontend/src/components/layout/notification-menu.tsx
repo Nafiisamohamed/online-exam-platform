@@ -35,18 +35,18 @@ function timeAgo(iso: string, locale: string) {
 
 export function NotificationMenu() {
   const { t, locale } = useI18n();
-  const { isPreview } = useSession();
+  const { isSignedIn } = useSession();
   const [items, setItems] = useState<AppNotification[] | null>(null);
   const unread = items?.filter((n) => !n.readAt).length ?? 0;
 
   const load = useCallback(() => {
-    if (isPreview) return;
+    if (!isSignedIn) return;
     api<{ items: AppNotification[] }>("/notifications").then((r) => setItems(r.items)).catch(() => setItems([]));
-  }, [isPreview]);
+  }, [isSignedIn]);
 
   useEffect(() => {
-    if (!isPreview) load();
-  }, [isPreview, load, locale]);
+    if (isSignedIn) load();
+  }, [isSignedIn, load, locale]);
 
   const markAll = async () => {
     await api("/notifications/read-all", { method: "POST" }).catch(() => undefined);
@@ -79,7 +79,7 @@ export function NotificationMenu() {
           )}
         </div>
         <div className="max-h-[60dvh] overflow-y-auto">
-          {!isPreview && items === null ? (
+          {isSignedIn && items === null ? (
             <div className="space-y-3 p-4">
               {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>

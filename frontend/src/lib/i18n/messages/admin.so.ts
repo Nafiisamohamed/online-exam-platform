@@ -23,6 +23,9 @@ export const authSo: Widen<typeof authEn> = {
   passwordRule: "Ugu yaraan 8 xaraf, oo leh xaraf iyo tiro.",
   mismatch: "Labada eray ee sirta ah isku mid ma aha.",
   savePassword: "Kaydi erayga sirta ah",
+  currentPasswordRegular: "Erayga sirta ah ee hadda",
+  changeOthersNote: "Beddelka kadib halkan waad gashan tahay; qalab kasta oo kale waa laga saarayaa.",
+  passwordChanged: "Erayga sirta ah waa la beddelay.",
   requiredTitle: "Gal si aad u furto boggan",
   requiredHint: "Bogagga maamulku waxay muujiyaan xog toos ah oo ka timid server-ka, sidaa darteed waxay u baahan yihiin akoon diiwaangeliye oo soo galay.",
   notAllowedTitle: "Boggani waxa uu u gaar yahay diiwaangeliyaha",
@@ -34,7 +37,6 @@ export const authSo: Widen<typeof authEn> = {
   invigilatorOnlyTitle: "Boggani waxa uu u gaar yahay ilaaliyeyaasha",
   invigilatorOnlyHint: "Akoonkaagu ma laha fasax uu ku galo bogagga ilaaliyeyaasha.",
   goSignIn: "Gal",
-  backToApp: "Ku noqo madasha",
   sessionEnded: "Fadhigaagu wuu dhammaaday. Fadlan mar kale gal.",
   campusNote: "Fadhigaaga waxa lagu hayaa cookie ammaan ah oo qalabkan oo keliya ku jira.",
 };

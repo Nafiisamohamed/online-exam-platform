@@ -3,8 +3,7 @@
 /**
  * Wraps every page of one role (registrar, lecturer, student or invigilator). These pages show live data only, so:
  * - while the session loads, a skeleton is shown;
- * - when nobody is signed in (preview mode), the page asks the user to sign in
- *   instead of showing sample numbers;
+ * - when nobody is signed in, the visitor is sent to the sign-in page (and returns here afterwards);
  * - a signed-in user who still has a temporary password is sent to change it
  *   (the API refuses everything else until then);
  * - other roles see a "this page is for …" message.
@@ -35,13 +34,15 @@ const NOT_ALLOWED: Record<GatedRole, { title: MessageKey; hint: MessageKey }> = 
 
 export function RoleGate({ role: required, children }: { role: GatedRole; children: ReactNode }) {
   const { t } = useI18n();
-  const { isLoading, isPreview, role, profile } = useSession();
+  const { isLoading, isSignedIn, role, profile } = useSession();
   const router = useRouter();
-  const mustChange = !isPreview && profile.mustChangePassword;
+  const mustChange = isSignedIn && profile.mustChangePassword;
 
   useEffect(() => {
+    if (isLoading) return;
     if (mustChange) router.replace("/sign-in");
-  }, [mustChange, router]);
+    else if (!isSignedIn) router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
+  }, [isLoading, isSignedIn, mustChange, router]);
 
   if (isLoading || mustChange) {
     return (
@@ -55,7 +56,7 @@ export function RoleGate({ role: required, children }: { role: GatedRole; childr
     );
   }
 
-  if (isPreview) {
+  if (!isSignedIn) {
     return (
       <Card className="mt-4">
         <EmptyState

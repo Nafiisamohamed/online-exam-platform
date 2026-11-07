@@ -4,15 +4,15 @@
  * The shared application frame for all four roles: sidebar, top bar and the
  * page area. Pages only render their own content inside it.
  */
-import { LogIn, Menu } from "lucide-react";
-import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { Menu } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/lib/i18n/i18n";
 import { createPersistedStore, usePersisted } from "@/lib/persisted-store";
 import { useSession } from "@/lib/session/session";
 import { STORAGE_KEYS } from "@/lib/storage";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/spinner";
 import { iconButton, LanguageSwitch, ThemeMenu } from "./header-controls";
 import { NotificationMenu } from "./notification-menu";
 import { ProfileMenu } from "./profile-menu";
@@ -20,24 +20,23 @@ import { MobileSidebar, Sidebar } from "./sidebar";
 
 const collapsedStore = createPersistedStore<"true" | "false">(STORAGE_KEYS.sidebarCollapsed, "false", ["true", "false"]);
 
-function PreviewBanner() {
-  const { t } = useI18n();
-  return (
-    <div className="border-b border-border bg-accent-soft px-4 py-2 text-center text-xs text-accent-foreground sm:px-6">
-      <Badge tone="navy" className="mr-2 align-middle">{t("preview.badge")}</Badge>
-      <span className="align-middle">{t("preview.banner")}</span>
-      <Link href="/sign-in" className="ml-2 inline-flex items-center gap-1 align-middle font-semibold text-accent-strong underline-offset-2 hover:underline">
-        <LogIn className="h-3.5 w-3.5" aria-hidden /> {t("preview.signIn")}
-      </Link>
-    </div>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useI18n();
-  const { isPreview, isLoading } = useSession();
+  const { isSignedIn, isLoading, profile } = useSession();
+  const router = useRouter();
+  // Pages are shown only to a signed-in user who has no temporary password left to change.
+  const mustChange = isSignedIn && profile.mustChangePassword;
+  const allowed = isSignedIn && !mustChange;
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isSignedIn || mustChange) router.replace(isSignedIn ? "/sign-in" : `/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
+  }, [isLoading, isSignedIn, mustChange, router]);
   const collapsed = usePersisted(collapsedStore) === "true";
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  if (!allowed) {
+    return <div className="min-h-dvh bg-background p-8" aria-busy><Skeleton className="h-10 w-64" /><Skeleton className="mt-6 h-72 w-full max-w-4xl" /></div>;
+  }
 
   return (
     <div className="flex min-h-dvh bg-background">
@@ -59,7 +58,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
-        {isPreview && !isLoading && <PreviewBanner />}
         <main className="flex-1 bg-[linear-gradient(180deg,var(--background-cream)_0%,var(--background)_420px)]">
           <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">{children}</div>
         </main>

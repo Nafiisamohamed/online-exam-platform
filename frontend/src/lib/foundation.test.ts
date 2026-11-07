@@ -4,7 +4,6 @@ import { initials } from "@/components/ui/avatar";
 import { BOOT_SCRIPT } from "@/lib/boot-script";
 import { dictionaries, translate, type MessageKey } from "@/lib/i18n/i18n";
 import { isActive, NAVIGATION } from "@/lib/navigation";
-import { PREVIEW_ACCOUNTS } from "@/lib/preview/demo-accounts";
 import { ROLES } from "@/types/account";
 
 /** Every dotted key that points at a text. */
@@ -76,7 +75,4 @@ describe("helpers", () => {
     expect(() => new Function(BOOT_SCRIPT)).not.toThrow();
   });
 
-  it("there is a preview account for every role", () => {
-    for (const role of ROLES) expect(PREVIEW_ACCOUNTS[role]?.role).toBe(role);
-  });
 });
