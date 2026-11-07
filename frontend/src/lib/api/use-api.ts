@@ -56,6 +56,18 @@ function load(path: string) {
   return e.promise;
 }
 
+/**
+ * The same cached GET for code that needs a promise (several paths at once):
+ * screens reading the same path with useApi() share this one request.
+ */
+export async function fetchCached<T>(path: string): Promise<T> {
+  const e = cache.get(path);
+  if (!e || e.stale || (e.data === undefined && !e.error)) await load(path);
+  const done = cache.get(path);
+  if (done?.error) throw done.error;
+  return done?.data as T;
+}
+
 /** Refetches every cached GET whose path starts with one of the prefixes. */
 export function invalidate(...prefixes: string[]) {
   for (const [path, e] of cache) {

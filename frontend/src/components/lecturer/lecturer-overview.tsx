@@ -25,9 +25,8 @@ import { EmptyState } from "@/components/ui/states";
 import { useNow } from "@/hooks/use-now";
 import { EXAM_STATES } from "@/lib/admin/exam-state";
 import { examStageCounts, upcomingExams } from "@/lib/admin/report-data";
-import { api } from "@/lib/api/client";
 import { lecturerPaths } from "@/lib/api/lecturer";
-import { invalidate, useApi } from "@/lib/api/use-api";
+import { fetchCached, invalidate, useApi } from "@/lib/api/use-api";
 import { formatRelative, formatDate, formatTimeRange } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
@@ -55,7 +54,7 @@ function usePendingGrading(exams: ExamListItem[] | undefined) {
   useEffect(() => {
     if (!ids) return;
     let live = true;
-    Promise.all(ids.map((id) => api<GradingQueue>(lecturerPaths.grading(id)).then((q) => q.remaining)))
+    Promise.all(ids.map((id) => fetchCached<GradingQueue>(lecturerPaths.grading(id)).then((q) => q.remaining)))
       .then((counts) => live && setTotal({ key, value: counts.reduce((s, n) => s + n, 0) }))
       .catch(() => live && setTotal({ key, value: null }));
     return () => {

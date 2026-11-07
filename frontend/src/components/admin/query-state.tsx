@@ -34,6 +34,6 @@ export function QueryState<T>({
   className?: string;
 }) {
   if (state.error && state.data === undefined) return <QueryError state={state} className={className} />;
-  if (state.data === undefined) return <div className={className}><Skeleton className={skeleton ?? "h-40 w-full"} /></div>;
+  if (state.data === undefined) return <div className={className} aria-busy="true"><Skeleton className={skeleton ?? "h-40 w-full"} /></div>;
   return <>{children(state.data)}</>;
 }

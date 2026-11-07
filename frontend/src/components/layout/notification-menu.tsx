@@ -3,11 +3,11 @@
 /**
  * Notification bell with an unread badge and a dropdown panel. Data comes from
  * the API (GET /api/notifications, already translated into the user's
- * language; POST /api/notifications/read-all). Nothing is shown in preview
- * mode, because there is no signed-in user whose notifications could be read.
+ * language; POST /api/notifications/read-all). It shares the cached list with
+ * the overview pages, so a page load reads it once; opening the panel refreshes it.
  */
 import { Bell, BellRing, CheckCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { invalidate, useApi } from "@/lib/api/use-api";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/cn";
 import { useI18n } from "@/lib/i18n/i18n";
@@ -36,17 +36,12 @@ function timeAgo(iso: string, locale: string) {
 export function NotificationMenu() {
   const { t, locale } = useI18n();
   const { isSignedIn } = useSession();
-  const [items, setItems] = useState<AppNotification[] | null>(null);
+  // Shared with the overview pages that list notifications: one request per page load.
+  const list = useApi<{ items: AppNotification[] }>(isSignedIn ? "/notifications" : null);
+  const items = list.data?.items ?? (list.error ? [] : null);
   const unread = items?.filter((n) => !n.readAt).length ?? 0;
 
-  const load = useCallback(() => {
-    if (!isSignedIn) return;
-    api<{ items: AppNotification[] }>("/notifications").then((r) => setItems(r.items)).catch(() => setItems([]));
-  }, [isSignedIn]);
-
-  useEffect(() => {
-    if (isSignedIn) load();
-  }, [isSignedIn, load, locale]);
+  const load = () => invalidate("/notifications");
 
   const markAll = async () => {
     await api("/notifications/read-all", { method: "POST" }).catch(() => undefined);
