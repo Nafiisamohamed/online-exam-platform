@@ -7,7 +7,7 @@
  */
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3, BookOpenCheck, Building2, CalendarClock, ClipboardCheck, CreditCard, FileQuestion,
+  BarChart3, BookOpenCheck, Building2, CalendarCheck2, CalendarClock, ClipboardCheck, CreditCard, FileQuestion,
   GraduationCap, LayoutDashboard, MonitorPlay, ScrollText,
   UserRound, Users, Award, NotebookPen,
 } from "lucide-react";
@@ -44,6 +44,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
       title: "nav.sections.examinations",
       items: [
         { label: "nav.examOversight", href: "/admin/exams", icon: NotebookPen },
+        { label: "nav.scheduleRequests", href: "/admin/schedules", icon: CalendarCheck2 },
         { label: "nav.reports", href: "/admin/reports", icon: BarChart3 },
       ],
     },

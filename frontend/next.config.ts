@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  // The development-mode badge sat over the sidebar's bottom-left button; production never shows it.
+  devIndicators: false,
   turbopack: {
     rules: {
       "*.css": {

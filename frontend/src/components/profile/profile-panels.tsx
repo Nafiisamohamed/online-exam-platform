@@ -2,15 +2,17 @@
 
 /**
  * Profile page building blocks:
- * - ProfileHeader: banner, initials avatar, name, role and identifiers (the API has no photo upload);
+ * - ProfileHeader: photo (upload / change / remove, kept on this device), name, role and login;
  * - ProfileDetails: account information as label/value rows;
  * - ProfileSettings: language and theme preferences, and the security section.
  * They take a Profile and work the same for every role.
  */
-import { BadgeCheck, Building2, KeyRound, Languages, Mail, MonitorSmartphone, Phone, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { BadgeCheck, Building2, Camera, KeyRound, Languages, Mail, MonitorSmartphone, Phone, ShieldCheck, UserRound, Trash2, type LucideIcon } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
+import { removeProfilePhoto, saveProfilePhoto } from "@/lib/profile-photo";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Modal } from "@/components/ui/overlays";
 import { useToast } from "@/components/ui/toast";
@@ -23,27 +25,41 @@ import { LanguageSwitch } from "@/components/layout/header-controls";
 import { Avatar } from "@/components/ui/avatar";
 import { loginIdentifier } from "./profile-identity";
 
-export function ProfileHeader({ profile, actions }: { profile: Profile; actions?: ReactNode }) {
+/** Name, role and login, with the profile photo (upload, change, remove; saved on this device). */
+export function ProfileHeader({ profile }: { profile: Profile }) {
   const { t } = useI18n();
+  const toast = useToast();
+  const inputId = useId();
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const hasPhoto = !!profile.avatarUrl;
+
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    const result = await saveProfilePhoto(profile.id, file);
+    setBusy(false);
+    if (result === "ok") {
+      setProblem(null);
+      toast(t("profile.photoSaved"));
+    } else setProblem(t(result === "invalid" ? "profile.photoInvalid" : "profile.photoFailed"));
+  };
+  const remove = () => {
+    removeProfilePhoto(profile.id);
+    setProblem(null);
+    toast(t("profile.photoRemoved"));
+  };
+
   return (
-    <Card className="overflow-hidden">
-      <div className="relative h-32 bg-[linear-gradient(120deg,var(--navy-900)_0%,var(--navy-700)_55%,var(--sky-500)_120%)] sm:h-40">
-        <svg aria-hidden className="absolute inset-0 h-full w-full opacity-[0.12]" preserveAspectRatio="none" viewBox="0 0 400 100">
-          <path d="M0 70 C 80 40, 160 100, 240 60 S 360 30, 400 50 L400 100 L0 100 Z" fill="white" />
-          <path d="M0 85 C 100 60, 200 110, 300 75 S 380 70, 400 80 L400 100 L0 100 Z" fill="white" />
-        </svg>
-      </div>
-      <div className="flex flex-col gap-4 px-5 pb-6 sm:flex-row sm:items-end sm:px-8">
-        <Avatar name={profile.fullName} size="xl" className="-mt-16 self-start ring-4 ring-surface sm:-mt-14" />
-        <div className="min-w-0 flex-1 sm:pb-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">{profile.fullName}</h2>
-            <BadgeCheck className="h-5 w-5 text-accent" aria-hidden />
-          </div>
+    <Card className="p-5 sm:p-7">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <Avatar name={profile.fullName} src={profile.avatarUrl} size="xl" className="self-start sm:self-center" />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">{profile.fullName}</h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted">
             <Badge tone="navy">{t(`roles.${profile.role}`)}</Badge>
-            <span className="inline-flex items-center gap-1.5">
-              {profile.studentNumber ? <UserRound className="h-4 w-4" aria-hidden /> : <Mail className="h-4 w-4" aria-hidden />}
+            <span className="inline-flex min-w-0 items-center gap-1.5 break-all">
+              {profile.studentNumber ? <UserRound className="h-4 w-4 shrink-0" aria-hidden /> : <Mail className="h-4 w-4 shrink-0" aria-hidden />}
               {loginIdentifier(profile)}
             </span>
             {profile.faculty && (
@@ -53,8 +69,20 @@ export function ProfileHeader({ profile, actions }: { profile: Profile; actions?
               </span>
             )}
           </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <label htmlFor={inputId} className={cn(buttonClasses("secondary", "sm"), "cursor-pointer", busy && "pointer-events-none opacity-60")}>
+              <Camera className="h-4 w-4" aria-hidden />
+              {hasPhoto ? t("profile.changePhoto") : t("profile.uploadPhoto")}
+            </label>
+            <input id={inputId} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+            {hasPhoto && (
+              <Button variant="ghost" size="sm" leftIcon={<Trash2 className="h-4 w-4" />} onClick={remove}>
+                {t("profile.removePhoto")}
+              </Button>
+            )}
+          </div>
+          <p className={cn("mt-2 text-xs", problem ? "font-medium text-danger" : "text-subtle")} role={problem ? "alert" : undefined}>{problem ?? t("profile.photoHint")}</p>
         </div>
-        {actions && <div className="flex flex-wrap gap-2 sm:pb-1">{actions}</div>}
       </div>
     </Card>
   );

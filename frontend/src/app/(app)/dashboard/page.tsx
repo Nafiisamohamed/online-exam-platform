@@ -11,10 +11,20 @@ import { InvigilatorOverview } from "@/components/invigilator/invigilator-overvi
 import { AdminGate, InvigilatorGate, LecturerGate, StudentGate } from "@/components/layout/role-gate";
 import { LecturerOverview } from "@/components/lecturer/lecturer-overview";
 import { StudentOverview } from "@/components/student/student-overview";
+import { Skeleton } from "@/components/ui/spinner";
 import { useSession } from "@/lib/session/session";
 
 export default function DashboardPage() {
-  const { role } = useSession();
+  const { role, isLoading } = useSession();
+  // Until the user is known, show a placeholder rather than any role's overview.
+  if (isLoading) {
+    return (
+      <div className="space-y-4" aria-busy>
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
   switch (role) {
     case "ADMIN":
       return <AdminGate><AdminOverview /></AdminGate>;

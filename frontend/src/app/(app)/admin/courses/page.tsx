@@ -71,7 +71,6 @@ export default function CoursesPage() {
           )}
         </Field>
       </FilterBar>
-      <p className="mb-3 text-xs text-muted">{t("admin.courses.statusNote")}</p>
       <Card className="overflow-hidden">
         {courses.error && !courses.data ? (
           <QueryError state={courses} />

@@ -33,6 +33,18 @@ const NOT_ALLOWED: Record<GatedRole, { title: MessageKey; hint: MessageKey }> = 
 };
 
 /** Without a role: any signed-in user (pages shared by all roles, such as the profile). */
+function GateSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy>
+      <Skeleton className="h-10 w-64" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28" />)}
+      </div>
+      <Skeleton className="h-72" />
+    </div>
+  );
+}
+
 export function RoleGate({ role: required, children }: { role?: GatedRole; children: ReactNode }) {
   const { t } = useI18n();
   const { isLoading, isSignedIn, role, profile } = useSession();
@@ -45,17 +57,17 @@ export function RoleGate({ role: required, children }: { role?: GatedRole; child
     else if (!isSignedIn) router.replace(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
   }, [isLoading, isSignedIn, mustChange, router]);
 
-  if (isLoading || mustChange) {
+  if (isLoading) {
     return (
-      <div className="space-y-4" aria-busy>
-        <Skeleton className="h-10 w-64" />
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-        <Skeleton className="h-72" />
-      </div>
+      <>
+        <GateSkeleton />
+        {/* The page is rendered hidden while the session loads (always so in the server prerender),
+            so Next.js can check it; it is shown only once the user and role are confirmed. */}
+        <div hidden>{children}</div>
+      </>
     );
   }
+  if (mustChange) return <GateSkeleton />;
 
   if (!isSignedIn) {
     return (

@@ -4,7 +4,7 @@
  * Distraction-free frame for a running exam: no sidebar or menus, only the
  * brand, language and theme switches. Students only (StudentGate).
  */
-import { GraduationCap } from "lucide-react";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { LanguageSwitch, ThemeMenu } from "@/components/layout/header-controls";
 import { StudentGate } from "@/components/layout/role-gate";
 import { useI18n } from "@/lib/i18n/i18n";
@@ -15,7 +15,7 @@ export default function ExamLayout({ children }: LayoutProps<"/exam">) {
     <div className="min-h-dvh bg-[linear-gradient(180deg,var(--background-cream)_0%,var(--background)_420px)]">
       <header className="border-b border-border bg-surface">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[linear-gradient(135deg,var(--sky-500),var(--sky-700))] text-white"><GraduationCap className="h-4 w-4" aria-hidden /></span>
+          <BrandLogo size={32} />
           <span className="text-sm font-bold text-foreground">{t("app.shortName")}</span>
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <LanguageSwitch />

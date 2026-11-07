@@ -6,7 +6,7 @@
  * tablets the same navigation opens as a drawer from the top-bar menu button.
  */
 import * as Dialog from "@radix-ui/react-dialog";
-import { GraduationCap, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
@@ -15,14 +15,13 @@ import { useI18n } from "@/lib/i18n/i18n";
 import { isActive, NAVIGATION } from "@/lib/navigation";
 import { useSession } from "@/lib/session/session";
 import { Tooltip } from "@/components/ui/overlays";
+import { BrandLogo } from "./brand-logo";
 
 function Brand({ compact }: { compact?: boolean }) {
   const { t } = useI18n();
   return (
     <Link href="/dashboard" className="flex items-center gap-3 rounded-xl outline-none">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,var(--sky-500),var(--sky-700))] text-white shadow-raised">
-        <GraduationCap className="h-5 w-5" aria-hidden />
-      </span>
+      <BrandLogo size={40} />
       {!compact && (
         <span className="min-w-0 leading-tight">
           <span className="block truncate text-[15px] font-bold tracking-tight text-white">{t("app.shortName")}</span>

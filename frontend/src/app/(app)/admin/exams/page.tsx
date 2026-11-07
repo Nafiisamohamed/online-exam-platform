@@ -53,7 +53,6 @@ export default function ExamOversightPage() {
       <PageHeader
         eyebrow={<Breadcrumbs items={[{ label: t("nav.dashboard"), href: "/dashboard" }, { label: t("nav.examOversight") }]} />}
         title={t("admin.exams.title")}
-        description={t("admin.exams.subtitle")}
       />
       <Alert tone="info" className="mb-4">{t("admin.exams.readOnlyNote")}</Alert>
 

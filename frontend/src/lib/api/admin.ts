@@ -4,7 +4,7 @@
  * below with useApi() (reads), so no component builds URLs or bodies itself.
  */
 import type {
-  AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty,
+  AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty, Schedule,
 } from "@/types/admin";
 import type { Role } from "@/types/account";
 import { api, query } from "./client";
@@ -106,4 +106,20 @@ export async function confirmImport(batchId: string) {
   const res = await api<ImportConfirmResult>(`/imports/${batchId}/confirm`, { method: "POST" });
   invalidate("/courses", "/users", "/analytics/dashboard", "/audit-logs");
   return res;
+}
+
+// --- Schedule requests (registrar decisions) -----------------------------------------
+
+/** POST /api/schedules/:id/approve (ADMIN only on the server). Notifies the enrolled students. */
+export async function approveSchedule(id: string) {
+  const res = await api<{ schedule: Schedule }>(`/schedules/${id}/approve`, { method: "POST" });
+  invalidate("/schedules", "/exams", "/analytics/dashboard", "/audit-logs");
+  return res.schedule;
+}
+
+/** POST /api/schedules/:id/reject { reason } (ADMIN only on the server). The lecturer sees the reason. */
+export async function rejectSchedule(id: string, reason: string) {
+  const res = await api<{ schedule: Schedule }>(`/schedules/${id}/reject`, { method: "POST", json: { reason } });
+  invalidate("/schedules", "/exams", "/analytics/dashboard", "/audit-logs");
+  return res.schedule;
 }

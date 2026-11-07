@@ -19,6 +19,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, SESSION_ENDED_EVENT } from "@/lib/api/client";
 import { clearApiCache } from "@/lib/api/use-api";
+import { useProfilePhoto } from "@/lib/profile-photo";
 import type { Profile } from "@/types/account";
 
 type SessionState = { status: "loading" } | { status: "signed-in"; profile: Profile } | { status: "signed-out" };
@@ -105,10 +106,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState({ status: "signed-out" });
   }, []);
 
+  // The profile photo is kept on this device (lib/profile-photo.ts); every avatar shows it.
+  const photo = useProfilePhoto(state.status === "signed-in" ? state.profile.id : "");
+
   const value = useMemo<SessionValue>(() => {
-    const profile = state.status === "signed-in" ? state.profile : NO_PROFILE;
+    const profile = state.status === "signed-in" ? { ...state.profile, avatarUrl: photo } : NO_PROFILE;
     return { profile, role: profile.role, isSignedIn: state.status === "signed-in", isLoading: state.status === "loading", sessionEnded, signedIn, signOut };
-  }, [state, sessionEnded, signOut, signedIn]);
+  }, [state, photo, sessionEnded, signOut, signedIn]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -24,12 +24,9 @@ function ProfileContent() {
       <PageHeader
         eyebrow={<Breadcrumbs items={[{ label: t("nav.dashboard"), href: "/dashboard" }, { label: t("profile.title") }]} />}
         title={t("profile.title")}
-        description={t("profile.subtitle")}
       />
       <div className="space-y-6">
-        <ProfileHeader
-          profile={profile}
-        />
+        <ProfileHeader profile={profile} />
         <div className="grid gap-6 lg:grid-cols-2">
           <ProfileDetails profile={profile} />
           <ProfileSettings />

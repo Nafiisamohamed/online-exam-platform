@@ -13,6 +13,6 @@ export interface Profile {
   mustChangePassword: boolean;
   /** Not part of /auth/me yet; shown when known (e.g. preview accounts). */
   faculty?: string;
-  /** Photo upload arrives with the profile module; until then initials are shown. */
+  /** Profile photo saved on this device (see lib/profile-photo.ts); initials are shown without one. */
   avatarUrl?: string | null;
 }

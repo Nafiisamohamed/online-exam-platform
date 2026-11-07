@@ -156,6 +156,7 @@
   --color-ring: var(--ring);
 
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
 
   --shadow-card: var(--shadow-sm);
   --shadow-raised: var(--shadow-md);
