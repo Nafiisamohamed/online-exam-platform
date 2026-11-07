@@ -4,7 +4,7 @@
  * page, so the structure can be reviewed now.
  *
  * Each role's modules live under their own prefix (/admin/*, /lecturer/*,
- * /student/*), so pages with the same names (courses, exams…) never clash.
+ * /student/*, /invigilator/*), so pages with the same names (courses, exams…) never clash.
  * The exam itself runs at /exam/:attemptId, outside the shell.
  */
 import type { LucideIcon } from "lucide-react";
@@ -88,8 +88,8 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
     {
       title: "nav.sections.examinations",
       items: [
-        { label: "nav.sessions", href: "/sessions", icon: CalendarClock },
-        { label: "nav.liveView", href: "/live", icon: MonitorPlay },
+        { label: "nav.sessions", href: "/invigilator/sessions", icon: CalendarClock },
+        { label: "nav.liveView", href: "/invigilator/live", icon: MonitorPlay },
       ],
     },
     { title: "nav.sections.system", items: [profile, designSystem] },

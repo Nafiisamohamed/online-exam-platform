@@ -7,9 +7,10 @@ import { ApiError } from "@/lib/api/client";
 import type { MessageKey } from "./i18n";
 import { errorsEn, importErrorsEn } from "./messages/admin.en";
 import { lecturerErrorsEn, questionErrorsEn } from "./messages/lecturer.en";
+import { invigilatorErrorsEn } from "./messages/invigilator.en";
 import { studentErrorsEn } from "./messages/student.en";
 
-const ERROR_CODES = { ...errorsEn, ...lecturerErrorsEn, ...studentErrorsEn };
+const ERROR_CODES = { ...errorsEn, ...lecturerErrorsEn, ...studentErrorsEn, ...invigilatorErrorsEn };
 
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 

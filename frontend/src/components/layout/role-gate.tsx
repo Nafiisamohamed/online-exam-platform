@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Wraps every page of one role (registrar, lecturer or student). These pages show live data only, so:
+ * Wraps every page of one role (registrar, lecturer, student or invigilator). These pages show live data only, so:
  * - while the session loads, a skeleton is shown;
  * - when nobody is signed in (preview mode), the page asks the user to sign in
  *   instead of showing sample numbers;
@@ -24,12 +24,13 @@ import type { MessageKey } from "@/lib/i18n/i18n";
 import { useSession } from "@/lib/session/session";
 import type { Role } from "@/types/account";
 
-type GatedRole = Extract<Role, "ADMIN" | "LECTURER" | "STUDENT">;
+type GatedRole = Extract<Role, "ADMIN" | "LECTURER" | "STUDENT" | "INVIGILATOR">;
 
 const NOT_ALLOWED: Record<GatedRole, { title: MessageKey; hint: MessageKey }> = {
   ADMIN: { title: "auth.notAllowedTitle", hint: "auth.notAllowedHint" },
   LECTURER: { title: "auth.lecturerOnlyTitle", hint: "auth.lecturerOnlyHint" },
   STUDENT: { title: "auth.studentOnlyTitle", hint: "auth.studentOnlyHint" },
+  INVIGILATOR: { title: "auth.invigilatorOnlyTitle", hint: "auth.invigilatorOnlyHint" },
 };
 
 export function RoleGate({ role: required, children }: { role: GatedRole; children: ReactNode }) {
@@ -99,4 +100,9 @@ export function LecturerGate({ children }: { children: ReactNode }) {
 /** Student pages. */
 export function StudentGate({ children }: { children: ReactNode }) {
   return <RoleGate role="STUDENT">{children}</RoleGate>;
+}
+
+/** Invigilator pages. */
+export function InvigilatorGate({ children }: { children: ReactNode }) {
+  return <RoleGate role="INVIGILATOR">{children}</RoleGate>;
 }

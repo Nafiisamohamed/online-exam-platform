@@ -59,3 +59,9 @@ export function campusInputToIso(value: string): string | null {
   const d = new Date(`${value}:00+03:00`);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+/** "09:05" in campus time. */
+export function formatTime(iso: string | null | undefined, locale: string) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat(tag(locale), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: CAMPUS_TIME_ZONE }).format(new Date(iso));
+}
