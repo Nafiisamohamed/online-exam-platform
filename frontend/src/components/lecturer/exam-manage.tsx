@@ -9,7 +9,7 @@
  * - links to grading, results and analytics.
  * A lecturer who is only the blind second grader sees a short note and the grading link.
  */
-import { BarChart3, CalendarPlus, ClipboardCheck, Eye, Award, PencilLine, Send, XCircle, Lock } from "lucide-react";
+import { BarChart3, CalendarPlus, Check, ClipboardCheck, Eye, Award, PencilLine, Send, XCircle } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
 import { DetailList, ExamStateBadge, FormError, ResultsBadge, ScheduleBadge } from "@/components/admin/admin-ui";
@@ -26,6 +26,7 @@ import { useNow } from "@/hooks/use-now";
 import { examState } from "@/lib/admin/exam-state";
 import { cancelSchedule, lecturerPaths, publishExam, setExamRules } from "@/lib/api/lecturer";
 import { useApi } from "@/lib/api/use-api";
+import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { BankSummaryRow, LecturerExam, Topic } from "@/types/lecturer";
@@ -152,7 +153,7 @@ function ManageView({ exam }: { exam: LecturerExam }) {
         }
       />
       {error ? <div className="mb-4"><FormError error={error} /></div> : null}
-      {exam.status === "PUBLISHED" && <Alert tone="info" className="mb-6"><span className="inline-flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" aria-hidden />{t("lecturer.exams.lockedNote")}</span></Alert>}
+      <WorkflowPanel exam={exam} now={now} />
 
       <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
@@ -242,6 +243,55 @@ function ManageView({ exam }: { exam: LecturerExam }) {
         onConfirm={() => open && act(() => cancelSchedule(open.id), t("lecturer.exams.cancelledToast"))}
       />
     </>
+  );
+}
+
+/**
+ * Where the examination stands in the approval workflow, and the next step:
+ * 1 Publish (finalise the content) -> 2 Request a schedule -> 3 Registrar approval
+ * -> 4 Open to students (the approved window has started). Publishing alone never
+ * makes the examination visible to students: the server only lists exams with an
+ * approved schedule to them, and only lets them start inside the window.
+ */
+function WorkflowPanel({ exam, now }: { exam: LecturerExam; now: number }) {
+  const { t, locale } = useI18n();
+  const published = exam.status === "PUBLISHED";
+  const open = exam.schedules.find((s) => s.status === "REQUESTED" || s.status === "APPROVED");
+  const approved = open?.status === "APPROVED" ? open : undefined;
+  const rejected = !open
+    ? [...exam.schedules].filter((s) => s.status === "REJECTED").sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""))[0]
+    : undefined;
+  const windowOpen = !!approved && now >= new Date(approved.windowStart).getTime();
+  const done = [published, !!open, !!approved, windowOpen];
+  const current = done.indexOf(false);
+  const steps = ["publish", "request", "approval", "students"] as const;
+
+  const message = !published
+    ? open ? t("lecturer.exams.workflow.draftRequested") : t("lecturer.exams.workflow.draft")
+    : approved
+      ? windowOpen ? t("lecturer.exams.workflow.open") : t("lecturer.exams.workflow.approved", { date: formatDateTime(approved.windowStart, locale) })
+      : open
+        ? t("lecturer.exams.workflow.requested")
+        : rejected
+          ? t("lecturer.exams.workflow.rejected", { reason: rejected.rejectionReason ?? "—" })
+          : t("lecturer.exams.workflow.published");
+  const tone = rejected && published && !open ? "warning" : approved ? "success" : "info";
+
+  return (
+    <Alert tone={tone} className="mb-6" title={t("lecturer.exams.workflow.title")}>
+      <ol className="mt-2 mb-3 flex flex-wrap gap-x-5 gap-y-2" aria-label={t("lecturer.exams.workflow.title")}>
+        {steps.map((step, i) => (
+          <li key={step} className={cn("inline-flex items-center gap-2 text-sm", done[i] ? "font-semibold" : i === current ? "font-semibold opacity-100" : "opacity-60")} aria-current={i === current ? "step" : undefined}>
+            <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold", done[i] ? "border-transparent bg-[var(--sky-700)] text-white" : "border-current")}>
+              {done[i] ? <Check className="h-3 w-3" aria-hidden /> : i + 1}
+            </span>
+            {t(`lecturer.exams.workflow.steps.${step}`)}
+            <span className="sr-only">{done[i] ? ` (${t("lecturer.exams.workflow.done")})` : ""}</span>
+          </li>
+        ))}
+      </ol>
+      <p>{message}</p>
+    </Alert>
   );
 }
 
