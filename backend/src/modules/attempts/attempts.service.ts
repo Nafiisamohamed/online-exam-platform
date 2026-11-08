@@ -33,7 +33,6 @@ import { findApprovedSchedule } from "../../repositories/schedules.repository.ts
 import type { AuthUser } from "../../middleware/auth.ts";
 import { AppError, badRequest, conflict, forbidden, notFound } from "../../lib/errors.ts";
 import { num, num0 } from "../../lib/format.ts";
-import { ipInRanges } from "../../lib/network.ts";
 import { audit } from "../../services/audit.ts";
 import { generateExam, NotEnoughQuestionsError } from "../../services/exam-generator.ts";
 import { loadRuleSpecs, rulesWithPools } from "../../services/exam-pool.ts";
@@ -141,7 +140,7 @@ export async function listMyExams(user: AuthUser) {
 /**
  * Starts the exam, or returns the existing attempt (recovery: never a second exam).
  * @throws 404 EXAM_NOT_FOUND, 403 NOT_ENROLLED, 409 EXAM_NOT_SCHEDULED / EXAM_NOT_OPEN_YET / EXAM_WINDOW_CLOSED,
- *         403 NETWORK_NOT_ALLOWED, 402 PAYMENT_REQUIRED, 409 EXAM_NOT_ENOUGH_QUESTIONS
+ *         402 PAYMENT_REQUIRED, 409 EXAM_NOT_ENOUGH_QUESTIONS
  */
 export async function startAttempt(user: AuthUser, examId: string, ip: string) {
   const existing = await attemptsRepo.findAttemptOfStudent(examId, user.id);
@@ -161,10 +160,8 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
   if (t < schedule.windowStart) throw conflict("EXAM_NOT_OPEN_YET", "The exam window has not opened yet", { windowStart: schedule.windowStart });
   if (t >= schedule.windowEnd) throw conflict("EXAM_WINDOW_CLOSED", "The exam window has closed", { windowEnd: schedule.windowEnd });
 
-  const ranges = schedule.rooms.flatMap((r) => r.room.networkRanges);
-  if (ranges.length && !ipInRanges(ip, ranges)) {
-    throw forbidden("NETWORK_NOT_ALLOWED", "Start the exam from a computer in one of the exam rooms");
-  }
+  // No network, IP address, room or device restriction: an eligible student may start from any
+  // device and any connection. The address is only recorded on the attempt (start_ip) for the record.
   if (num0(exam.feeAmount) > 0) {
     const paid = await findSuccessfulPayment(user.id, examId);
     if (!paid) throw new AppError(402, "PAYMENT_REQUIRED", "Pay the exam fee first", { amount: num(exam.feeAmount), currency: exam.feeCurrency });

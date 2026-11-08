@@ -1,9 +1,10 @@
 /**
- * Client IP address and campus network (CIDR) checks (section 4.5: exams can
- * be limited to allowed rooms or network addresses).
+ * Client IP address (recorded in the audit log and on exam attempts) and the
+ * format check for a room's optional network ranges. Network addresses never
+ * restrict access: students may take exams from any device and connection.
  */
 import type { Request } from "express";
-import { BlockList, isIP } from "node:net";
+import { isIP } from "node:net";
 
 /** The client's IP address, with IPv4-mapped IPv6 ("::ffff:10.0.0.5") shortened to IPv4. */
 export function clientIp(req: Request): string {
@@ -25,16 +26,3 @@ export function isValidCidr(cidr: string): boolean {
   return (family === 4 && prefix <= 32) || (family === 6 && prefix <= 128);
 }
 
-/** True when `ip` is inside at least one of the ranges. Invalid ranges are ignored. */
-export function ipInRanges(ip: string, ranges: string[]): boolean {
-  const addr = normalizeIp(ip);
-  const family = isIP(addr);
-  if (!family) return false;
-  const list = new BlockList();
-  for (const r of ranges) {
-    if (!isValidCidr(r)) continue;
-    const [base, prefix] = r.trim().split("/");
-    list.addSubnet(base, Number(prefix), isIP(base) === 4 ? "ipv4" : "ipv6");
-  }
-  return list.check(addr, family === 4 ? "ipv4" : "ipv6");
-}

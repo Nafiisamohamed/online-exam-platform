@@ -305,7 +305,7 @@ export const lecturerEn = {
     duration: "Duration (minutes)",
     durationHint: "5–600 minutes; it must fit inside the window.",
     rooms: "Rooms",
-    roomsHint: "Students can start only from these rooms' networks. No rooms means any network.",
+    roomsHint: "Reserves these rooms for the examination. Students can take it from any device and any network.",
     invigilators: "Invigilators",
     requestAction: "Send request",
     requestedToast: "Schedule requested. Students cannot see the examination until the registrar approves it.",

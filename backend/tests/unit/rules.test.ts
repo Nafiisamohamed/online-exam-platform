@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mapDbError } from "../../src/db/db-errors.ts";
 import { LABELS, NOTIFICATION_TEMPLATES, renderSms, SMS_TEMPLATES } from "../../src/i18n/messages.ts";
 import { normalizeText } from "../../src/lib/format.ts";
-import { ipInRanges, isValidCidr } from "../../src/lib/network.ts";
+import { isValidCidr } from "../../src/lib/network.ts";
 import { normalizeSomaliPhone } from "../../src/lib/phone.ts";
 import { csvCell } from "../../src/lib/uploads.ts";
 import { letterFor } from "../../src/modules/grading-scale/grading-scale.ts";
@@ -61,10 +61,6 @@ describe("input helpers", () => {
   it("checks exam-room network ranges", () => {
     expect(isValidCidr("10.10.4.0/24")).toBe(true);
     expect(isValidCidr("10.10.4.0/33")).toBe(false);
-    expect(ipInRanges("10.10.4.77", ["10.10.4.0/24"])).toBe(true);
-    expect(ipInRanges("::ffff:10.10.4.77", ["10.10.4.0/24"])).toBe(true);
-    expect(ipInRanges("10.10.5.1", ["10.10.4.0/24"])).toBe(false);
-    expect(ipInRanges("::1", ["::1/128"])).toBe(true);
   });
   it("normalises text for duplicate checks (D19)", () => {
     expect(normalizeText("  What IS   a key? ")).toBe("what is a key?");

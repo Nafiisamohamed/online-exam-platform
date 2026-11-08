@@ -7,13 +7,13 @@ const scheduleInclude = {
   exam: { select: { id: true, title: true, status: true, course: { select: { id: true, code: true, name: true, lecturerId: true } } } },
   requestedBy: { select: { id: true, fullName: true } },
   decidedBy: { select: { id: true, fullName: true } },
-  rooms: { include: { room: { select: { id: true, name: true, building: true, networkRanges: true } } } },
+  rooms: { include: { room: { select: { id: true, name: true, building: true } } } },
   invigilators: { include: { invigilator: { select: { id: true, fullName: true } } } },
 };
 
 /** The exam's approved schedule with its rooms (for the network check). */
 export function findApprovedSchedule(examId: string, db: Db = prisma) {
-  return db.examSchedule.findFirst({ where: { examId, status: "APPROVED" }, include: { rooms: { include: { room: true } } } });
+  return db.examSchedule.findFirst({ where: { examId, status: "APPROVED" } });
 }
 
 /** A schedule with its exam, people, rooms and invigilators. */

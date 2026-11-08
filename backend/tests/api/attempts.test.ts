@@ -168,17 +168,14 @@ describe("attempt security", () => {
     expect((await lecturer.get(`/api/attempts/${a.id}`)).status).toBe(403);
   });
 
-  it("only lets enrolled students start inside the window, from an allowed network, after paying", async () => {
+  it("only lets enrolled students start inside the window, after paying (from any network)", async () => {
     const notOpen = await openExam({ students: 1, openedMinutesAgo: -30 });
     expect((await notOpen.studentAgents[0].post(`/api/exams/${notOpen.examId}/attempts`)).body.error.code).toBe("EXAM_NOT_OPEN_YET");
     const closed = await openExam({ students: 1, openedMinutesAgo: 200, windowMinutes: 120 });
     expect((await closed.studentAgents[0].post(`/api/exams/${closed.examId}/attempts`)).body.error.code).toBe("EXAM_WINDOW_CLOSED");
+    // A room with network ranges never blocks a student (see any-network.test.ts for many addresses).
     const room = await openExam({ students: 1, networkRanges: ["10.10.4.0/24"] });
-    const blocked = await room.studentAgents[0].post(`/api/exams/${room.examId}/attempts`);
-    expect(blocked.status).toBe(403);
-    expect(blocked.body.error.code).toBe("NETWORK_NOT_ALLOWED");
-    const local = await openExam({ students: 1, networkRanges: ["127.0.0.1/32", "::1/128"] });
-    expect((await local.studentAgents[0].post(`/api/exams/${local.examId}/attempts`)).status).toBe(201);
+    expect((await room.studentAgents[0].post(`/api/exams/${room.examId}/attempts`)).status).toBe(201);
     const paid = await openExam({ students: 1, feeAmount: 5 });
     const unpaid = await paid.studentAgents[0].post(`/api/exams/${paid.examId}/attempts`);
     expect(unpaid.status).toBe(402);

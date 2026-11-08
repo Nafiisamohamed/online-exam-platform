@@ -293,7 +293,7 @@ See [docs/demo-data.md](docs/demo-data.md) for the full dataset.
 | Lecturer dashboard limits (from the API) | Lecturers see enrolled students per course (read-only) and per-exam results; there is no per-student profile endpoint for them. The audit log is registrar-only, so the lecturer overview shows the lecturer's own notifications as recent activity. |
 | Registrar dashboard limits (from the API) | The backend has no faculty delete or deactivate, no course status, and no list of all enrolments (they are listed per course). Reports have no date filter, and PDF export exists only for students. The screens say so instead of offering these. |
 | Somali texts | The Somali translations in `frontend/src/lib/i18n/messages/so.ts` should be reviewed by a native speaker. |
-| Campus network rule | It relies on the client IP address. Behind a reverse proxy, set `TRUST_PROXY=true`. |
+| No network restriction | Students can take examinations from any device and connection; rooms are for scheduling only. The client address is recorded in the audit log and on each attempt; behind a reverse proxy, set `TRUST_PROXY=true` so it shows the real address. |
 | Clock offset | The browser shows the time remaining from the server's timer. Network delay of a few hundred milliseconds isn't compensated, so the last-chance warnings appear slightly early. |
 | Short-answer matching | It ignores only case and extra spaces, as the brief says. Punctuation differences go to "Needs review". |
 | Backup and restore | The exact procedure is in [docs/backup-restore.md](docs/backup-restore.md). It has not been rehearsed yet: the development machine has no PostgreSQL client tools, and Docker and a local installation are excluded. Rehearse it on the campus server. |

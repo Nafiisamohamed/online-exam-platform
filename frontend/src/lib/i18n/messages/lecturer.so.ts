@@ -306,7 +306,7 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
     duration: "Muddada (daqiiqado)",
     durationHint: "5–600 daqiiqo; waa inay ku jirtaa waqtiga.",
     rooms: "Qolalka",
-    roomsHint: "Ardaydu waxay ka bilaabi karaan oo keliya shabakadaha qolalkan. Qol la'aan waxay ka dhigan tahay shabakad kasta.",
+    roomsHint: "Qolalkan waxaa loo qoondeeyaa imtixaanka. Ardaydu waxay ka geli karaan qalab kasta iyo shabakad kasta.",
     invigilators: "Ilaaliyeyaasha",
     requestAction: "Dir codsiga",
     requestedToast: "Jadwal waa la codsaday. Ardaydu ma arki karaan imtixaanka ilaa diiwaangeliyuhu oggolaado.",

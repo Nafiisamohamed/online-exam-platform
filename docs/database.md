@@ -218,7 +218,7 @@ These rules span several rows or tables, so the service layer enforces them. Eac
 - **Questions:** multiple choice has 4–5 options with exactly one correct, and True/False has exactly 2. Rubric marks add up to the question's marks.
 - **Exam rules:** there are enough eligible questions across all rules together (no question used twice).
 - **Schedules:** no overlapping approved exams for any shared student.
-- **Access:** students must be enrolled, and can start only inside the window, from an allowed room or network, and after paying if the exam has a fee.
+- **Access:** students must be enrolled, and can start only inside the window, from any device or network, and after paying if the exam has a fee.
 - **Ownership:** every request checks that the attempt or payment belongs to the current user. A failed check returns 404.
 - **Grading:** blind second grading and the 20% discrepancy rule.
 - **Payments:** checking the demo PIN itself, and marking unfinished payments EXPIRED once the database allows it.

@@ -42,7 +42,7 @@ Every error has the same shape:
 | 400 | `VALIDATION_ERROR` (`details.problems` lists `{ path, message }`) and other invalid input |
 | 401 | `UNAUTHENTICATED`, `SESSION_EXPIRED`, `INVALID_CREDENTIALS`, `TEMP_PASSWORD_EXPIRED` |
 | 402 | `PAYMENT_REQUIRED` (exam fee not paid) |
-| 403 | `FORBIDDEN` (wrong role), `NOT_ENROLLED`, `NETWORK_NOT_ALLOWED`, `PASSWORD_CHANGE_REQUIRED` |
+| 403 | `FORBIDDEN` (wrong role), `NOT_ENROLLED`, `PASSWORD_CHANGE_REQUIRED` |
 | 404 | Missing, or belonging to someone else |
 | 409 | State conflicts and database rules, for example `ATTEMPT_DEADLINE_PASSED`, `SCHEDULE_CONFLICT`, `DUPLICATE_QUESTION`, `PAYMENT_EXPIRED` |
 | 429 | `RATE_LIMITED` |
@@ -218,7 +218,7 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 | Method | Path | Request | Response |
 |---|---|---|---|
 | GET | `/api/my/exams` | — | `{ items: [{ id, title, course, schedule, fee: { amount, currency, required, paid }, attempt, state, canStart }] }`. `state` is `UPCOMING`, `OPEN`, `CLOSED`, `IN_PROGRESS` or `SUBMITTED`. |
-| POST | `/api/exams/:examId/attempts` | — | `201 { resumed: false, attempt }` for a new attempt, or `200 { resumed: true, attempt }` when one exists. Errors: `403 NOT_ENROLLED`, `409 EXAM_NOT_OPEN_YET`, `409 EXAM_WINDOW_CLOSED`, `403 NETWORK_NOT_ALLOWED`, `402 PAYMENT_REQUIRED` |
+| POST | `/api/exams/:examId/attempts` | — | `201 { resumed: false, attempt }` for a new attempt, or `200 { resumed: true, attempt }` when one exists. Errors: `403 NOT_ENROLLED`, `409 EXAM_NOT_OPEN_YET`, `409 EXAM_WINDOW_CLOSED`, `402 PAYMENT_REQUIRED` |
 | GET | `/api/attempts/:id` | — | `{ attempt }` (after a reload or reconnection) |
 | PUT | `/api/attempts/:id/questions/:questionId/answer` | `{ selectedOptionId }` or `{ textAnswer }` (an empty value clears the answer) | `{ saved: true, savedAt, remainingSeconds }`. Errors: `409 ATTEMPT_DEADLINE_PASSED`, `409 ATTEMPT_ALREADY_SUBMITTED`, `400 OPTION_NOT_IN_QUESTION` |
 | PUT | `/api/attempts/:id/questions/:questionId/flag` | `{ flagged }` | `{ flagged }` |
@@ -374,6 +374,6 @@ All numbers come from live database queries.
 | GET | `/api/grading-scale` | any | — | `{ bands: [{ letter, minPercentage }] }` |
 | PUT | `/api/grading-scale` | ADMIN | `{ bands }`: unique letters and minimums, one band at 0 | `{ bands }` |
 
-**Rooms:** a student can start an exam only from an IP address inside the schedule's room ranges. A schedule without rooms allows any address.
+**Rooms** are allocated to schedules for planning and are checked for clashes. They never restrict access: students can take examinations from any device and any connection (university or home Wi-Fi, mobile data). A room may list network ranges (`networkRanges`, optional) for information only. The client address is recorded on the attempt (`startIp`) and in the audit log, but never checked.
 
 **Grading scale:** changes apply to grades calculated afterwards. Published results keep their letters.

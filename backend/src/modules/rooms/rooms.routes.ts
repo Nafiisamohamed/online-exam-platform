@@ -1,5 +1,6 @@
 /**
- * Examination rooms and their campus network ranges (section 4.5). See docs/api.md#rooms.
+ * Examination rooms (section 4.5): allocated to schedules and checked for clashes.
+ * A room may list network ranges for information only; they never restrict access.
  *
  * GET   /api/rooms       ADMIN, LECTURER (lecturers pick rooms in schedule requests)
  * POST  /api/rooms       ADMIN  { name, building, networkRanges: ["10.10.4.0/24"] }
@@ -19,7 +20,6 @@ export const roomsRouter = Router();
 
 const ranges = z
   .array(z.string().trim().refine(isValidCidr, "must be a network range such as 10.10.4.0/24"))
-  .min(1, "add at least one network range")
   .max(20);
 
 roomsRouter.use(authenticate());
@@ -29,7 +29,7 @@ roomsRouter.get("/", requireRole("ADMIN", "LECTURER"), async (_req, res) => {
 });
 
 /** Response 201: { room }. Errors: 400 VALIDATION_ERROR (bad range), 409 ROOM_NAME_TAKEN. */
-roomsRouter.post("/", requireRole("ADMIN"), validate({ body: z.object({ name: trimmed(100), building: trimmed(200), networkRanges: ranges }) }), async (req, res) => {
+roomsRouter.post("/", requireRole("ADMIN"), validate({ body: z.object({ name: trimmed(100), building: trimmed(200), networkRanges: ranges.default([]) }) }), async (req, res) => {
   res.status(201).json({ room: await rooms.createRoom(req.valid.body, currentUser(req).id, req) });
 });
 
