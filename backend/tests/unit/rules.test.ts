@@ -80,7 +80,7 @@ describe("Somali and English text (6.8, P10)", () => {
     expect(Object.keys(LABELS.so).sort()).toEqual(Object.keys(LABELS.en).sort());
   });
   it("SMS bodies start with [DEMO] and never contain a password", () => {
-    const params = { studentNumber: "S1", course: "CS201", date: "01/01/2027", window: "09:00–11:00", amount: "5.00 USD", merchant: "Jaamacadda Demo", merchantNumber: "000000", receipt: "DEMO-EVC-20270101-ABCDEF", password: "secret123" };
+    const params = { studentNumber: "S1", course: "CS201", date: "01/01/2027", window: "09:00–11:00", amount: "5.00 USD", merchant: "Online Examination System", merchantNumber: "000000", receipt: "DEMO-EVC-20270101-ABCDEF", password: "secret123" };
     for (const key of Object.keys(SMS_TEMPLATES)) {
       for (const lang of ["so", "en"] as const) {
         const body = renderSms(key, lang, params);

@@ -178,7 +178,6 @@ function MonitorBody({ sessionId }: { sessionId: string }) {
             <p>{t("invigilator.monitor.rules.focus")}</p>
             <p>{t("invigilator.monitor.rules.extension")}</p>
             <p>{t("invigilator.monitor.rules.privacy")}</p>
-            <p className="text-xs text-muted">{t("invigilator.monitor.instructionsNote")}</p>
           </div>
         </Card>
       </div>

@@ -36,10 +36,15 @@ import { num, num0 } from "../../lib/format.ts";
 import { audit } from "../../services/audit.ts";
 import { generateExam, NotEnoughQuestionsError } from "../../services/exam-generator.ts";
 import { loadRuleSpecs, rulesWithPools } from "../../services/exam-pool.ts";
-import { submitAttempt, submitIfExpired } from "../../services/submission.ts";
+import { submitAttempt, submitIfExpired, terminateLocked } from "../../services/submission.ts";
 
 /** Counted tab switches after which the student is warned (4.8). */
 export const FOCUS_WARNING_THRESHOLD = 3;
+/**
+ * Counted tab switches at which the attempt is terminated automatically (project policy).
+ * Note: brief 4.8 itself only asks for a warning after 3 and leaves any penalty to the lecturer.
+ */
+export const MAX_COUNTED_FOCUS_LOSSES = 3;
 /** Focus losses shorter than this are logged but not counted (4.8). */
 export const FOCUS_MIN_COUNTED_MS = 1000;
 
@@ -119,7 +124,7 @@ export async function listMyExams(user: AuthUser) {
     const fee = num0(e.feeAmount);
     const paid = fee === 0 || e.payments.length > 0;
     const windowState = !schedule ? "UNSCHEDULED" : t < schedule.windowStart ? "UPCOMING" : t < schedule.windowEnd ? "OPEN" : "CLOSED";
-    const state = attempt ? (attempt.status === "IN_PROGRESS" && attempt.deadline > t ? "IN_PROGRESS" : "SUBMITTED") : windowState;
+    const state = attempt ? (attempt.status === "TERMINATED" ? "TERMINATED" : attempt.status === "IN_PROGRESS" && attempt.deadline > t ? "IN_PROGRESS" : "SUBMITTED") : windowState;
     return {
       id: e.id,
       title: e.title,
@@ -210,6 +215,7 @@ export async function getAttempt(user: AuthUser, attemptId: string) {
 /** Loads an in-progress attempt for a change. Expired attempts are submitted and rejected. */
 async function activeAttempt(user: AuthUser, attemptId: string) {
   const a = await ownAttempt(user, attemptId);
+  if (a.status === "TERMINATED") throw conflict("ATTEMPT_TERMINATED", "This exam was terminated after the maximum number of tab switches");
   if (a.status !== "IN_PROGRESS") throw conflict("ATTEMPT_ALREADY_SUBMITTED", "This exam has already been submitted");
   if (await submitIfExpired(a)) throw conflict("ATTEMPT_DEADLINE_PASSED", "The time for this exam is over; your saved answers were submitted");
   return a;
@@ -271,8 +277,10 @@ export async function heartbeat(user: AuthUser, attemptId: string) {
  * SERVER records the times and duration. clientEventId (a UUID made by the
  * browser) makes retries safe: the same event is never stored twice.
  * Losses of 1 second or more are counted; shorter ones are kept but not counted.
- * After 3 counted switches the response carries focusWarning = true. Nothing
- * is penalised automatically: the lecturer decides later.
+ * At the third counted switch the attempt is TERMINATED in the same locked
+ * transaction (saved answers kept and auto-graded, no more changes); the
+ * response then carries terminated = true. A repeated or concurrent event
+ * cannot count twice: each event is closed once, under the attempt's row lock.
  */
 export async function recordFocusEvent(user: AuthUser, attemptId: string, clientEventId: string, kind: "LOST" | "RETURNED") {
   const a = await activeAttempt(user, attemptId);
@@ -284,23 +292,38 @@ export async function recordFocusEvent(user: AuthUser, attemptId: string, client
       if (!isUniqueViolation(error)) throw error; // retry of the same event
     }
   } else {
-    await transaction(async (tx) => {
+    const outcome = await transaction(async (tx) => {
+      // Lock the attempt first (as a submission does), so termination, saves and other events cannot interleave.
+      const locked = await attemptsRepo.lockAttempt(a.id, false, tx);
+      if (!locked || locked.status !== "IN_PROGRESS") return { closed: true as const };
       const ev = await attemptsRepo.findFocusEvent(a.id, clientEventId, tx);
       if (!ev) throw notFound("FOCUS_EVENT_NOT_FOUND");
-      if (ev.returnedAt) return; // already recorded
+      if (ev.returnedAt) return { closed: false as const }; // already recorded
       const durationMs = Math.max(0, t.getTime() - ev.lostAt.getTime());
       const isCounted = durationMs >= FOCUS_MIN_COUNTED_MS;
       const changed = await attemptsRepo.closeFocusEvent(ev.id, { returnedAt: t, durationMs, isCounted }, tx);
-      if (changed === 1 && isCounted) await attemptsRepo.incrementFocusLosses(a.id, tx);
+      if (changed === 1 && isCounted) {
+        const updated = await attemptsRepo.incrementFocusLosses(a.id, tx);
+        if (updated.countedFocusLosses >= MAX_COUNTED_FOCUS_LOSSES) {
+          const r = await terminateLocked(tx, { id: a.id, deadline: locked.deadline }, updated.countedFocusLosses, user.id);
+          return { closed: true as const, ...r };
+        }
+      }
+      return { closed: false as const };
     });
+    if (outcome.closed) {
+      const end = await attemptsRepo.findAttemptOrThrow(a.id);
+      return { countedFocusLosses: end.countedFocusLosses, focusWarning: true, terminated: end.status === "TERMINATED", status: end.status };
+    }
   }
   const fresh = await attemptsRepo.touchAttempt(a.id, t);
-  return { countedFocusLosses: fresh.countedFocusLosses, focusWarning: fresh.countedFocusLosses >= FOCUS_WARNING_THRESHOLD };
+  return { countedFocusLosses: fresh.countedFocusLosses, focusWarning: fresh.countedFocusLosses >= FOCUS_WARNING_THRESHOLD, terminated: false, status: fresh.status };
 }
 
-/** The student submits. Repeated clicks are safe: an already submitted attempt is simply returned. */
+/** The student submits. Repeated clicks are safe: an already submitted attempt is simply returned. A terminated attempt cannot be submitted. */
 export async function submit(user: AuthUser, attemptId: string) {
   const a = await ownAttempt(user, attemptId);
+  if (a.status === "TERMINATED") throw conflict("ATTEMPT_TERMINATED", "This exam was terminated after the maximum number of tab switches");
   await submitAttempt(a.id, "MANUAL", user.id);
   return attemptView(a.id);
 }

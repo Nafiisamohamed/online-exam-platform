@@ -15,6 +15,7 @@ export const studentErrorsSo: Widen<typeof studentErrorsEn> = {
   PAYMENT_REQUIRED: "Bixi lacagta imtixaanka ({amount} {currency}) ka hor intaadan bilaabin.",
   ATTEMPT_NOT_FOUND: "Isku daygan imtixaanka lama helin.",
   ATTEMPT_DEADLINE_PASSED: "Waqtiga imtixaankani wuu dhammaaday. Jawaabahaagii la kaydiyay waa la gudbiyay.",
+  ATTEMPT_TERMINATED: "Uma qalmid inaad sii wadato imtixaankan sababtoo ah waxaad dhaaftay ugu badnaan 3 jeer ee la oggol yahay in tabka la beddelo. Fadlan la xiriir macallinkaaga.",
   ATTEMPT_ALREADY_SUBMITTED: "Imtixaankan horay ayaa loo gudbiyay.",
   ATTEMPT_NOT_IN_PROGRESS: "Imtixaankani ma socdo.",
   OPTION_NOT_IN_QUESTION: "Doorashadani kama mid aha su'aasha.",
@@ -42,6 +43,7 @@ export const studentSo: Widen<typeof studentEn> = {
       CLOSED: "Waqtigii wuu xirmay",
       IN_PROGRESS: "Socda",
       SUBMITTED: "La gudbiyay",
+      TERMINATED: "La joojiyay",
     },
     questions: "{count} su'aalood",
     marks: "{marks} dhibcood",
@@ -98,8 +100,9 @@ export const studentSo: Widen<typeof studentEn> = {
   },
 
   exams: {
+    terminatedNote: "Imtixaankaaga waa la joojiyay markii 3aad ee beddelka tabka. Jawaabahaaga la kaydiyay waxaa loo diray macallinkaaga si uu dib ugu eego.",
     title: "Imtixaannadayda",
-    subtitle: "Waqtiyadu waa waqtiga jaamacadda (Muqdisho). Server-ka ayaa fura oo xira imtixaan kasta.",
+    subtitle: "Dhammaan waqtiyada waxaa lagu muujiyaa waqtiga jaamacadda (Muqdisho).",
     tabUpcoming: "Soo socda",
     tabActive: "Furan iyo socda",
     tabDone: "Dhammaaday",
@@ -110,9 +113,9 @@ export const studentSo: Widen<typeof studentEn> = {
     rulesTitle: "Xeerarka",
     rules: {
       oneAttempt: "Waxaad leedahay hal isku day. Haddii aad baxdo ama xiriirku go'o, waxaad sii wadaysaa isla isku dayga oo leh jawaabahaagii la kaydiyay.",
-      deadline: "Waxaad haysataa {minutes} daqiiqo laga bilaabo marka aad bilowdo, laakiin weligeed kama gudbaysid dhammaadka waqtiga. Saacadda server-ka ayaa go'aamisa; saacadda qalabkaagu muhiim ma aha.",
-      autosave: "Jawaab kasta waxaa lagu kaydiyaa server-ka markaad socoto. Waad beddeli kartaa jawaabaha ilaa aad gudbiso.",
-      focus: "Ka bixitaanka bogga imtixaanka 1 ilbiriqsi ama ka badan waa la diiwaangeliyaa. 3 jeer kadib waxaad helaysaa digniin. Waxba si toos ah looguma ciqaabo; macallinkaaga ayaa dib u eegaya.",
+      deadline: "Waxaad haysataa {minutes} daqiiqo laga bilaabo markaad bilowdo. Imtixaanku had iyo jeer wuu dhammaadaa marka muddadu xirmato, iyadoon loo eegin waqtiga qalabkaaga.",
+      autosave: "Jawaab kasta si toos ah ayaa loo kaydiyaa markaad socoto. Jawaabahaaga waad beddeli kartaa ilaa aad gudbiso.",
+      focus: "Ka bixidda bogga imtixaanka 1 ilbiriqsi ama ka badan waxaa loo tiriyaa beddel tab. Markii 3aad, imtixaankaagu si toos ah ayuu u dhammaanayaa, jawaabahaaga la kaydiyayna waxaa loo dirayaa macallinkaaga.",
       network: "Imtixaanka waxaad ku geli kartaa qalab kasta (taleefan, laptop ama kombiyuutar) iyo xiriir internet kasta.",
       autoSubmit: "Marka waqtigu dhammaado, jawaabahaagii la kaydiyay si toos ah ayaa loo gudbiyaa.",
     },
@@ -153,7 +156,7 @@ export const studentSo: Widen<typeof studentEn> = {
       saved: "La kaydiyay",
       unsaved: "Weli lama kaydin",
       failed: "Lama kaydin. Mar kale ayaa la isku dayayaa…",
-      rejected: "Server-ku ma aqbalin jawaabtan.",
+      rejected: "Jawaabtan lama kaydin karin. Fadlan isku day mar kale.",
       allSaved: "Dhammaan jawaabaha waa la kaydiyay",
       pending: "{count} weli lama kaydin",
     },
@@ -164,7 +167,7 @@ export const studentSo: Widen<typeof studentEn> = {
     warnings: {
       tenMinutes: "10 daqiiqo ayaa haray.",
       oneMinute: "1 daqiiqo ayaa haray. Jawaabahaaga la kaydiyay waa la gudbinayaa marka waqtigu dhammaado.",
-      focus: "Waxaad ka baxday bogga imtixaanka {count} jeer. Tan waa loo diiwaangeliyay macallinkaaga.",
+      focus: "Waxaad ka baxday bogga imtixaanka {count} ka mid ah {max} jeer ee la oggol yahay. Markii {max}aad imtixaankaagu si toos ah ayuu u dhammaanayaa.",
       leave: "Jawaabo qaar weli lama kaydin. Ma baxaysaa si kastaba?",
     },
     extension: "Ilaaliyahaagu wuxuu kuu daray {minutes} daqiiqo.",
@@ -189,6 +192,10 @@ export const studentSo: Widen<typeof studentEn> = {
     focus: "Inta jeer ee aad ka baxday bogga",
     resultsLater: "Waa lagu ogeysiin doonaa marka natiijooyinka la daabaco.",
     back: "Ku noqo imtixaannadayda",
+    terminatedTitle: "Imtixaanka waa la joojiyay",
+    terminatedBody: "Uma qalmid inaad sii wadato imtixaankan sababtoo ah waxaad dhaaftay ugu badnaan 3 jeer ee la oggol yahay in tabka la beddelo. Fadlan la xiriir macallinkaaga.",
+    terminatedAt: "Waqtiga la joojiyay",
+    backDashboard: "Ku noqo bogga hore",
   },
 
   results: {

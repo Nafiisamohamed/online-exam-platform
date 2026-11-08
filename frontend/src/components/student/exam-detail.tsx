@@ -132,6 +132,7 @@ function DetailBody({ exam }: { exam: MyExam }) {
               </>
             )}
             {exam.state === "CLOSED" && <Alert tone="info">{t("student.exams.closedNote")}</Alert>}
+            {exam.state === "TERMINATED" && <Alert tone="danger">{t("student.exams.terminatedNote")}</Alert>}
             {exam.state === "SUBMITTED" && (
               <>
                 <Alert tone="success">{t("student.exams.submittedNote")}{exam.attempt?.submittedAt ? ` ${t("student.exams.submittedAt", { date: formatDateTime(exam.attempt.submittedAt, locale) })}` : ""}</Alert>

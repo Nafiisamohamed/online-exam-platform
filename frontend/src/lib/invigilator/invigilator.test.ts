@@ -17,7 +17,7 @@ describe("invigilator rules mirror the backend", () => {
   });
 
   it("shows exactly the live statuses the backend can return", () => {
-    const found = [...service.matchAll(/"(NOT_STARTED|IN_PROGRESS|SUBMITTED|DISCONNECTED)" as const/g)].map((m) => m[1]);
+    const found = [...service.matchAll(/"(NOT_STARTED|IN_PROGRESS|SUBMITTED|DISCONNECTED|TERMINATED)" as const/g)].map((m) => m[1]);
     expect(new Set(found)).toEqual(new Set(LIVE_STATUSES));
   });
 

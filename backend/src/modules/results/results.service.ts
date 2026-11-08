@@ -146,6 +146,11 @@ export async function examResults(user: AuthUser, examId: string) {
       submittedAt: a.submittedAt,
       countedFocusLosses: a.countedFocusLosses,
       extensionMinutes: a.totalExtensionMinutes,
+      answeredCount: a._count.answers,
+      questionCount: a._count.questions,
+      // Terminated after the tab-switch limit: when and why (never shown as absent).
+      terminatedAt: a.status === "TERMINATED" ? a.submittedAt : null,
+      terminationReason: a.status === "TERMINATED" ? ("TAB_SWITCH_LIMIT" as const) : null,
       working: a.grade ? { totalScore: num(a.grade.totalScore), maxScore: num(a.grade.maxScore), percentage: num(a.grade.percentage), letterGrade: a.grade.letterGrade } : null,
       published: rev ? { revisionNumber: rev.revisionNumber, totalScore: num(rev.totalScore), maxScore: num(rev.maxScore), percentage: num(rev.percentage), letterGrade: rev.letterGrade } : null,
     };
@@ -167,7 +172,7 @@ export async function gradesCsv(user: AuthUser, examId: string, lang: Language, 
   const header = [L.studentNumber, L.studentName, L.status, L.score, L.maxScore, L.percentage, L.grade, L.focusLosses, L.submissionType, L.publication];
   const rows = data.students.map((s) => {
     const g = s.published ?? s.working;
-    return [s.student.studentNumber, s.student.fullName, s.status === "ABSENT" ? L.absent : s.status, g?.totalScore ?? "", g?.maxScore ?? "", g?.percentage ?? "", g?.letterGrade ?? "", s.countedFocusLosses ?? "", s.submissionType ?? "", s.published ? s.published.revisionNumber : ""];
+    return [s.student.studentNumber, s.student.fullName, s.status === "ABSENT" ? L.absent : s.status === "TERMINATED" ? L.terminated : s.status, g?.totalScore ?? "", g?.maxScore ?? "", g?.percentage ?? "", g?.letterGrade ?? "", s.countedFocusLosses ?? "", s.submissionType ?? "", s.published ? s.published.revisionNumber : ""];
   });
   await audit(null, { actorId: user.id, action: "GRADES_EXPORTED", entityType: "exam", entityId: examId, details: { rows: rows.length }, req });
   return { filename: `grades-${data.exam.title.replace(/[^A-Za-z0-9]+/g, "-").slice(0, 40)}.csv`, csv: toCsv(header, rows) };
@@ -258,3 +263,38 @@ export async function resultSlipPdf(user: AuthUser, examId: string, lang: Langua
   return { pdf, filename: `result-${r.exam.course.code}-${user.studentNumber ?? "student"}.pdf` };
 }
 
+
+/**
+ * Staff review of one closed attempt (submitted, or terminated after the tab-switch
+ * limit): every question with the student's saved answer, its grading status and
+ * marks. Read-only. The course lecturer and the registrar only.
+ * @throws 404 EXAM_NOT_FOUND / ATTEMPT_NOT_FOUND
+ */
+export async function attemptReview(user: AuthUser, examId: string, attemptId: string) {
+  await manageableExam(user, examId);
+  const a = await resultsRepo.findAttemptReview(attemptId);
+  if (!a || a.examId !== examId || a.status === "IN_PROGRESS") throw notFound("ATTEMPT_NOT_FOUND");
+  return {
+    attempt: {
+      id: a.id, status: a.status, submissionType: a.submissionType, submittedAt: a.submittedAt, startedAt: a.startedAt,
+      countedFocusLosses: a.countedFocusLosses,
+      terminatedAt: a.status === "TERMINATED" ? a.submittedAt : null,
+      terminationReason: a.status === "TERMINATED" ? ("TAB_SWITCH_LIMIT" as const) : null,
+      student: a.student,
+    },
+    questions: a.questions.map((q) => {
+      const ans = q.answer;
+      const answered = !!ans && (ans.selectedOptionId !== null || (ans.textAnswer ?? "").trim() !== "");
+      return {
+        position: q.position, type: q.questionVersion.type, text: q.questionVersion.text, maxMarks: num0(q.marks),
+        answerId: ans?.id ?? null,
+        answered,
+        selectedOption: ans?.selectedOptionId ? (q.questionVersion.options.find((o) => o.id === ans.selectedOptionId)?.text ?? null) : null,
+        textAnswer: ans?.textAnswer ?? null,
+        savedAt: ans?.savedAt ?? null,
+        gradingStatus: ans?.gradingStatus ?? null,
+        marksAwarded: ans?.marksAwarded === null || ans?.marksAwarded === undefined ? null : num(ans.marksAwarded),
+      };
+    }),
+  };
+}

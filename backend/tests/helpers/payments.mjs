@@ -13,7 +13,7 @@ export async function createPaidExam(db) {
 /** Columns every new payment needs. Extra columns and values can be appended. */
 function insertSql(extraColumns = "", extraValues = "") {
   return `INSERT INTO payments (student_id, exam_id, provider, phone, amount, currency, merchant_name, merchant_number, idempotency_key${extraColumns})
-          VALUES ($1, $2, 'EVC_PLUS', '+252615000000', 5, 'USD', 'Jaamacadda Demo', '000000', gen_random_uuid()${extraValues})
+          VALUES ($1, $2, 'EVC_PLUS', '+252615000000', 5, 'USD', 'Online Examination System', '000000', gen_random_uuid()${extraValues})
           RETURNING *`;
 }
 

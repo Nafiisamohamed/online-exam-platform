@@ -10,7 +10,8 @@
  *   last published snapshot meanwhile.
  * Notifications and the grade snapshots are created by the server.
  */
-import { Download, RotateCcw, Send } from "lucide-react";
+import { ClipboardCheck, Download, Eye, RotateCcw, Send, ShieldX } from "lucide-react";
+import Link from "next/link";
 import { use, useState, type FormEvent } from "react";
 import { FormError } from "@/components/admin/admin-ui";
 import { QueryState } from "@/components/admin/query-state";
@@ -29,7 +30,7 @@ import { lecturerPaths, publishResults, reopenResults } from "@/lib/api/lecturer
 import { useApi } from "@/lib/api/use-api";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n";
-import type { ExamResults, GradingStatus, ResultScore } from "@/types/lecturer";
+import type { AttemptReview, ExamResults, GradingStatus, ResultScore } from "@/types/lecturer";
 
 type Row = ExamResults["students"][number];
 
@@ -102,9 +103,58 @@ function ReasonDialog({ mode, examId, republish, onClose }: { mode: "publish" | 
   );
 }
 
+type AttemptStatus = ExamResults["students"][number]["status"];
+const STATUS_TONE: Record<AttemptStatus, "success" | "warning" | "danger" | "neutral"> = { SUBMITTED: "success", IN_PROGRESS: "warning", TERMINATED: "danger", ABSENT: "neutral" };
+
+/** Submitted, terminated (tab-switch limit), in progress, or absent (never started) - four distinct states. */
+function AttemptStatusBadge({ status }: { status: AttemptStatus }) {
+  const { t } = useI18n();
+  const label = { SUBMITTED: t("lecturer.results.submitted"), IN_PROGRESS: t("lecturer.results.inProgress"), TERMINATED: t("lecturer.results.terminated"), ABSENT: t("lecturer.results.absent") }[status];
+  return <Badge tone={STATUS_TONE[status]} dot>{label}</Badge>;
+}
+
+/** Read-only review of one closed attempt: every question with the saved answer, its status and marks. */
+function ReviewDialog({ examId, attemptId, onClose }: { examId: string; attemptId: string; onClose: () => void }) {
+  const { t, locale } = useI18n();
+  const review = useApi<AttemptReview>(lecturerPaths.attemptAnswers(examId, attemptId));
+  const a = review.data?.attempt;
+  return (
+    <Modal open onOpenChange={(o) => !o && onClose()} title={a ? `${a.student.fullName} · ${a.student.studentNumber ?? ""}` : t("common.loading")} closeLabel={t("common.close")} size="lg">
+      <QueryState state={review} skeleton="h-64 w-full">
+        {(d) => (
+          <div className="space-y-4">
+            {d.attempt.status === "TERMINATED" && (
+              <Alert tone="danger" title={t("lecturer.results.terminatedTitleOne")}>
+                {t("lecturer.results.terminatedDetail", { count: d.attempt.countedFocusLosses, time: formatDateTime(d.attempt.terminatedAt, locale) })}
+              </Alert>
+            )}
+            <ol className="space-y-3">
+              {d.questions.map((q) => (
+                <li key={q.position} className="rounded-xl border border-border p-4 text-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-semibold text-foreground">{q.position}. {q.text}</p>
+                    <span className="shrink-0 tabular-nums text-muted">{q.marksAwarded === null ? "—" : formatNumber(q.marksAwarded, locale, 2)} / {formatNumber(q.maxMarks, locale, 2)}</span>
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-text">
+                    {q.answered ? (q.selectedOption ?? q.textAnswer) : <span className="text-muted italic">{t("lecturer.results.noAnswer")}</span>}
+                  </p>
+                  {q.gradingStatus && <p className="mt-2 text-xs text-muted">{t(`lecturer.grading.statuses.${q.gradingStatus}`)}</p>}
+                </li>
+              ))}
+            </ol>
+            <Link href={`/lecturer/grading/${examId}`} className={buttonClasses("secondary")}><ClipboardCheck className="h-4 w-4" aria-hidden />{t("lecturer.results.openGrading")}</Link>
+          </div>
+        )}
+      </QueryState>
+    </Modal>
+  );
+}
+
 function ResultsBody({ r, examId }: { r: ExamResults; examId: string }) {
   const { t, locale } = useI18n();
   const [dialog, setDialog] = useState<"publish" | "reopen" | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const terminated = r.students.filter((s) => s.status === "TERMINATED");
   const published = r.exam.resultsStatus === "PUBLISHED";
   const republish = r.publications.length > 0;
   const ungraded = Object.entries(r.blockers.ungraded) as [GradingStatus, number][];
@@ -124,12 +174,17 @@ function ResultsBody({ r, examId }: { r: ExamResults; examId: string }) {
     {
       key: "status",
       header: t("admin.status"),
-      cell: (s) => <Badge tone={s.status === "SUBMITTED" ? "success" : s.status === "IN_PROGRESS" ? "warning" : "neutral"}>{s.status === "ABSENT" ? t("lecturer.results.absent") : s.status === "IN_PROGRESS" ? t("lecturer.results.inProgress") : t("lecturer.results.submitted")}</Badge>,
+      cell: (s) => <AttemptStatusBadge status={s.status} />,
     },
     { key: "working", header: t("lecturer.results.working"), cell: (s) => <Score s={s.working} /> },
     { key: "published", header: t("lecturer.results.published"), cell: (s) => <Score s={s.published} /> },
+    {
+      key: "review",
+      header: t("lecturer.results.answers"),
+      cell: (s) => (s.attemptId && (s.status === "SUBMITTED" || s.status === "TERMINATED") ? <Button variant="ghost" size="sm" leftIcon={<Eye className="h-4 w-4" />} onClick={() => setReviewing(s.attemptId!)}>{t("lecturer.results.review")}</Button> : "—"),
+    },
     { key: "focus", header: t("lecturer.results.focus"), align: "right", cell: (s) => <span className="tabular-nums">{s.countedFocusLosses ?? "—"}</span>, className: "hidden lg:table-cell" },
-    { key: "submission", header: t("lecturer.results.submission"), cell: (s) => (s.submissionType ? (s.submissionType === "MANUAL" ? t("lecturer.results.manual") : t("lecturer.results.auto")) : "—"), className: "hidden xl:table-cell" },
+    { key: "submission", header: t("lecturer.results.submission"), cell: (s) => (s.submissionType ? (s.submissionType === "MANUAL" ? t("lecturer.results.manual") : s.submissionType === "TERMINATED_TAB_LIMIT" ? t("lecturer.results.terminatedShort") : t("lecturer.results.auto")) : "—"), className: "hidden xl:table-cell" },
   ];
 
   return (
@@ -185,11 +240,33 @@ function ResultsBody({ r, examId }: { r: ExamResults; examId: string }) {
           </CardContent>
         </Card>
       </div>
+      {terminated.length > 0 && (
+        <Card className="mb-6 overflow-hidden border-danger/40">
+          <CardHeader title={t("lecturer.results.terminatedSection", { count: terminated.length })} description={t("lecturer.results.terminatedHint")} />
+          <CardContent className="pt-0">
+            <ul className="divide-y divide-border">
+              {terminated.map((s) => (
+                <li key={s.student.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 font-semibold text-foreground"><ShieldX className="h-4 w-4 shrink-0 text-danger" aria-hidden />{s.student.fullName} <span className="text-sm font-normal text-muted">{s.student.studentNumber}</span></p>
+                    <p className="mt-1 text-sm text-muted">
+                      {t("lecturer.results.terminatedLine", { switches: s.countedFocusLosses ?? 0, time: formatDateTime(s.terminatedAt ?? null, locale), answered: s.answeredCount ?? 0, total: s.questionCount ?? 0 })}
+                    </p>
+                    <p className="text-xs text-muted">{t("lecturer.results.reasonLabel")}: {t("lecturer.results.terminationReasons.TAB_SWITCH_LIMIT")}</p>
+                  </div>
+                  {s.attemptId && <Button variant="outline" size="sm" leftIcon={<Eye className="h-4 w-4" />} onClick={() => setReviewing(s.attemptId!)}>{t("lecturer.results.review")}</Button>}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       <Card className="overflow-hidden">
         <CardHeader title={t("lecturer.results.students")} className="pb-4" />
         <DataTable columns={columns} rows={r.students} rowKey={(s) => s.student.id} emptyTitle={t("table.noRows")} caption={t("lecturer.results.students")} />
       </Card>
       {dialog && <ReasonDialog mode={dialog} examId={examId} republish={republish} onClose={() => setDialog(null)} />}
+      {reviewing && <ReviewDialog examId={examId} attemptId={reviewing} onClose={() => setReviewing(null)} />}
     </>
   );
 }

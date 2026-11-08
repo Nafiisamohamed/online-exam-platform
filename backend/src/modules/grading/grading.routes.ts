@@ -70,6 +70,11 @@ gradingRouter.get("/exams/:id/results", authenticate(), requireRole("ADMIN", "LE
 });
 
 /** Response 200: { publicationNumber, attempts, notifiedStudents }. Errors: 409 GRADING_INCOMPLETE { ungraded }, 409 ATTEMPTS_IN_PROGRESS. */
+/** Read-only review of one closed attempt's saved answers (submitted or terminated). Response 200: { attempt, questions }. */
+gradingRouter.get("/exams/:id/attempts/:attemptId/answers", authenticate(), requireRole("ADMIN", "LECTURER"), validate({ params: z.object({ id: zid, attemptId: zid }) }), async (req, res) => {
+  res.json(await results.attemptReview(currentUser(req), req.valid.params.id, req.valid.params.attemptId));
+});
+
 gradingRouter.post("/exams/:id/results/publish", ...lecturer, validate({ params: idParams, body: z.object({ reason: z.string().trim().max(1000).optional() }) }), async (req, res) => {
   res.json(await results.publishResults(currentUser(req), req.valid.params.id, req.valid.body.reason, req));
 });

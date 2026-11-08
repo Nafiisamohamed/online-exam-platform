@@ -155,6 +155,11 @@ export function markSubmitted(id: string, submissionType: SubmissionType, submit
   return db.examAttempt.update({ where: { id }, data: { status: "SUBMITTED", submissionType, submittedAt } });
 }
 
+/** Closes the attempt as TERMINATED (third counted tab switch); `at` is the termination time. */
+export function markTerminated(id: string, at: Date, db: Db = prisma) {
+  return db.examAttempt.update({ where: { id }, data: { status: "TERMINATED", submissionType: "TERMINATED_TAB_LIMIT", submittedAt: at } });
+}
+
 /** In-progress attempts whose deadline has passed (optionally of one schedule). */
 export function findExpiredAttempts(before: Date, take: number, scheduleId?: string, db: Db = prisma) {
   return db.examAttempt.findMany({

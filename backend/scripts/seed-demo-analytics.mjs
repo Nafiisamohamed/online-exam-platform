@@ -278,7 +278,7 @@ async function main() {
         [pub, r.attempt, r.total, r.max, r.pct, letterFor(r.pct), JSON.stringify(marks), r.counted, publishedAt]);
       const body = SMS[r.s.lang](course.code);
       await q(`INSERT INTO sms_outbox (recipient_id, phone, language, template_key, params, body, sender_id, segments, status, related_type, related_id, created_at, sent_at, delivered_at)
-               VALUES ($1, $2, $3, 'RESULTS_PUBLISHED', $4, $5, 'JAAMACADDA-DEMO', 1, 'DELIVERED', 'exam', $6, $7, $7, $7)`,
+               VALUES ($1, $2, $3, 'RESULTS_PUBLISHED', $4, $5, 'ONLINE-EXAM-SYSTEM', 1, 'DELIVERED', 'exam', $6, $7, $7, $7)`,
         [r.s.id, r.s.phone, r.s.lang, JSON.stringify({ course: course.code }), body, exam, publishedAt]);
       await q(`INSERT INTO notifications (user_id, template_key, params, created_at) VALUES ($1, 'RESULTS_PUBLISHED', $2, $3)`, [r.s.id, JSON.stringify({ course: course.code, exam: EXAM_TITLE }), publishedAt]);
     }

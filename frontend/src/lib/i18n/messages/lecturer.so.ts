@@ -104,7 +104,6 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
   },
 
   overview: {
-    subtitle: "Maadooyinkaaga, imtixaannadaada iyo saxitaanka, si toos ah oo ka yimid server-ka.",
     stats: {
       courses: "Maadooyinkayga",
       students: "Ardayda diiwaangashan",
@@ -137,7 +136,7 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
     title: "Maadooyinkayga",
     subtitle: "Maadooyinka aad dhigto, ardaydooda iyo imtixaannadooda.",
     studentsTitle: "Ardayda diiwaangashan",
-    studentsHint: "Akhris keliya. Diiwaangeliyaha ayaa ardayda diiwaangeliya oo saara.",
+    studentsHint: "Diiwaangeliyaha ayaa maamula diiwaangelinta maadadan.",
     examsTitle: "Imtixaannada",
     participation: "Ka qaybgalka",
   },
@@ -416,6 +415,19 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
     publishedBy: "{name}, {date}",
     students: "Ardayda",
     absent: "Maqan",
+    terminated: "La joojiyay",
+    terminatedShort: "La joojiyay (beddelka tabka)",
+    terminatedSection: "Imtixaannada la joojiyay ({count})",
+    terminatedHint: "Si toos ah ayaa loo xiray markii 3aad ee beddelka tabka la tiriyay. Jawaabaha la kaydiyay waa la hayaa: halkan dib ugu eeg oo u sax sida jawaabaha kale.",
+    terminatedTitleOne: "La joojiyay: waxaa la gaaray xadka ugu badan ee beddelka tabka",
+    terminatedDetail: "{count} beddel tab oo la tiriyay. Waxaa la joojiyay {time}.",
+    terminatedLine: "{switches} beddel tab · la joojiyay {time} · {answered} ka mid ah {total} su'aalood ayaa laga jawaabay",
+    reasonLabel: "Sababta",
+    terminationReasons: { TAB_SWITCH_LIMIT: "Waxaa la gaaray xadka ugu badan ee beddelka tabka" },
+    answers: "Jawaabaha",
+    review: "Dib u eeg jawaabaha",
+    noAnswer: "Jawaab lama kaydin",
+    openGrading: "Fur saxidda",
     inProgress: "Socda",
     submitted: "La gudbiyay",
     working: "Darajada hadda",
@@ -429,7 +441,7 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
 
   analytics: {
     title: "Falanqeynta",
-    subtitle: "Maadooyinkaaga oo keliya, si toos ah oo ka yimid server-ka. Xariiqda (—) waxay ka dhigan tahay weli xog ma jirto; weligeed eber looma muujiyo.",
-    exportNote: "Darajooyinka imtixaan kasta waxaa loo soo dejin karaa CSV. Backend-ku ma laha shaandheyn taariikheed ama dhoofin PDF oo warbixinnadan ah, sidaa darteed lama bixiyo.",
+    subtitle: "Xariiqda (—) waxay ka dhigan tahay in aan weli xog jirin.",
+    exportNote: "Darajooyinka imtixaan kasta waxaad u soo dejisan kartaa fayl CSV ah.",
   },
 };

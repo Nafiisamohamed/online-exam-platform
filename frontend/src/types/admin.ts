@@ -235,7 +235,7 @@ export interface AdminDashboard {
   averageScoreByCourse: { courseId: string; code: string; name: string; semester: string; attempts: number; averagePercent: number | null }[];
   scoreDistribution: { from: number; to: number; count: number }[];
   examsByStatus: { status: ExamStatus; resultsStatus: ResultsStatus; count: number }[];
-  attemptsBySubmission: { status: "IN_PROGRESS" | "SUBMITTED"; submissionType: "MANUAL" | "AUTO_DEADLINE" | null; count: number }[];
+  attemptsBySubmission: { status: "IN_PROGRESS" | "SUBMITTED" | "TERMINATED"; submissionType: "MANUAL" | "AUTO_DEADLINE" | "TERMINATED_TAB_LIMIT" | null; count: number }[];
   tabSwitches: { attempts: number; countedFocusLosses: number };
   paymentsByProvider?: { provider: string; status: string; count: number; amount: number | null }[];
   usersByRole?: { role: Role | undefined; count: number }[];

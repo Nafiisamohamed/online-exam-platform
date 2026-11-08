@@ -12,6 +12,6 @@ export function groupMyExams(exams: MyExam[]) {
     active: exams.filter((e) => e.state === "OPEN" || e.state === "IN_PROGRESS").sort(byStart),
     upcoming: exams.filter((e) => e.state === "UPCOMING").sort(byStart),
     /** Submitted, or the window closed. */
-    done: exams.filter((e) => e.state === "SUBMITTED" || e.state === "CLOSED").sort((a, b) => byStart(b, a)),
+    done: exams.filter((e) => e.state === "SUBMITTED" || e.state === "TERMINATED" || e.state === "CLOSED").sort((a, b) => byStart(b, a)),
   };
 }

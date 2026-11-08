@@ -19,8 +19,8 @@ export interface InvigilatorSession {
   state: SessionState;
 }
 
-export type LiveStatus = "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "DISCONNECTED";
-export const LIVE_STATUSES: readonly LiveStatus[] = ["NOT_STARTED", "IN_PROGRESS", "DISCONNECTED", "SUBMITTED"];
+export type LiveStatus = "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "DISCONNECTED" | "TERMINATED";
+export const LIVE_STATUSES: readonly LiveStatus[] = ["NOT_STARTED", "IN_PROGRESS", "DISCONNECTED", "SUBMITTED", "TERMINATED"];
 
 export interface LiveStudentBase {
   student: { id: string; studentNumber: string | null; fullName: string };

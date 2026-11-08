@@ -61,9 +61,7 @@ export function StudentOverview() {
   return (
     <>
       <PageHeader
-        eyebrow={<span className="flex items-center gap-2"><Badge tone="sky">{t("roles.STUDENT")}</Badge><Badge tone="success" dot>{t("admin.liveData")}</Badge></span>}
         title={t("dashboard.greeting", { name: profile.fullName.split(" ")[0] })}
-        description={t("student.overview.subtitle")}
       />
       {failed && <Card className="mb-6"><QueryError state={failed} className="py-8" /></Card>}
 
@@ -71,7 +69,7 @@ export function StudentOverview() {
         <StatCard emphasis label={t("student.overview.stats.courses")} value={v(courses.data?.items.length)} icon={BookOpenCheck} />
         <StatCard label={t("student.overview.stats.upcoming")} value={v(g?.upcoming.length)} icon={CalendarClock} />
         <StatCard label={t("student.overview.stats.active")} value={v(g?.active.length)} icon={PlayCircle} />
-        <StatCard label={t("student.overview.stats.completed")} value={v(exams.data?.items.filter((e) => e.state === "SUBMITTED").length)} icon={CheckCircle2} />
+        <StatCard label={t("student.overview.stats.completed")} value={v(exams.data?.items.filter((e) => e.state === "SUBMITTED" || e.state === "TERMINATED").length)} icon={CheckCircle2} />
         <StatCard label={t("student.overview.stats.results")} value={v(results.data?.items.length)} icon={Award} />
       </section>
 

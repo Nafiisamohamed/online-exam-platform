@@ -1,7 +1,11 @@
 /**
  * Submitting attempts (sections 4.7 and 4.10, P6).
  *
- * submitAttempt() is the only place where an attempt becomes SUBMITTED:
+ * submitAttempt() is the only place where an attempt becomes SUBMITTED, and
+ * terminateLocked() the only place where it becomes TERMINATED (third counted
+ * tab switch). Both auto-grade the saved answers and calculate the grade.
+ *
+ * submitAttempt() covers:
  * - by the student (MANUAL), or
  * - automatically at the server deadline (AUTO_DEADLINE), by the background
  *   job, or by any request that reaches an attempt whose deadline has passed
@@ -77,6 +81,31 @@ export async function submitAttempt(attemptId: string, requested: "MANUAL" | "AU
     });
     return { submitted: true, submissionType };
   });
+}
+
+/**
+ * Terminates an attempt whose row the caller has already locked (FOR UPDATE) in
+ * `tx`: the saved answers are auto-graded as at a submission (unanswered
+ * questions get empty rows), the attempt is closed as TERMINATED and the grade
+ * is calculated. If the deadline had already passed, it is an ordinary
+ * automatic submission instead.
+ */
+export async function terminateLocked(tx: Tx, attempt: { id: string; deadline: Date }, countedFocusLosses: number, actorId: string) {
+  const at = now();
+  await gradeAttempt(tx, attempt.id);
+  if (at > attempt.deadline) {
+    await attemptsRepo.markSubmitted(attempt.id, "AUTO_DEADLINE", attempt.deadline, tx);
+    await recalcGrade(tx, attempt.id);
+    await audit(tx, { actorId: null, action: "ATTEMPT_AUTO_SUBMITTED", entityType: "exam_attempt", entityId: attempt.id });
+    return { terminated: false as const };
+  }
+  await attemptsRepo.markTerminated(attempt.id, at, tx);
+  await recalcGrade(tx, attempt.id);
+  await audit(tx, {
+    actorId, action: "ATTEMPT_TERMINATED", entityType: "exam_attempt", entityId: attempt.id,
+    details: { reason: "TAB_SWITCH_LIMIT", countedFocusLosses },
+  });
+  return { terminated: true as const, terminatedAt: at };
 }
 
 /** Submits the attempt now if its deadline has passed. Returns true when it did. */

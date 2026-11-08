@@ -108,7 +108,7 @@ export const importErrorsEn = {
 } as const;
 
 export const adminEn = {
-  liveData: "Live data",
+  liveData: "Summary",
   unavailable: "Not available",
   noData: "No data yet",
   refresh: "Refresh",
@@ -323,7 +323,7 @@ export const adminEn = {
     enrolledCount: "New enrolments",
     reactivated: "Re-enrolled",
     passwordsTitle: "Temporary passwords for the new students",
-    passwordsHint: "Shown only this once and never stored in readable form. Give each student their password privately.",
+    passwordsHint: "Shown only this once. Give each student their password privately.",
     temporaryPassword: "Temporary password",
     another: "Import another file",
   },
@@ -361,7 +361,7 @@ export const adminEn = {
     },
     questionTypes: { MCQ: "Multiple choice", TRUE_FALSE: "True / False", SHORT_ANSWER: "Short answer", ESSAY: "Essay" },
     difficulty: { EASY: "Easy", MEDIUM: "Medium", HARD: "Hard" },
-    readOnlyNote: "Read-only. Only the course lecturer can change this examination.",
+    readOnlyNote: "Only the course lecturer can change this examination.",
     rules: "Question rules",
     rulesEmpty: "No question rules yet",
     ruleLine: "{count} × {type}, {difficulty}, {marks} marks each",
@@ -511,6 +511,7 @@ export const adminEn = {
       ATTEMPT_STARTED: "started an exam",
       ATTEMPT_SUBMITTED: "submitted an exam",
       ATTEMPT_AUTO_SUBMITTED: "auto-submitted an exam at the deadline",
+      ATTEMPT_TERMINATED: "exam attempt terminated (tab-switch limit)",
       INVIGILATOR_NOTE_ADDED: "added an invigilation note",
       RESULTS_REPUBLISHED: "republished results",
       QUESTION_ARCHIVED: "archived a question",

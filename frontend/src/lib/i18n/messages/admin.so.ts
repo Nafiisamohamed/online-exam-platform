@@ -112,7 +112,7 @@ export const importErrorsSo: Widen<typeof importErrorsEn> = {
 };
 
 export const adminSo: Widen<typeof adminEn> = {
-  liveData: "Xog toos ah",
+  liveData: "Soo koobid",
   unavailable: "Lama heli karo",
   noData: "Weli xog ma jirto",
   refresh: "Cusbooneysii",
@@ -327,7 +327,7 @@ export const adminSo: Widen<typeof adminEn> = {
     enrolledCount: "Diiwaangelinno cusub",
     reactivated: "Dib loo diiwaangeliyay",
     passwordsTitle: "Erayada sirta ah ee ku meel gaarka ah ee ardayda cusub",
-    passwordsHint: "Hal mar oo keliya ayaa la muujinayaa, weligoodna si la akhriyi karo looma kaydiyo. Arday kasta si qarsoodi ah u sii erayga sirta ah.",
+    passwordsHint: "Hal mar oo keliya ayaa la muujinayaa. Arday kasta si qarsoodi ah u sii erayga sirta ah.",
     temporaryPassword: "Eray sir ah oo ku meel gaar ah",
     another: "Soo geli fayl kale",
   },
@@ -365,7 +365,7 @@ export const adminSo: Widen<typeof adminEn> = {
     },
     questionTypes: { MCQ: "Doorasho badan", TRUE_FALSE: "Run / Been", SHORT_ANSWER: "Jawaab gaaban", ESSAY: "Qormo" },
     difficulty: { EASY: "Fudud", MEDIUM: "Dhexdhexaad", HARD: "Adag" },
-    readOnlyNote: "Akhris keliya. Macallinka maadada oo keliya ayaa beddeli kara imtixaankan.",
+    readOnlyNote: "Macallinka maadada oo keliya ayaa beddeli kara imtixaankan.",
     rules: "Xeerarka su'aalaha",
     rulesEmpty: "Weli xeerar su'aalo ma jiraan",
     ruleLine: "{count} × {type}, {difficulty}, {marks} dhibcood midkiiba",
@@ -515,6 +515,7 @@ export const adminSo: Widen<typeof adminEn> = {
       ATTEMPT_STARTED: "bilaabay imtixaan",
       ATTEMPT_SUBMITTED: "gudbiyay imtixaan",
       ATTEMPT_AUTO_SUBMITTED: "si toos ah loo gudbiyay imtixaan waqtiga ugu dambeeya",
+      ATTEMPT_TERMINATED: "imtixaan la joojiyay (xadka beddelka tabka)",
       INVIGILATOR_NOTE_ADDED: "ku daray qoraal ilaalin",
       RESULTS_REPUBLISHED: "dib u daabacay natiijooyin",
       QUESTION_ARCHIVED: "kaydiyay su'aal",

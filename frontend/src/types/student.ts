@@ -7,7 +7,7 @@
 import type { QuestionType } from "./lecturer";
 
 /** attempts.service listMyExams: state of one exam for this student. */
-export type MyExamState = "UNSCHEDULED" | "UPCOMING" | "OPEN" | "CLOSED" | "IN_PROGRESS" | "SUBMITTED";
+export type MyExamState = "UNSCHEDULED" | "UPCOMING" | "OPEN" | "CLOSED" | "IN_PROGRESS" | "SUBMITTED" | "TERMINATED";
 
 /** GET /api/my/exams */
 export interface MyExam {
@@ -19,7 +19,7 @@ export interface MyExam {
   totalMarks: number;
   schedule: { id: string; windowStart: string; windowEnd: string; durationMinutes: number } | null;
   fee: { amount: number; currency: string; required: boolean; paid: boolean; receiptNumber: string | null };
-  attempt: { id: string; status: "IN_PROGRESS" | "SUBMITTED"; deadline: string; submittedAt: string | null } | null;
+  attempt: { id: string; status: "IN_PROGRESS" | "SUBMITTED" | "TERMINATED"; deadline: string; submittedAt: string | null } | null;
   resultsPublished: boolean;
   state: MyExamState;
   canStart: boolean;
@@ -53,8 +53,8 @@ export interface AttemptQuestion {
 /** GET /api/attempts/:id, POST /api/exams/:examId/attempts (attempt), POST /api/attempts/:id/submit */
 export interface Attempt extends AttemptTiming {
   id: string;
-  status: "IN_PROGRESS" | "SUBMITTED";
-  submissionType: "MANUAL" | "AUTO_DEADLINE" | null;
+  status: "IN_PROGRESS" | "SUBMITTED" | "TERMINATED";
+  submissionType: "MANUAL" | "AUTO_DEADLINE" | "TERMINATED_TAB_LIMIT" | null;
   submittedAt: string | null;
   exam: { id: string; title: string; instructions: string; course: { code: string; name: string } };
   totalQuestions: number;
@@ -69,8 +69,8 @@ export interface Attempt extends AttemptTiming {
 
 /** POST /api/attempts/:id/heartbeat */
 export interface Heartbeat extends AttemptTiming {
-  status: "IN_PROGRESS" | "SUBMITTED";
-  submissionType: "MANUAL" | "AUTO_DEADLINE" | null;
+  status: "IN_PROGRESS" | "SUBMITTED" | "TERMINATED";
+  submissionType: "MANUAL" | "AUTO_DEADLINE" | "TERMINATED_TAB_LIMIT" | null;
   countedFocusLosses?: number;
   focusWarning?: boolean;
 }

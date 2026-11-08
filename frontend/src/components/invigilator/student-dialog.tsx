@@ -5,8 +5,8 @@
  * the tab-switch log (GET /api/invigilation/attempts/:id/focus-events, with
  * server-recorded times), the notes about the student, and the actions (add
  * time, add note). Only status is shown: the backend gives invigilators no
- * questions, answers or marks. Tab switches carry no automatic penalty; the
- * lecturer decides.
+ * questions, answers or marks. The server ends the examination at the 3rd
+ * counted tab switch; the lecturer reviews the events.
  */
 import { AlertTriangle, Clock, MessageSquarePlus } from "lucide-react";
 import { QueryState } from "@/components/admin/query-state";

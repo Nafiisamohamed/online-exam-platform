@@ -10,10 +10,10 @@ export function findPublicationCounts(examId: string, unfinished: GradingStatus[
     db.examAttempt.count({ where: { examId, status: "IN_PROGRESS" } }),
     db.answer.groupBy({
       by: ["gradingStatus"],
-      where: { attempt: { examId, status: "SUBMITTED" }, gradingStatus: { in: unfinished } },
+      where: { attempt: { examId, status: { in: ["SUBMITTED", "TERMINATED"] } }, gradingStatus: { in: unfinished } },
       _count: { _all: true },
     }),
-    db.examAttempt.count({ where: { examId, status: "SUBMITTED" } }),
+    db.examAttempt.count({ where: { examId, status: { in: ["SUBMITTED", "TERMINATED"] } } }),
   ]);
 }
 
@@ -29,7 +29,7 @@ export function insertPublication(data: { examId: string; publicationNumber: num
 /** Submitted attempts with student, question marks and the latest revision, for publishing. */
 export function findAttemptsToPublish(examId: string, db: Db = prisma) {
   return db.examAttempt.findMany({
-    where: { examId, status: "SUBMITTED" },
+    where: { examId, status: { in: ["SUBMITTED", "TERMINATED"] } },
     include: {
       student: { select: { id: true, phone: true, preferredLanguage: true, isActive: true } },
       questions: { include: { answer: { select: { marksAwarded: true, gradingStatus: true } } }, orderBy: { position: "asc" } },
@@ -47,7 +47,11 @@ export function findExamResultsData(examId: string, courseId: string, db: Db = p
   return Promise.all([
     db.examAttempt.findMany({
       where: { examId },
-      include: { student: { select: { id: true, studentNumber: true, fullName: true } }, grade: true, gradeRevisions: { orderBy: { revisionNumber: "desc" }, take: 1 } },
+      include: {
+        student: { select: { id: true, studentNumber: true, fullName: true } }, grade: true, gradeRevisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+        // questions with a saved answer (unanswered ones get an empty answer row when the attempt closes)
+        _count: { select: { answers: { where: { OR: [{ selectedOptionId: { not: null } }, { textAnswer: { not: null } }] } }, questions: true } },
+      },
     }),
     db.user.findMany({
       where: { enrolments: { some: { courseId } } },
@@ -78,6 +82,23 @@ export function findStudentResult(examId: string, studentId: string, db: Db = pr
         include: {
           answer: { include: { essayMarks: { where: { graderRole: "FIRST" }, select: { comment: true } } } },
           questionVersion: { include: { options: true, acceptedAnswers: true } },
+        },
+      },
+    },
+  });
+}
+
+/** One attempt with its questions (in the student's order) and the saved answers, for the staff review. */
+export function findAttemptReview(attemptId: string, db: Db = prisma) {
+  return db.examAttempt.findUnique({
+    where: { id: attemptId },
+    include: {
+      student: { select: { id: true, studentNumber: true, fullName: true } },
+      questions: {
+        orderBy: { position: "asc" },
+        include: {
+          questionVersion: { select: { type: true, text: true, options: { select: { id: true, text: true } } } },
+          answer: { select: { id: true, selectedOptionId: true, textAnswer: true, marksAwarded: true, gradingStatus: true, savedAt: true } },
         },
       },
     },

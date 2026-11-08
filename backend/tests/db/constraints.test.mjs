@@ -179,7 +179,7 @@ describe("database constraints", () => {
     const insertSms = (body, params) =>
       db.one(
         `INSERT INTO sms_outbox (recipient_id, phone, language, template_key, params, body, sender_id)
-         VALUES ($1, '+252615000000', 'so', 'ACCOUNT_CREATED', $2, $3, 'JAAMACADDA-DEMO') RETURNING status`,
+         VALUES ($1, '+252615000000', 'so', 'ACCOUNT_CREATED', $2, $3, 'ONLINE-EXAM-SYSTEM') RETURNING status`,
         [w.studentId, params, body],
       );
 

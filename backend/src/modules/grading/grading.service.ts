@@ -48,7 +48,8 @@ export function resolveEssay(maxMarks: number, hasSecondGrader: boolean, first: 
 /** Loads an answer with everything grading needs, and decides the user's grading role. */
 async function loadForGrading(user: AuthUser, answerId: string) {
   const answer = await gradingRepo.findAnswerForGrading(answerId);
-  if (!answer || answer.attempt.status !== "SUBMITTED") throw notFound("ANSWER_NOT_FOUND");
+  // Answers of closed attempts: submitted, or terminated after the tab-switch limit (their saved answers are graded too).
+  if (!answer || (answer.attempt.status !== "SUBMITTED" && answer.attempt.status !== "TERMINATED")) throw notFound("ANSWER_NOT_FOUND");
   const exam = answer.attempt.exam;
   const isOwner = user.role === "LECTURER" && exam.course.lecturerId === user.id;
   const isSecond = user.role === "LECTURER" && exam.secondGraderId === user.id;

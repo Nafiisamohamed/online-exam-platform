@@ -23,7 +23,7 @@ describe("invigilator live view", () => {
 
     const live = await inv.get(`/api/invigilation/sessions/${fx.schedule.id}/live`);
     expect(live.status).toBe(200);
-    expect(live.body.summary).toEqual({ total: 3, notStarted: 1, inProgress: 1, disconnected: 1, submitted: 0 });
+    expect(live.body.summary).toEqual({ total: 3, notStarted: 1, inProgress: 1, disconnected: 1, submitted: 0, terminated: 0 });
     const row = (id: string) => live.body.students.find((s: any) => s.student.id === id);
     expect(row(fx.students[0].id)).toMatchObject({ status: "IN_PROGRESS", answeredCount: 1, totalQuestions: 6, countedFocusLosses: 1, connection: "OK" });
     expect(row(fx.students[1].id)).toMatchObject({ status: "DISCONNECTED", connection: "LOST" });

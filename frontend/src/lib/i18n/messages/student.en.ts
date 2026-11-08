@@ -12,6 +12,7 @@ export const studentErrorsEn = {
   PAYMENT_REQUIRED: "Pay the exam fee ({amount} {currency}) before starting.",
   ATTEMPT_NOT_FOUND: "This examination attempt was not found.",
   ATTEMPT_DEADLINE_PASSED: "The time for this examination is over. Your saved answers were submitted.",
+  ATTEMPT_TERMINATED: "You are no longer eligible to continue this examination because you have exceeded the maximum of 3 allowed tab switches. Please contact your lecturer.",
   ATTEMPT_ALREADY_SUBMITTED: "This examination has already been submitted.",
   ATTEMPT_NOT_IN_PROGRESS: "This examination is not in progress.",
   OPTION_NOT_IN_QUESTION: "This option does not belong to the question.",
@@ -39,6 +40,7 @@ export const studentEn = {
       CLOSED: "Window closed",
       IN_PROGRESS: "In progress",
       SUBMITTED: "Submitted",
+      TERMINATED: "Terminated",
     },
     questions: "{count} questions",
     marks: "{marks} marks",
@@ -95,8 +97,9 @@ export const studentEn = {
   },
 
   exams: {
+    terminatedNote: "Your examination was terminated at the 3rd tab switch. Your saved answers were sent to your lecturer for review.",
     title: "My examinations",
-    subtitle: "Times are campus time (Mogadishu). The server opens and closes every examination.",
+    subtitle: "All times are shown in campus time (Mogadishu).",
     tabUpcoming: "Upcoming",
     tabActive: "Open and in progress",
     tabDone: "Completed",
@@ -107,9 +110,9 @@ export const studentEn = {
     rulesTitle: "Rules",
     rules: {
       oneAttempt: "You have one attempt. If you leave or lose the connection, you continue the same attempt with your saved answers.",
-      deadline: "You have {minutes} minutes from when you start, but never beyond the end of the window. The server clock decides; your device clock does not matter.",
-      autosave: "Every answer is saved on the server as you go. You can change answers until you submit.",
-      focus: "Leaving the examination page for 1 second or more is recorded. After 3 times you get a warning. Nothing is penalised automatically; your lecturer reviews it.",
+      deadline: "You have {minutes} minutes from when you start. The examination always ends when the window closes, whatever the time on your device.",
+      autosave: "Every answer is saved automatically as you go. You can change your answers until you submit.",
+      focus: "Leaving the examination page for 1 second or more counts as a tab switch. At the 3rd, your examination ends automatically and your saved answers are sent to your lecturer.",
       network: "You can take the examination on any device (phone, laptop or computer) with any internet connection.",
       autoSubmit: "When the time is over, your saved answers are submitted automatically.",
     },
@@ -150,7 +153,7 @@ export const studentEn = {
       saved: "Saved",
       unsaved: "Not saved yet",
       failed: "Not saved. Retrying…",
-      rejected: "The server did not accept this answer.",
+      rejected: "This answer could not be saved. Please try again.",
       allSaved: "All answers saved",
       pending: "{count} not saved yet",
     },
@@ -161,7 +164,7 @@ export const studentEn = {
     warnings: {
       tenMinutes: "10 minutes left.",
       oneMinute: "1 minute left. Your saved answers are submitted when the time is over.",
-      focus: "You have left the examination page {count} times. This is recorded for your lecturer.",
+      focus: "You have left the examination page {count} of {max} allowed times. At the {max}rd time your examination ends automatically.",
       leave: "Some answers are not saved yet. Leave anyway?",
     },
     extension: "Your invigilator added {minutes} minutes.",
@@ -186,6 +189,10 @@ export const studentEn = {
     focus: "Times you left the page",
     resultsLater: "You will be notified when results are published.",
     back: "Back to my examinations",
+    terminatedTitle: "Examination Terminated",
+    terminatedBody: "You are no longer eligible to continue this examination because you have exceeded the maximum of 3 allowed tab switches. Please contact your lecturer.",
+    terminatedAt: "Terminated at",
+    backDashboard: "Back to my dashboard",
   },
 
   results: {

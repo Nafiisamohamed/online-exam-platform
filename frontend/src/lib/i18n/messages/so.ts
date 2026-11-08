@@ -12,7 +12,7 @@ export const so: Messages = {
   app: {
     name: "Madal Imtixaan Online",
     shortName: "ExamHub",
-    university: "Jaamacadda Demo",
+    university: "Online Examination System",
     tagline: "Imtixaanno cadaalad ah oo ammaan ah oo ku shaqeeya shabakadda jaamacadda",
   },
   roles: {

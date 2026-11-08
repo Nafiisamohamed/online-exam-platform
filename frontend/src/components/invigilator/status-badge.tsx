@@ -4,7 +4,7 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { LiveStatus, SessionState } from "@/types/invigilator";
 
-const liveTone: Record<LiveStatus, BadgeTone> = { NOT_STARTED: "neutral", IN_PROGRESS: "success", DISCONNECTED: "warning", SUBMITTED: "navy" };
+const liveTone: Record<LiveStatus, BadgeTone> = { NOT_STARTED: "neutral", IN_PROGRESS: "success", DISCONNECTED: "warning", SUBMITTED: "navy", TERMINATED: "danger" };
 const sessionTone: Record<SessionState, BadgeTone> = { UPCOMING: "sky", OPEN: "success", CLOSED: "neutral" };
 
 /** A student's live status. Disconnected is the only warm colour, so it stands out at a glance. */

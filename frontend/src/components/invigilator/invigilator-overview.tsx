@@ -81,9 +81,7 @@ export function InvigilatorOverview() {
   return (
     <>
       <PageHeader
-        eyebrow={<span className="flex items-center gap-2"><Badge tone="sky">{t("roles.INVIGILATOR")}</Badge><Badge tone="success" dot>{t("admin.liveData")}</Badge></span>}
         title={t("dashboard.greeting", { name: profile.fullName.split(" ")[0] })}
-        description={t("invigilator.overview.subtitle")}
       />
       {sessions.error && !sessions.data && <Card className="mb-6"><QueryError state={sessions} className="py-8" /></Card>}
 

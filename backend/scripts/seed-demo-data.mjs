@@ -41,7 +41,7 @@ dotenv.config({ path: path.join(backendDir, ".env") }); // values set in the she
 
 const ACCOUNTS_FILE = process.env.SEED_ACCOUNTS_FILE || path.join(backendDir, "demo-accounts.local.md");
 const DEMO_ADMIN_EMAIL = "registrar@uni-demo.test";
-const MERCHANT = { name: "Jaamacadda Demo", number: "000000" };
+const MERCHANT = { name: "Online Examination System", number: "000000" };
 const BCRYPT_COST = 12;
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ async function main() {
       const sent = status === "QUEUED" ? null : new Date();
       await q(
         `INSERT INTO sms_outbox (recipient_id, phone, language, template_key, params, body, sender_id, segments, status, related_type, related_id, sent_at, delivered_at, failure_reason)
-         VALUES ($1, $2, $3, $4, $5, $6, 'JAAMACADDA-DEMO', $7, $8, $9, $10, $11, $12, $13)`,
+         VALUES ($1, $2, $3, $4, $5, $6, 'ONLINE-EXAM-SYSTEM', $7, $8, $9, $10, $11, $12, $13)`,
         [U[`s${n}`], STUDENTS[n - 1].phone, lang(n), template, JSON.stringify(params), body, Math.ceil(body.length / 160), status,
           related?.[0] ?? null, related?.[1] ?? null, sent, status === "DELIVERED" ? new Date() : null, status === "FAILED" ? "SIMULATED_NETWORK_ERROR" : null],
       );

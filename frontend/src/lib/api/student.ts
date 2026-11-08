@@ -50,7 +50,7 @@ export function heartbeat(attemptId: string) {
 
 /** The server records the times; the browser only reports the moments, with a retry-safe event id. */
 export function reportFocus(attemptId: string, clientEventId: string, type: "LOST" | "RETURNED") {
-  return api<{ countedFocusLosses: number; focusWarning: boolean }>(`/attempts/${attemptId}/focus-events`, { method: "POST", json: { clientEventId, type } });
+  return api<{ countedFocusLosses: number; focusWarning: boolean; terminated?: boolean }>(`/attempts/${attemptId}/focus-events`, { method: "POST", json: { clientEventId, type } });
 }
 
 /** Safe to repeat: an already submitted attempt is returned as it is. */

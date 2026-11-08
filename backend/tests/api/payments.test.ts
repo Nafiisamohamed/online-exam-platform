@@ -14,7 +14,7 @@ describe("simulated payments", () => {
     const created = await start(agent, fx.examId);
     expect(created.status).toBe(201);
     const p = created.body.payment;
-    expect(p).toMatchObject({ status: "PENDING_CONFIRMATION", amount: 5, currency: "USD", merchantName: "Jaamacadda Demo", phone: "+252619876500", isSimulated: true, pinAttemptsLeft: 3 });
+    expect(p).toMatchObject({ status: "PENDING_CONFIRMATION", amount: 5, currency: "USD", merchantName: "Online Examination System", phone: "+252619876500", isSimulated: true, pinAttemptsLeft: 3 });
     expect(p.secondsUntilExpiry).toBeGreaterThan(290);
 
     // A PIN before the Yes step is refused.

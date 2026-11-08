@@ -36,7 +36,8 @@ export interface LocalAnswer {
 const HEARTBEAT_MS = 5000;
 const TEXT_DEBOUNCE_MS = 900;
 const RETRY_MS = 3000;
-const ENDED = new Set(["ATTEMPT_DEADLINE_PASSED", "ATTEMPT_ALREADY_SUBMITTED"]);
+/** Server answers that mean the attempt is over (submitted, timed out, or terminated after the tab-switch limit). */
+const ENDED = new Set(["ATTEMPT_DEADLINE_PASSED", "ATTEMPT_ALREADY_SUBMITTED", "ATTEMPT_TERMINATED"]);
 
 const isChoice = (q: AttemptQuestion) => q.type === "MCQ" || q.type === "TRUE_FALSE";
 const hasValue = (a: LocalAnswer | undefined) => !!a && (!!a.selectedOptionId || !!a.textAnswer.trim());
@@ -78,7 +79,7 @@ export function useExamSession(attemptId: string) {
   }, []);
 
   /** The server says the exam is over: show the submitted attempt. */
-  const finish = useCallback(async () => {
+  const finish = useCallback(async (endedAs: "SUBMITTED" | "TERMINATED" = "SUBMITTED") => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     Object.values(timers.current).forEach(clearTimeout);
@@ -86,7 +87,7 @@ export function useExamSession(attemptId: string) {
       setFinished(await loadAttempt(attemptId));
     } catch {
       // The server already ended the attempt; show what is known even if reloading failed.
-      if (attemptRef.current) setFinished({ ...attemptRef.current, status: "SUBMITTED", questions: [] });
+      if (attemptRef.current) setFinished({ ...attemptRef.current, status: endedAs, questions: [] });
     }
   }, [attemptId]);
 
@@ -110,7 +111,7 @@ export function useExamSession(attemptId: string) {
         setAnswer(qid, { status: "saved", savedAt: res.savedAt });
       } catch (error) {
         inflight.current.delete(qid);
-        if (error instanceof ApiError && ENDED.has(error.code)) return void finish();
+        if (error instanceof ApiError && ENDED.has(error.code)) return void finish(error.code === "ATTEMPT_TERMINATED" ? "TERMINATED" : "SUBMITTED");
         const transient = !(error instanceof ApiError) || error.status === 0 || error.status >= 500 || error.status === 429;
         if (transient) {
           if (!(error instanceof ApiError) || error.status === 0) setOnline(false);
@@ -160,7 +161,7 @@ export function useExamSession(attemptId: string) {
         await setFlag(attemptId, qid, next);
       } catch (error) {
         setFlags((f) => ({ ...f, [qid]: !next }));
-        if (error instanceof ApiError && ENDED.has(error.code)) void finish();
+        if (error instanceof ApiError && ENDED.has(error.code)) void finish(error.code === "ATTEMPT_TERMINATED" ? "TERMINATED" : "SUBMITTED");
       }
     },
     [attemptId, flags, finish],
@@ -171,14 +172,14 @@ export function useExamSession(attemptId: string) {
     try {
       const hb = await heartbeat(attemptId);
       setOnline(true);
-      if (hb.status === "SUBMITTED") return void finish();
+      if (hb.status === "SUBMITTED" || hb.status === "TERMINATED") return void finish(hb.status);
       resync(hb.remainingSeconds);
       setExtensionMinutes(hb.extensionMinutes);
       if (hb.countedFocusLosses !== undefined) setFocus({ count: hb.countedFocusLosses, warning: !!hb.focusWarning });
       // Back online: send answers that failed while offline.
       for (const [qid, a] of Object.entries(answersRef.current)) if (a.status === "error") void save(qid);
     } catch (error) {
-      if (error instanceof ApiError && ENDED.has(error.code)) return void finish();
+      if (error instanceof ApiError && ENDED.has(error.code)) return void finish(error.code === "ATTEMPT_TERMINATED" ? "TERMINATED" : "SUBMITTED");
       if (!(error instanceof ApiError) || error.status === 0 || error.status >= 500) setOnline(false);
     }
   }, [attemptId, finish, resync, save]);
@@ -242,9 +243,11 @@ export function useExamSession(attemptId: string) {
           try {
             const r = await reportFocus(attemptId, id, type);
             setFocus({ count: r.countedFocusLosses, warning: r.focusWarning });
+            // The server terminated the attempt at the third counted switch: close the exam screen now.
+            if (r.terminated) return void finish("TERMINATED");
             return;
           } catch (error) {
-            if (error instanceof ApiError && ENDED.has(error.code)) return void finish();
+            if (error instanceof ApiError && ENDED.has(error.code)) return void finish(error.code === "ATTEMPT_TERMINATED" ? "TERMINATED" : "SUBMITTED");
             if (error instanceof ApiError && error.status > 0 && error.status < 500) return; // e.g. unknown event: nothing to retry
             await new Promise((r) => setTimeout(r, RETRY_MS));
           }
@@ -308,7 +311,7 @@ export function useExamSession(attemptId: string) {
       finishedRef.current = true;
       setFinished(done);
     } catch (error) {
-      if (error instanceof ApiError && ENDED.has(error.code)) await finish();
+      if (error instanceof ApiError && ENDED.has(error.code)) await finish(error.code === "ATTEMPT_TERMINATED" ? "TERMINATED" : "SUBMITTED");
       else setSubmitting(false);
       throw error;
     }

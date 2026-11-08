@@ -34,6 +34,8 @@ export const lecturerPaths = {
   grading: (examId: string, status?: string) => `/exams/${examId}/grading${query({ status })}`,
   gradingAnswer: (answerId: string) => `/grading/answers/${answerId}`,
   results: (examId: string) => `/exams/${examId}/results`,
+  /** Read-only review of one closed attempt's saved answers (submitted or terminated). */
+  attemptAnswers: (examId: string, attemptId: string) => `/exams/${examId}/attempts/${attemptId}/answers`,
   gradesCsv: (examId: string, lang: "so" | "en") => `/exams/${examId}/grades.csv?lang=${lang}`,
   examAnalytics: (examId: string) => `/exams/${examId}/analytics`,
   dashboard: "/analytics/dashboard",

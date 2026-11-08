@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n/i18n";
 import { untilParts } from "@/lib/student/exam-clock";
 import type { MyExam, MyExamState } from "@/types/student";
 
-export const stateTone: Record<MyExamState, BadgeTone> = { UNSCHEDULED: "neutral", UPCOMING: "sky", OPEN: "success", CLOSED: "neutral", IN_PROGRESS: "warning", SUBMITTED: "navy" };
+export const stateTone: Record<MyExamState, BadgeTone> = { UNSCHEDULED: "neutral", UPCOMING: "sky", OPEN: "success", CLOSED: "neutral", IN_PROGRESS: "warning", SUBMITTED: "navy", TERMINATED: "danger" };
 
 /** "2 d 4 h", "3 h 12 min", "4 min 09 s". */
 export function useCountdownText() {

@@ -223,7 +223,7 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 | PUT | `/api/attempts/:id/questions/:questionId/answer` | `{ selectedOptionId }` or `{ textAnswer }` (an empty value clears the answer) | `{ saved: true, savedAt, remainingSeconds }`. Errors: `409 ATTEMPT_DEADLINE_PASSED`, `409 ATTEMPT_ALREADY_SUBMITTED`, `400 OPTION_NOT_IN_QUESTION` |
 | PUT | `/api/attempts/:id/questions/:questionId/flag` | `{ flagged }` | `{ flagged }` |
 | POST | `/api/attempts/:id/heartbeat` | — | `{ status, remainingSeconds, deadline, serverTime, warnings, countedFocusLosses, focusWarning }` |
-| POST | `/api/attempts/:id/focus-events` | `{ clientEventId: uuid, type: "LOST" \| "RETURNED" }` | `{ countedFocusLosses, focusWarning }` |
+| POST | `/api/attempts/:id/focus-events` | `{ clientEventId: uuid, type: "LOST" \| "RETURNED" }` | `{ countedFocusLosses, focusWarning, terminated, status }` |
 | POST | `/api/attempts/:id/submit` | — | `{ attempt }`. Safe to repeat. |
 
 **The `attempt` object**
@@ -238,7 +238,7 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 - **Deadline:** `min(start + duration, window end) + extensions`, set by the server clock.
 - **Resuming:** starting again, or reloading, returns the same attempt with the saved answers. A new exam is never generated.
 - **Late answers** are rejected. The attempt is then submitted with the saved answers, recording the deadline itself as the submission time. A background job does the same for disconnected students.
-- **Tab switches:** the server records the times. A focus loss is counted only if it lasts 1 second or more. After 3 counted switches, `focusWarning` becomes `true`; nothing is penalised automatically.
+- **Tab switches:** the server records the times. A focus loss is counted only if it lasts 1 second or more. At the **3rd counted switch the attempt is terminated** in the same locked transaction: status `TERMINATED`, `submissionType: "TERMINATED_TAB_LIMIT"`, `submittedAt` = the termination time. The saved answers are kept and auto-graded like a submission (essays wait for the lecturer). After that, saves, flags, focus events and manual submission return `409 ATTEMPT_TERMINATED`; starting again returns the same attempt (`resumed: true`, no questions). Repeated or concurrent events cannot count twice.
 - **Grading on submit:**
   - MCQ, True/False and matching short answers are graded automatically. Matching ignores case and extra spaces but keeps punctuation.
   - Other short answers become `NEEDS_REVIEW`.
@@ -290,6 +290,7 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 | POST | `/api/exams/:id/results/publish` | course lecturer | `{ reason? }` (required from the 2nd publication) | `{ publicationNumber, attempts, notifiedStudents }`. Errors: `409 GRADING_INCOMPLETE { ungraded }`, `409 ATTEMPTS_IN_PROGRESS`, `400 PUBLICATION_REASON_REQUIRED`, `409 RESULTS_ALREADY_PUBLISHED` |
 | POST | `/api/exams/:id/results/reopen` | course lecturer | `{ reason }` | `{ resultsStatus: "REOPENED" }` |
 | GET | `/api/exams/:id/grades.csv?lang=so\|en` | ADMIN, course lecturer | — | CSV with the header in the chosen language |
+| GET | `/api/exams/:id/attempts/:attemptId/answers` | ADMIN, course LECTURER | — | `{ attempt: { status, countedFocusLosses, terminatedAt, terminationReason, student, … }, questions: [{ position, type, text, maxMarks, answered, selectedOption, textAnswer, gradingStatus, marksAwarded, answerId }] }`. Read-only review of one submitted or terminated attempt. `404 ATTEMPT_NOT_FOUND` otherwise. |
 | GET | `/api/my/results` | STUDENT | — | `{ items }`: published results only |
 | GET | `/api/my/results/:examId` | STUDENT | — | `{ result: { totalScore, maxScore, percentage, letterGrade, countedFocusLosses, publicationNumber, questions } }`. `404 RESULT_NOT_FOUND` until results are published. |
 | GET | `/api/my/results/:examId/slip.pdf?lang=so\|en` | STUDENT | — | result slip PDF |

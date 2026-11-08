@@ -6,9 +6,9 @@
  * (deadline, saving, focus counting, submission) are the server's; see
  * use-exam-session.ts. Correct answers are never part of the data.
  */
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Clock, Flag, LayoutGrid, Loader2, Send, WifiOff, XCircle } from "lucide-react";
+import { AlertTriangle, ShieldX, CheckCircle2, ChevronLeft, ChevronRight, Clock, Flag, LayoutGrid, Loader2, Send, WifiOff, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "@/lib/api/client";
 import { QueryError } from "@/components/admin/query-state";
 import { Alert } from "@/components/ui/alert";
@@ -114,6 +114,7 @@ function Navigator({ questions, current, onPick, isAnswered, flags }: { question
 
 export function Completion({ a }: { a: Attempt }) {
   const { t, locale } = useI18n();
+  if (a.status === "TERMINATED") return <Terminated a={a} />;
   return (
     <div className="mx-auto max-w-xl py-10">
       <Card>
@@ -222,7 +223,7 @@ export function ExamInterface({ attemptId }: { attemptId: string }) {
         {level === "one" && s.remaining > 0 && <Alert tone="danger">{t("student.attempt.warnings.oneMinute")}</Alert>}
         {level === "ten" && <Alert tone="warning">{t("student.attempt.warnings.tenMinutes")}</Alert>}
         {newExtension > 0 && <Alert tone="info">{t("student.attempt.extension", { minutes: newExtension })}</Alert>}
-        {s.focus.warning && <Alert tone="warning">{t("student.attempt.warnings.focus", { count: s.focus.count })}</Alert>}
+        {s.focus.count > 0 && <Alert tone="warning">{t("student.attempt.warnings.focus", { count: s.focus.count, max: 3 })}</Alert>}
       </div>
 
       <div className="mx-auto mt-4 grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
@@ -292,6 +293,32 @@ export function ExamInterface({ attemptId }: { attemptId: string }) {
         {s.unsavedCount > 0 && <Alert tone="warning" className="mt-3">{t("student.attempt.summaryUnsaved", { count: s.unsavedCount })}</Alert>}
         {submitError ? <Alert tone="danger" className="mt-3" title={errorText(t, submitError)} /> : null}
       </Modal>
+    </div>
+  );
+}
+
+/**
+ * Shown once the server terminated the attempt (third counted tab switch): a popup over the whole
+ * page that cannot be dismissed. The exam itself is gone; the only way out is the dashboard.
+ */
+function Terminated({ a }: { a: Attempt }) {
+  const { t, locale } = useI18n();
+  const back = useRef<HTMLAnchorElement>(null);
+  useEffect(() => back.current?.focus(), []);
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-[rgb(11_26_48/0.7)] p-4 backdrop-blur-sm">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="terminated-title" aria-describedby="terminated-body" className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 text-center shadow-overlay animate-pop-in sm:p-8">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-danger-soft text-danger"><ShieldX className="h-8 w-8" aria-hidden /></span>
+        <h1 id="terminated-title" className="mt-4 text-2xl font-bold text-foreground">{t("student.completion.terminatedTitle")}</h1>
+        <p className="mt-1 text-sm text-muted">{a.exam.course.code} · {a.exam.title}</p>
+        <Alert tone="danger" className="mt-5 text-left"><span id="terminated-body">{t("student.completion.terminatedBody")}</span></Alert>
+        <dl className="mt-5 grid gap-3 text-left text-sm sm:grid-cols-3">
+          <div className="rounded-xl border border-border p-3"><dt className="text-xs text-muted">{t("student.completion.terminatedAt")}</dt><dd className="mt-1 font-semibold text-foreground">{formatDateTime(a.submittedAt, locale)}</dd></div>
+          <div className="rounded-xl border border-border p-3"><dt className="text-xs text-muted">{t("student.completion.answered")}</dt><dd className="mt-1 font-semibold text-foreground tabular-nums">{a.answeredCount} / {a.totalQuestions}</dd></div>
+          <div className="rounded-xl border border-border p-3"><dt className="text-xs text-muted">{t("student.completion.focus")}</dt><dd className="mt-1 font-semibold text-foreground tabular-nums">{a.countedFocusLosses}</dd></div>
+        </dl>
+        <Link ref={back} href="/dashboard" className={cn(buttonClasses("primary"), "mt-6")}>{t("student.completion.backDashboard")}</Link>
+      </div>
     </div>
   );
 }

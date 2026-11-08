@@ -98,6 +98,7 @@ Trigger errors use SQLSTATE `P0001`, and the error message is a stable code (for
 | exam_attempts | `exam_attempts_base_deadline_chk` | Base deadline is after the start | 4.7 |
 | exam_attempts | `exam_attempts_submitted_chk` | SUBMITTED exactly when `submitted_at` and `submission_type` are set | 4.7, P6 |
 | exam_attempts | `exam_attempts_focus_losses_chk` | Counted focus losses ≥ 0 | 4.8 |
+| exam_attempts | `exam_attempts_submitted_chk` | A closed attempt (`SUBMITTED`, or `TERMINATED` at the 3rd counted tab switch) has `submitted_at` and `submission_type`; an `IN_PROGRESS` one has neither | 4.7, 4.8 |
 | attempt_questions | `*_option_order_chk`, `*_position_chk`, `*_marks_chk` | Option order not null, position ≥ 1, marks > 0 | 4.7 |
 | answers | `answers_single_response_chk` | An answer is either a chosen option or text, never both | 4.6 |
 | answers | `answers_marks_chk` | Awarded marks ≥ 0 | 4.10 |

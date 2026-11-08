@@ -91,11 +91,15 @@ enum ScheduleStatus {
 enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
+  /// Closed automatically at the third counted tab switch (saved answers kept).
+  TERMINATED
 }
 
 enum SubmissionType {
   MANUAL
   AUTO_DEADLINE
+  /// The attempt was terminated after the maximum number of counted tab switches.
+  TERMINATED_TAB_LIMIT
 }
 
 /// Set at submission time. NULL while the attempt is still in progress.

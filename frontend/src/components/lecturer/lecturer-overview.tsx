@@ -16,7 +16,6 @@ import { HorizontalBarChartView, BarChartView } from "@/components/charts/charts
 import { ChartCard } from "@/components/charts/chart-card";
 import { QueryError } from "@/components/admin/query-state";
 import { PageHeader } from "@/components/layout/app-shell";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/spinner";
@@ -87,9 +86,7 @@ export function LecturerOverview() {
   return (
     <>
       <PageHeader
-        eyebrow={<span className="flex items-center gap-2"><Badge tone="sky">{t("roles.LECTURER")}</Badge><Badge tone="success" dot>{t("admin.liveData")}</Badge></span>}
         title={t("dashboard.greeting", { name: firstName })}
-        description={t("lecturer.overview.subtitle")}
         actions={<Button variant="outline" leftIcon={<RefreshCw className="h-4 w-4" />} onClick={refresh}>{t("admin.refresh")}</Button>}
       />
       {failed && <Card className="mb-6"><QueryError state={failed} className="py-8" /></Card>}

@@ -6,7 +6,7 @@ import type { Prisma } from "../generated/prisma/client.ts";
 /** Submitted attempts of an exam with their working grade and per-question marks. */
 export function findSubmittedAttemptsWithMarks(examId: string, db: Db = prisma) {
   return db.examAttempt.findMany({
-    where: { examId, status: "SUBMITTED" },
+    where: { examId, status: { in: ["SUBMITTED", "TERMINATED"] } },
     include: {
       grade: true,
       questions: { include: { answer: { select: { marksAwarded: true, gradingStatus: true } }, questionVersion: { select: { type: true } } } },
@@ -30,7 +30,7 @@ export function findCoursesForDashboard(where: Prisma.CourseWhereInput, db: Db =
 export function findCourseStatistics(courseIds: string[], db: Db = prisma) {
   return Promise.all([
     db.grade.findMany({
-      where: { attempt: { status: "SUBMITTED", exam: { courseId: { in: courseIds } } } },
+      where: { attempt: { status: { in: ["SUBMITTED", "TERMINATED"] }, exam: { courseId: { in: courseIds } } } },
       select: { percentage: true, totalScore: true, maxScore: true, attempt: { select: { exam: { select: { courseId: true } } } } },
     }),
     db.exam.groupBy({ by: ["status", "resultsStatus"], where: { courseId: { in: courseIds } }, _count: { _all: true } }),

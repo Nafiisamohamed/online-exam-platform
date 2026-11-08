@@ -223,9 +223,14 @@ export interface ExamResults {
   students: {
     student: { id: string; studentNumber: string | null; fullName: string };
     enrolment: "ACTIVE" | "DROPPED" | null;
-    status: "ABSENT" | "IN_PROGRESS" | "SUBMITTED";
+    status: "ABSENT" | "IN_PROGRESS" | "SUBMITTED" | "TERMINATED";
+    /** Terminated attempts: when and why; how many questions had a saved answer. */
+    terminatedAt?: string | null;
+    terminationReason?: "TAB_SWITCH_LIMIT" | null;
+    answeredCount?: number;
+    questionCount?: number;
     attemptId?: string;
-    submissionType?: "MANUAL" | "AUTO_DEADLINE" | null;
+    submissionType?: "MANUAL" | "AUTO_DEADLINE" | "TERMINATED_TAB_LIMIT" | null;
     submittedAt?: string | null;
     countedFocusLosses?: number;
     extensionMinutes?: number;
@@ -242,4 +247,17 @@ export interface AppNotification {
   body: string;
   readAt: string | null;
   createdAt: string;
+}
+
+/** GET /api/exams/:id/attempts/:attemptId/answers */
+export interface AttemptReview {
+  attempt: {
+    id: string; status: "SUBMITTED" | "TERMINATED"; submissionType: string | null; submittedAt: string | null; startedAt: string;
+    countedFocusLosses: number; terminatedAt: string | null; terminationReason: "TAB_SWITCH_LIMIT" | null;
+    student: { id: string; studentNumber: string | null; fullName: string };
+  };
+  questions: {
+    position: number; type: QuestionType; text: string; maxMarks: number; answerId: string | null; answered: boolean;
+    selectedOption: string | null; textAnswer: string | null; savedAt: string | null; gradingStatus: GradingStatus | null; marksAwarded: number | null;
+  }[];
 }

@@ -83,7 +83,7 @@ export async function liveView(user: AuthUser, scheduleId: string) {
     if (!a) return { student: st, status: "NOT_STARTED" as const, attemptId: null, notes: notesBy.get(st.id) ?? 0 };
     const secondsSinceContact = Math.max(0, Math.floor((t.getTime() - a.lastSeenAt.getTime()) / 1000));
     const inProgress = a.status === "IN_PROGRESS";
-    const status = !inProgress ? ("SUBMITTED" as const) : secondsSinceContact >= DISCONNECTED_AFTER_SECONDS ? ("DISCONNECTED" as const) : ("IN_PROGRESS" as const);
+    const status = a.status === "TERMINATED" ? ("TERMINATED" as const) : !inProgress ? ("SUBMITTED" as const) : secondsSinceContact >= DISCONNECTED_AFTER_SECONDS ? ("DISCONNECTED" as const) : ("IN_PROGRESS" as const);
     const awaySince = awayBy.get(a.id);
     return {
       student: st,
@@ -113,7 +113,7 @@ export async function liveView(user: AuthUser, scheduleId: string) {
     serverTime: t.toISOString(),
     refreshSeconds: 5,
     disconnectedAfterSeconds: DISCONNECTED_AFTER_SECONDS,
-    summary: { total: students.length, notStarted: count("NOT_STARTED"), inProgress: count("IN_PROGRESS"), disconnected: count("DISCONNECTED"), submitted: count("SUBMITTED") },
+    summary: { total: students.length, notStarted: count("NOT_STARTED"), inProgress: count("IN_PROGRESS"), disconnected: count("DISCONNECTED"), submitted: count("SUBMITTED"), terminated: count("TERMINATED") },
     students,
   };
 }

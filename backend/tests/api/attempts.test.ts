@@ -186,7 +186,7 @@ describe("attempt security", () => {
 });
 
 describe("tab-switch detection (4.8)", () => {
-  it("logs every focus loss, counts only those of 1 second or more, and warns after 3", async () => {
+  it("logs every focus loss and counts only those of 1 second or more (the third counted one terminates: termination.test.ts)", async () => {
     const { examId, studentAgents } = await openExam({ students: 1 });
     const agent = studentAgents[0];
     const attempt = (await agent.post(`/api/exams/${examId}/attempts`)).body.attempt;
@@ -200,16 +200,14 @@ describe("tab-switch detection (4.8)", () => {
       await agent.post(`/api/attempts/${attempt.id}/focus-events`).send({ clientEventId: id, type: "RETURNED" });
       return res.body;
     };
-    expect(await lose(300)).toEqual({ countedFocusLosses: 0, focusWarning: false });
+    expect(await lose(300)).toMatchObject({ countedFocusLosses: 0, focusWarning: false, terminated: false });
     expect((await lose(4000)).countedFocusLosses).toBe(1);
-    expect((await lose(2500)).countedFocusLosses).toBe(2);
-    expect(await lose(1200)).toEqual({ countedFocusLosses: 3, focusWarning: true });
+    expect(await lose(2500)).toMatchObject({ countedFocusLosses: 2, focusWarning: false, terminated: false });
     const events = await prisma.focusEvent.findMany({ where: { attemptId: attempt.id }, orderBy: { lostAt: "asc" } });
-    expect(events).toHaveLength(4);
-    expect(events.filter((e) => e.isCounted)).toHaveLength(3);
+    expect(events).toHaveLength(3);
+    expect(events.filter((e) => e.isCounted)).toHaveLength(2);
     expect(events.every((e) => e.durationMs !== null && e.returnedAt)).toBe(true);
-    const view = await agent.get(`/api/attempts/${attempt.id}`);
-    expect(view.body.attempt.focusWarning).toBe(true);
+    expect((await agent.get(`/api/attempts/${attempt.id}`)).body.attempt.status).toBe("IN_PROGRESS");
   });
 });
 

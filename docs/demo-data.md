@@ -2,7 +2,7 @@
 
 `npm run db:seed:demo` (from `backend/`) loads fictional demo data for demonstrations and manual testing. It is loaded in the hosted Supabase project.
 
-- **Fictional:** Somali names, real cities (Muqdisho, Hargeysa), USD amounts and a fictional university, "Jaamacadda Demo".
+- **Fictional:** Somali names, real cities (Muqdisho, Hargeysa), USD amounts and a fictional institution, shown in the platform as "Online Examination System".
 - **Connects as `exam_app`**, so the data is created with exactly the application's permissions.
 - **Safe:** it never changes or deletes existing data, refuses to run twice, and runs in one transaction. If any step fails, nothing is saved.
 - **Script:** [backend/scripts/seed-demo-data.mjs](../backend/scripts/seed-demo-data.mjs).

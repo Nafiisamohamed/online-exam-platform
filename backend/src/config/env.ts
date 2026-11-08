@@ -53,9 +53,9 @@ const schema = z
     SMS_MODE: z.literal("simulated", { message: 'SMS_MODE must be "simulated"' }).default("simulated"),
     /** The one PIN accepted by the simulated mobile-money screen. Not a real PIN. */
     DEMO_PAYMENT_PIN: z.string().regex(/^\d{4,6}$/, "DEMO_PAYMENT_PIN must be 4-6 digits"),
-    PAYMENT_MERCHANT_NAME: z.string().min(1).default("Jaamacadda Demo"),
+    PAYMENT_MERCHANT_NAME: z.string().min(1).default("Online Examination System"),
     PAYMENT_MERCHANT_NUMBER: z.string().min(1).default("000000"),
-    SMS_SENDER_ID: z.string().min(1).max(20).default("JAAMACADDA-DEMO"),
+    SMS_SENDER_ID: z.string().min(1).max(20).default("ONLINE-EXAM-SYSTEM"),
 
     /** P9: exam fee currencies. */
     DEFAULT_CURRENCY: z.string().regex(/^[A-Z]{3}$/).default("USD"),

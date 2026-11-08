@@ -103,7 +103,6 @@ export const lecturerEn = {
   },
 
   overview: {
-    subtitle: "Your courses, examinations and grading, live from the server.",
     stats: {
       courses: "My courses",
       students: "Enrolled students",
@@ -136,7 +135,7 @@ export const lecturerEn = {
     title: "My courses",
     subtitle: "The courses you teach, with their students and examinations.",
     studentsTitle: "Enrolled students",
-    studentsHint: "Read-only. The registrar enrols and drops students.",
+    studentsHint: "The registrar manages enrolment for this course.",
     examsTitle: "Examinations",
     participation: "Participation",
   },
@@ -415,6 +414,19 @@ export const lecturerEn = {
     publishedBy: "{name}, {date}",
     students: "Students",
     absent: "Absent",
+    terminated: "Terminated",
+    terminatedShort: "Terminated (tab switches)",
+    terminatedSection: "Terminated attempts ({count})",
+    terminatedHint: "Closed automatically at the 3rd counted tab switch. The saved answers were kept: review them here and grade them like any other answers.",
+    terminatedTitleOne: "Terminated: maximum tab-switch limit reached",
+    terminatedDetail: "{count} counted tab switches. Terminated at {time}.",
+    terminatedLine: "{switches} tab switches · terminated {time} · {answered} of {total} questions answered",
+    reasonLabel: "Reason",
+    terminationReasons: { TAB_SWITCH_LIMIT: "Maximum tab-switch limit reached" },
+    answers: "Answers",
+    review: "Review answers",
+    noAnswer: "No answer saved",
+    openGrading: "Open grading",
     inProgress: "In progress",
     submitted: "Submitted",
     working: "Current grade",
@@ -428,7 +440,7 @@ export const lecturerEn = {
 
   analytics: {
     title: "Analytics",
-    subtitle: "Your courses only, live from the server. A dash (—) means no data yet; it is never shown as zero.",
-    exportNote: "Grades can be downloaded as CSV for each examination. The backend has no date filter or PDF export for these reports, so none is offered.",
+    subtitle: "A dash (—) means there is no data yet.",
+    exportNote: "You can download the grades of each examination as a CSV file.",
   },
 } as const;

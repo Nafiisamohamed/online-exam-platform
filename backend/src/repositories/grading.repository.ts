@@ -52,7 +52,7 @@ export function findVersionWithKey(versionId: string, db: Db = prisma) {
 export function findAnswersForQueue(examId: string, essaysOnly: boolean, db: Db = prisma) {
   return db.answer.findMany({
     where: {
-      attempt: { examId, status: "SUBMITTED" },
+      attempt: { examId, status: { in: ["SUBMITTED", "TERMINATED"] } },
       ...(essaysOnly ? { attemptQuestion: { questionVersion: { type: "ESSAY" } }, NOT: { gradingStatus: "NOT_ANSWERED" } } : {}),
     },
     include: {

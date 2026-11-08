@@ -22,8 +22,8 @@
   --sky-100: #d7eefa;
   --sky-50: #eaf6fc;
 
-  --background: #ffffff;
-  --background-cream: #f7f4ec;
+  --background: #fbfdfb; /* page background (white-gray) */
+  --background-cream: #fbfdfb; /* top of the page gradient: same shade, so pages are one even colour */
   --surface: #ffffff;
   --surface-muted: #fafbfd;
   --surface-sunken: #f2f5f9;

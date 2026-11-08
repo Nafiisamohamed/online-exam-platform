@@ -12,7 +12,7 @@ export const en = {
   app: {
     name: "Online Exam Platform",
     shortName: "ExamHub",
-    university: "Jaamacadda Demo",
+    university: "Online Examination System",
     tagline: "Fair, secure examinations on the campus network",
   },
   roles: {
