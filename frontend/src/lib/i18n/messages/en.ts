@@ -37,6 +37,7 @@ export const en = {
     exams: "Exams",
     grading: "Grading",
     results: "Results",
+    allResults: "All results",
     analytics: "Analytics",
     payments: "Payments",
     myExams: "My exams",

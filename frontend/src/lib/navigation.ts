@@ -49,6 +49,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
         { label: "nav.examOversight", href: "/admin/exams", icon: NotebookPen },
         { label: "nav.scheduleRequests", href: "/admin/schedules", icon: CalendarCheck2 },
         { label: "nav.rooms", href: "/admin/rooms", icon: DoorOpen },
+        { label: "nav.allResults", href: "/admin/results", icon: Award },
         { label: "nav.reports", href: "/admin/reports", icon: BarChart3 },
       ],
     },

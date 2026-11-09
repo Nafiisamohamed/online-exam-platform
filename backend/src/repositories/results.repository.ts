@@ -104,3 +104,60 @@ export function findAttemptReview(attemptId: string, db: Db = prisma) {
     },
   });
 }
+
+/** Filters for the registrar's read-only results search (one row per submitted or terminated attempt). */
+export interface ResultSearchFilter {
+  search?: string;
+  facultyId?: string;
+  academicYearId?: string;
+  semesterNumber?: number;
+  courseId?: string;
+  examType?: "QUIZ" | "MIDTERM" | "FINAL";
+  examId?: string;
+  publication?: "UNPUBLISHED" | "PUBLISHED" | "REOPENED";
+}
+
+function resultSearchWhere(f: ResultSearchFilter): Prisma.ExamAttemptWhereInput {
+  return {
+    status: { in: ["SUBMITTED", "TERMINATED"] },
+    ...(f.search ? { student: { OR: [{ fullName: { contains: f.search, mode: "insensitive" } }, { username: { contains: f.search, mode: "insensitive" } }] } } : {}),
+    exam: {
+      ...(f.examId ? { id: f.examId } : {}),
+      ...(f.examType ? { examType: f.examType } : {}),
+      ...(f.publication ? { resultsStatus: f.publication } : {}),
+      course: {
+        ...(f.courseId ? { id: f.courseId } : {}),
+        ...(f.facultyId ? { facultyId: f.facultyId } : {}),
+        ...(f.academicYearId ? { academicYearId: f.academicYearId } : {}),
+        ...(f.semesterNumber ? { semesterNumber: f.semesterNumber } : {}),
+      },
+    },
+  };
+}
+
+/** One page of results for the registrar, newest submissions first, with the total count. */
+export function searchResults(f: ResultSearchFilter, skip: number, take: number, db: Db = prisma) {
+  const where = resultSearchWhere(f);
+  return Promise.all([
+    db.examAttempt.findMany({
+      where,
+      orderBy: [{ submittedAt: "desc" }, { id: "asc" }],
+      skip,
+      take,
+      select: {
+        id: true, status: true, submittedAt: true,
+        student: { select: { id: true, fullName: true, username: true } },
+        exam: {
+          select: {
+            id: true, title: true, examType: true, resultsStatus: true,
+            course: { select: { id: true, code: true, name: true, semesterNumber: true, faculty: { select: { id: true, code: true } }, academicYear: { select: { id: true, name: true } } } },
+            publications: { orderBy: { publicationNumber: "desc" }, take: 1, select: { publicationNumber: true, publishedAt: true } },
+          },
+        },
+        grade: { select: { totalScore: true, maxScore: true, percentage: true, letterGrade: true } },
+        _count: { select: { gradeRevisions: true } },
+      },
+    }),
+    db.examAttempt.count({ where }),
+  ]);
+}

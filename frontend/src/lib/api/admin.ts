@@ -28,6 +28,7 @@ export const paths = {
   academicYears: "/academic-years",
   rooms: "/rooms",
   semesterFees: (academicYearId: string) => `/semester-fees${query({ academicYearId })}`,
+  resultsSearch: (q: { search?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number; courseId?: string; examType?: string; examId?: string; publication?: string; page?: number; pageSize?: number }) => `/results-search${query(q)}`,
   feeStatus: (q: { academicYearId: string; facultyId?: string; semesterNumber?: number; status?: string; search?: string; page?: number; pageSize?: number }) => `/fee-status${query(q)}`,
   facultyLecturers: (facultyId: string) => `/faculties/${facultyId}/lecturers`,
   registrations: (q: { academicYearId?: string; facultyId?: string; semesterNumber?: number; search?: string; page?: number; pageSize?: number } = {}) => `/registrations${query(q)}`,

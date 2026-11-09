@@ -13,6 +13,8 @@
  * POST /api/exams/:id/results/publish         course lecturer { reason? } (reason required from the 2nd publication)
  * POST /api/exams/:id/results/reopen          course lecturer { reason }
  * GET  /api/exams/:id/grades.csv?lang=so|en   ADMIN, course lecturer
+ * GET  /api/results-search                   ADMIN, read only: ?search, facultyId, academicYearId, semesterNumber,
+ *                                             courseId, examType, examId, publication, page, pageSize
  * GET  /api/my/results                        STUDENT: published results
  * GET  /api/my/results/:examId                STUDENT: one result with answers (correct answers if review allowed)
  * GET  /api/my/results/:examId/slip.pdf       STUDENT: result slip PDF (?lang=so|en, default: user's language)
@@ -20,7 +22,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { authenticate, currentUser, requireRole } from "../../middleware/auth.ts";
-import { idParams, trimmed, validate, zid } from "../../middleware/validate.ts";
+import { idParams, pageQuery, trimmed, validate, zid } from "../../middleware/validate.ts";
 import * as results from "../results/results.service.ts";
 import * as grading from "./grading.service.ts";
 
@@ -102,3 +104,23 @@ gradingRouter.get("/my/results/:examId/slip.pdf", authenticate(), requireRole("S
   const { pdf, filename } = await results.resultSlipPdf(user, req.valid.params.examId, req.valid.query.lang ?? user.preferredLanguage);
   res.type("application/pdf").attachment(filename).send(pdf);
 });
+
+gradingRouter.get(
+  "/results-search",
+  authenticate(), requireRole("ADMIN"),
+  validate({
+    query: pageQuery.extend({
+      search: z.string().trim().min(1).max(100).optional(),
+      facultyId: zid.optional(),
+      academicYearId: zid.optional(),
+      semesterNumber: z.coerce.number().int().min(1).max(8).optional(),
+      courseId: zid.optional(),
+      examType: z.enum(["QUIZ", "MIDTERM", "FINAL"]).optional(),
+      examId: zid.optional(),
+      publication: z.enum(["UNPUBLISHED", "PUBLISHED", "REOPENED"]).optional(),
+    }),
+  }),
+  async (req, res) => {
+    res.json(await results.searchResults(req.valid.query));
+  },
+);
