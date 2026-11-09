@@ -38,6 +38,7 @@ const ruleBody = z.object({
 });
 const settings = {
   instructions: z.string().trim().max(5000).optional(),
+  examType: z.enum(["QUIZ", "MIDTERM", "FINAL"]).optional(),
   shuffleQuestions: z.boolean().optional(),
   shuffleOptions: z.boolean().optional(),
   allowAnswerReview: z.boolean().optional(),
@@ -61,7 +62,7 @@ examsRouter.get(
 examsRouter.post(
   "/",
   requireRole("LECTURER"),
-  validate({ body: z.object({ courseId: zid, title: trimmed(200), ...settings, rules: z.array(ruleBody).max(30).optional() }) }),
+  validate({ body: z.object({ courseId: zid, title: trimmed(200), ...settings, examType: z.enum(["QUIZ", "MIDTERM", "FINAL"]), rules: z.array(ruleBody).max(30).optional() }) }),
   async (req, res) => {
     const { courseId, ...rest } = req.valid.body;
     res.status(201).json({ exam: await exams.createExam(currentUser(req), courseId, rest, req) });
@@ -86,6 +87,16 @@ examsRouter.put("/:id/rules", requireRole("LECTURER"), validate({ params: idPara
   res.json({ exam: await exams.setRules(currentUser(req), req.valid.params.id, req.valid.body.rules, req) });
 });
 
+/** The lecturer's tick list: per rule, the reviewed questions that match and whether each is included. */
+examsRouter.get("/:id/question-pool", requireRole("LECTURER"), validate({ params: idParams }), async (req, res) => {
+  res.json(await exams.questionPool(currentUser(req), req.valid.params.id));
+});
+
+/** Body: { questionIds } = the questions unticked for this draft exam. */
+examsRouter.put("/:id/excluded-questions", requireRole("LECTURER"), validate({ params: idParams, body: z.object({ questionIds: z.array(zid).max(2000) }) }), async (req, res) => {
+  res.json({ exam: await exams.setExcludedQuestions(currentUser(req), req.valid.params.id, req.valid.body.questionIds, req) });
+});
+
 examsRouter.get("/:id/preview", requireRole("LECTURER"), validate({ params: idParams }), async (req, res) => {
   res.json(await exams.previewExam(currentUser(req), req.valid.params.id));
 });
@@ -97,7 +108,7 @@ examsRouter.post("/:id/publish", requireRole("LECTURER"), validate({ params: idP
 const scheduleBody = z.object({
   windowStart: z.coerce.date(),
   windowEnd: z.coerce.date(),
-  durationMinutes: z.number().int().min(5).max(600),
+  // durationMinutes is not sent: the server uses the window length (end - start).
   roomIds: z.array(zid).max(20).default([]),
   invigilatorIds: z.array(zid).max(20).default([]),
 });
@@ -120,8 +131,9 @@ schedulesRouter.get("/:id", validate({ params: idParams }), async (req, res) => 
   res.json({ schedule: await schedules.getSchedule(currentUser(req), req.valid.params.id) });
 });
 
-schedulesRouter.post("/:id/approve", requireRole("ADMIN"), validate({ params: idParams }), async (req, res) => {
-  res.json({ schedule: await schedules.approveSchedule(currentUser(req), req.valid.params.id, req) });
+/** Body (optional): { confirmUnknownCapacity: true } when a chosen room's capacity is unknown. */
+schedulesRouter.post("/:id/approve", requireRole("ADMIN"), validate({ params: idParams, body: z.object({ confirmUnknownCapacity: z.boolean().optional() }).default({}) }), async (req, res) => {
+  res.json({ schedule: await schedules.approveSchedule(currentUser(req), req.valid.params.id, req, req.valid.body) });
 });
 
 schedulesRouter.post("/:id/reject", requireRole("ADMIN"), validate({ params: idParams, body: z.object({ reason: trimmed(500) }) }), async (req, res) => {

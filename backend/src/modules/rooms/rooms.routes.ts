@@ -24,12 +24,15 @@ const ranges = z
 
 roomsRouter.use(authenticate());
 
-roomsRouter.get("/", requireRole("ADMIN", "LECTURER"), async (_req, res) => {
-  res.json({ items: await rooms.listRooms() });
+const capacity = z.number().int().min(1).max(5000).nullable();
+
+/** Query: active=true|false. Lecturers choose from active rooms. */
+roomsRouter.get("/", requireRole("ADMIN", "LECTURER"), validate({ query: z.object({ active: z.enum(["true", "false"]).transform((v) => v === "true").optional() }) }), async (req, res) => {
+  res.json({ items: await rooms.listRooms(req.valid.query) });
 });
 
 /** Response 201: { room }. Errors: 400 VALIDATION_ERROR (bad range), 409 ROOM_NAME_TAKEN. */
-roomsRouter.post("/", requireRole("ADMIN"), validate({ body: z.object({ name: trimmed(100), building: trimmed(200), networkRanges: ranges.default([]) }) }), async (req, res) => {
+roomsRouter.post("/", requireRole("ADMIN"), validate({ body: z.object({ name: trimmed(100), building: trimmed(200), capacity: capacity.optional(), isActive: z.boolean().optional(), networkRanges: ranges.default([]) }) }), async (req, res) => {
   res.status(201).json({ room: await rooms.createRoom(req.valid.body, currentUser(req).id, req) });
 });
 
@@ -38,7 +41,7 @@ roomsRouter.patch(
   requireRole("ADMIN"),
   validate({
     params: idParams,
-    body: z.object({ name: trimmed(100).optional(), building: trimmed(200).optional(), networkRanges: ranges.optional() }).refine((v) => Object.keys(v).length > 0, "send at least one field"),
+    body: z.object({ name: trimmed(100).optional(), building: trimmed(200).optional(), capacity: capacity.optional(), isActive: z.boolean().optional(), networkRanges: ranges.optional() }).refine((v) => Object.keys(v).length > 0, "send at least one field"),
   }),
   async (req, res) => {
     res.json({ room: await rooms.updateRoom(req.valid.params.id, req.valid.body, currentUser(req).id, req) });

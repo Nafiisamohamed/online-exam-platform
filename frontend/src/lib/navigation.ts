@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3, BookOpenCheck, Building2, CalendarCheck2, CalendarClock, ClipboardCheck, CreditCard, FileQuestion,
   GraduationCap, LayoutDashboard, MonitorPlay, ScrollText,
-  UserRound, Users, Award, NotebookPen, History, CalendarRange, ClipboardList,
+  UserRound, Users, Award, NotebookPen, History, CalendarRange, ClipboardList, DoorOpen,
 } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n/i18n";
 import type { Role } from "@/types/account";
@@ -47,6 +47,7 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
       items: [
         { label: "nav.examOversight", href: "/admin/exams", icon: NotebookPen },
         { label: "nav.scheduleRequests", href: "/admin/schedules", icon: CalendarCheck2 },
+        { label: "nav.rooms", href: "/admin/rooms", icon: DoorOpen },
         { label: "nav.reports", href: "/admin/reports", icon: BarChart3 },
       ],
     },

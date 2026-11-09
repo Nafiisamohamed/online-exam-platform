@@ -26,6 +26,7 @@ export const paths = {
   faculties: "/faculties",
   courses: (q: { semester?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number } = {}) => `/courses${query(q)}`,
   academicYears: "/academic-years",
+  rooms: "/rooms",
   facultyLecturers: (facultyId: string) => `/faculties/${facultyId}/lecturers`,
   registrations: (q: { academicYearId?: string; facultyId?: string; semesterNumber?: number; search?: string; page?: number; pageSize?: number } = {}) => `/registrations${query(q)}`,
   course: (id: string) => `/courses/${id}`,
@@ -173,8 +174,9 @@ export async function confirmImport(batchId: string) {
 // --- Schedule requests (registrar decisions) -----------------------------------------
 
 /** POST /api/schedules/:id/approve (ADMIN only on the server). Notifies the enrolled students. */
-export async function approveSchedule(id: string) {
-  const res = await api<{ schedule: Schedule }>(`/schedules/${id}/approve`, { method: "POST" });
+/** confirmUnknownCapacity: the registrar accepts that a chosen room's capacity is unknown. */
+export async function approveSchedule(id: string, opts: { confirmUnknownCapacity?: boolean } = {}) {
+  const res = await api<{ schedule: Schedule }>(`/schedules/${id}/approve`, { method: "POST", json: opts });
   invalidate("/schedules", "/exams", "/analytics/dashboard", "/audit-logs");
   return res.schedule;
 }
@@ -184,4 +186,10 @@ export async function rejectSchedule(id: string, reason: string) {
   const res = await api<{ schedule: Schedule }>(`/schedules/${id}/reject`, { method: "POST", json: { reason } });
   invalidate("/schedules", "/exams", "/analytics/dashboard", "/audit-logs");
   return res.schedule;
+}
+
+/** Creates (id null) or updates an examination room. */
+export async function saveRoom(id: string | null, input: { name: string; building: string; capacity: number | null; isActive: boolean }) {
+  await api(id ? `/rooms/${id}` : "/rooms", { method: id ? "PATCH" : "POST", json: input });
+  invalidate("/rooms", "/audit-logs");
 }

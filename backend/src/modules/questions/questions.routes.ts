@@ -66,6 +66,7 @@ questionsRouter.get(
       topicId: zid.optional(),
       search: z.string().trim().max(200).optional(),
       archived: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+      review: z.enum(["REVIEWED", "DRAFT"]).optional(),
     }),
   }),
   async (req, res) => {
@@ -111,6 +112,14 @@ questionsRouter.put("/questions/:id", validate({ params: idParams, body: questio
 
 questionsRouter.get("/questions/:id/versions/:versionId", validate({ params: z.object({ id: zid, versionId: zid }) }), async (req, res) => {
   res.json({ version: await questions.getVersion(currentUser(req), req.valid.params.id, req.valid.params.versionId) });
+});
+
+/** Marks the current version reviewed (POST) or back to draft (DELETE). Response: { question }. */
+questionsRouter.post("/questions/:id/review", validate({ params: idParams }), async (req, res) => {
+  res.json({ question: await questions.setReviewed(currentUser(req), req.valid.params.id, true, req) });
+});
+questionsRouter.delete("/questions/:id/review", validate({ params: idParams }), async (req, res) => {
+  res.json({ question: await questions.setReviewed(currentUser(req), req.valid.params.id, false, req) });
 });
 
 questionsRouter.post("/questions/:id/archive", validate({ params: idParams }), async (req, res) => {

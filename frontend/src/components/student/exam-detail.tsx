@@ -9,6 +9,7 @@
  * returns the existing attempt instead of creating a second one.
  */
 import { ArrowRight, CalendarClock, CheckCircle2, Clock, CreditCard, Info, PlayCircle } from "lucide-react";
+import { ExamTypeBadge } from "@/components/exam-type-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
@@ -78,7 +79,7 @@ function DetailBody({ exam }: { exam: MyExam }) {
       <PageHeader
         eyebrow={<Breadcrumbs items={[{ label: t("nav.dashboard"), href: "/dashboard" }, { label: t("nav.myExams"), href: "/student/exams" }, { label: exam.title }]} />}
         title={exam.title}
-        description={<span className="flex flex-wrap items-center gap-2"><Badge tone={stateTone[exam.state]} dot>{t(`student.common.examState.${exam.state}`)}</Badge><span className="text-sm text-muted">{exam.course.code} · {exam.course.name}</span></span>}
+        description={<span className="flex flex-wrap items-center gap-2"><ExamTypeBadge type={exam.examType} /><Badge tone={stateTone[exam.state]} dot>{t(`student.common.examState.${exam.state}`)}</Badge><span className="text-sm text-muted">{exam.course.code} · {exam.course.name}</span></span>}
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] [&>*]:min-w-0">
         <div className="space-y-6">

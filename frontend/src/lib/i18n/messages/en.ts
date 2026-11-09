@@ -21,6 +21,11 @@ export const en = {
     STUDENT: "Student",
     INVIGILATOR: "Invigilator",
   },
+  examTypes: {
+    QUIZ: "Quiz",
+    MIDTERM: "Midterm",
+    FINAL: "Final",
+  },
   nav: {
     sections: { main: "Main", academics: "Academics", examinations: "Examinations", system: "System" },
     dashboard: "Dashboard",
@@ -46,6 +51,7 @@ export const en = {
     activity: "Activity history",
     academicYears: "Academic years",
     registrations: "Student registration",
+    rooms: "Rooms",
     signIn: "Sign in",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",

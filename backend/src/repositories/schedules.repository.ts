@@ -7,7 +7,7 @@ const scheduleInclude = {
   exam: { select: { id: true, title: true, status: true, course: { select: { id: true, code: true, name: true, lecturerId: true } } } },
   requestedBy: { select: { id: true, fullName: true } },
   decidedBy: { select: { id: true, fullName: true } },
-  rooms: { include: { room: { select: { id: true, name: true, building: true } } } },
+  rooms: { include: { room: { select: { id: true, name: true, building: true, capacity: true, isActive: true } } } },
   invigilators: { include: { invigilator: { select: { id: true, fullName: true } } } },
 };
 
@@ -103,22 +103,36 @@ export async function findScheduleClashes(scheduleId: string, db: Db = prisma) {
 
 // --- Rooms --------------------------------------------------------------------------
 
-export function listRooms(db: Db = prisma) {
-  return db.room.findMany({ orderBy: { name: "asc" } });
+export function listRooms(q: { active?: boolean } = {}, db: Db = prisma) {
+  return db.room.findMany({ where: q.active === undefined ? {} : { isActive: q.active }, orderBy: { name: "asc" } });
 }
 
 export function findRoom(id: string, db: Db = prisma) {
   return db.room.findUnique({ where: { id } });
 }
 
+/** How many of these rooms exist and are active. */
+export function countActiveRooms(ids: string[], db: Db = prisma) {
+  return db.room.count({ where: { id: { in: ids }, isActive: true } });
+}
+
+/** The rooms of a schedule with capacity and active flag (for the capacity check at approval). */
+export async function findScheduleRooms(scheduleId: string, db: Db = prisma) {
+  return (await db.scheduleRoom.findMany({ where: { scheduleId }, select: { room: { select: { id: true, name: true, capacity: true, isActive: true } } } })).map((r) => r.room);
+}
+
+export function countActiveStudentsOfCourse(courseId: string, db: Db = prisma) {
+  return db.enrolment.count({ where: { courseId, status: "ACTIVE", student: { isActive: true } } });
+}
+
 export function countRooms(ids: string[], db: Db = prisma) {
   return db.room.count({ where: { id: { in: ids } } });
 }
 
-export function insertRoom(data: { name: string; building: string; networkRanges: string[] }, db: Db = prisma) {
+export function insertRoom(data: { name: string; building: string; networkRanges: string[]; capacity?: number | null; isActive?: boolean }, db: Db = prisma) {
   return db.room.create({ data });
 }
 
-export function updateRoom(id: string, data: { name?: string; building?: string; networkRanges?: string[] }, db: Db = prisma) {
+export function updateRoom(id: string, data: { name?: string; building?: string; networkRanges?: string[]; capacity?: number | null; isActive?: boolean }, db: Db = prisma) {
   return db.room.update({ where: { id }, data });
 }

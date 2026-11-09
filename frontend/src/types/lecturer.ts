@@ -30,10 +30,27 @@ export interface QuestionVersion {
 }
 
 /** GET /api/courses/:courseId/questions (paged) */
+/** Draft or reviewed (the current version was reviewed by the lecturer). */
+export interface QuestionReview {
+  status: "DRAFT" | "REVIEWED";
+  reviewedAt: string | null;
+  reviewedBy: { id: string; fullName: string } | null;
+}
+
 export interface QuestionListItem {
   id: string;
   isArchived: boolean;
+  review: QuestionReview;
   current: QuestionVersion | null;
+}
+
+/** GET /api/courses/:id/questions also returns the course's review progress. */
+export interface QuestionPage {
+  items: QuestionListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  review: { reviewed: number; total: number; target: number };
 }
 
 /** GET /api/questions/:id */
@@ -141,7 +158,6 @@ export interface ExamPreview {
 export interface ScheduleRequestInput {
   windowStart: string;
   windowEnd: string;
-  durationMinutes: number;
   roomIds: string[];
   invigilatorIds: string[];
 }
@@ -151,7 +167,18 @@ export interface Room {
   id: string;
   name: string;
   building: string;
+  /** Seats; null when unknown. */
+  capacity: number | null;
+  isActive: boolean;
   networkRanges: string[];
+}
+
+/** GET /api/exams/:id/question-pool */
+export interface QuestionPool {
+  status: "DRAFT" | "PUBLISHED";
+  reviewedOnly: boolean;
+  rules: { id: string; position: number; questionType: QuestionType; difficulty: "EASY" | "MEDIUM" | "HARD"; marksPerQuestion: number; questionCount: number;
+    questions: { questionId: string; text: string; topic: string; included: boolean }[] }[];
 }
 
 // --- Grading (modules/grading) -------------------------------------------------------------

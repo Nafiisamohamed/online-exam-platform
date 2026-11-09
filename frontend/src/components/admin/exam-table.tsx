@@ -6,6 +6,7 @@
  * (GET /api/courses, passed in as `courses`), matched by course id.
  */
 import Link from "next/link";
+import { ExamTypeBadge } from "@/components/exam-type-badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { currentSchedule, examState } from "@/lib/admin/exam-state";
 import { formatDate, formatTimeRange } from "@/lib/format";
@@ -22,7 +23,7 @@ export function ExamTable({ exams, courses, now, loading, hideCourse, hideLectur
       primary: true,
       cell: (e) => (
         <Link href={`${basePath}/${e.id}`} className="group block min-w-0">
-          <span className="block font-semibold text-foreground group-hover:text-accent-strong">{e.title}</span>
+          <span className="flex flex-wrap items-center gap-2 font-semibold text-foreground group-hover:text-accent-strong">{e.title}<ExamTypeBadge type={e.examType} /></span>
           {!hideCourse && <span className="block truncate text-xs text-muted">{e.course.code} · {e.course.name}</span>}
         </Link>
       ),

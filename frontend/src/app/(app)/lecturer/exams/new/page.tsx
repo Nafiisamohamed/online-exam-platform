@@ -18,7 +18,8 @@ import { Alert } from "@/components/ui/alert";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Field, Input } from "@/components/ui/form";
+import { Field, Input, Select } from "@/components/ui/form";
+import { EXAM_TYPES, type ExamType } from "@/types/admin";
 import { useToast } from "@/components/ui/toast";
 import { DetailList } from "@/components/admin/admin-ui";
 import { createExam, lecturerPaths } from "@/lib/api/lecturer";
@@ -34,6 +35,7 @@ function NewExamForm({ courses }: { courses: Course[] }) {
   const router = useRouter();
   const [courseId, setCourseId] = useChosenCourse(courses);
   const [title, setTitle] = useState("");
+  const [examType, setExamType] = useState<ExamType | "">("");
   const [settings, setSettings] = useState<SettingsDraft>(defaultSettings);
   const [rules, setRules] = useState<RuleDraft[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -46,13 +48,13 @@ function NewExamForm({ courses }: { courses: Course[] }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const incomplete = !title.trim() || !courseId || !rulesComplete(rules);
+    const incomplete = !title.trim() || !examType || !courseId || !rulesComplete(rules);
     setMissing(incomplete);
     if (incomplete) return;
     setBusy(true);
     setError(null);
     try {
-      const exam = await createExam(courseId, { title: title.trim(), ...settingsInput(settings), ...(rules.length ? { rules: toRuleInputs(rules) } : {}) });
+      const exam = await createExam(courseId, { title: title.trim(), examType: examType as ExamType, ...settingsInput(settings), ...(rules.length ? { rules: toRuleInputs(rules) } : {}) });
       toast(t("lecturer.exams.createdToast"));
       router.push(`/lecturer/exams/${exam.id}`);
     } catch (err) {
@@ -70,6 +72,14 @@ function NewExamForm({ courses }: { courses: Course[] }) {
             <CourseSelect courses={courses} value={courseId} onChange={(id) => { setCourseId(id); setRules([]); }} />
             <Field label={t("lecturer.exams.examTitle")} error={missing && !title.trim() ? t("validation.required") : undefined} required>
               {({ id, describedBy, invalid }) => <Input id={id} aria-describedby={describedBy} aria-invalid={invalid} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />}
+            </Field>
+            <Field label={t("lecturer.exams.examType")} hint={t("lecturer.exams.examTypeHint")} error={missing && !examType ? t("validation.required") : undefined} required>
+              {({ id, describedBy, invalid }) => (
+                <Select id={id} aria-describedby={describedBy} aria-invalid={invalid} value={examType} onChange={(e) => setExamType(e.target.value as ExamType)}>
+                  <option value="">{t("lecturer.exams.chooseExamType")}</option>
+                  {EXAM_TYPES.map((x) => <option key={x} value={x}>{t(`examTypes.${x}`)}</option>)}
+                </Select>
+              )}
             </Field>
           </CardContent>
         </Card>
@@ -92,6 +102,7 @@ function NewExamForm({ courses }: { courses: Course[] }) {
             items={[
               { label: t("lecturer.common.course"), value: course ? `${course.code} · ${course.name}` : "—" },
               { label: t("lecturer.exams.examTitle"), value: title.trim() || "—" },
+              { label: t("lecturer.exams.examType"), value: examType ? t(`examTypes.${examType}`) : "—" },
               { label: t("lecturer.exams.rules"), value: rules.length },
               { label: t("admin.exams.totalQuestions"), value: totals.questions },
               { label: t("admin.exams.totalMarks"), value: formatNumber(totals.marks, locale, 2) },

@@ -24,13 +24,12 @@ import { Field, SearchInput, Select } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/overlays";
 import { Pagination } from "@/components/ui/pagination";
 import { useDebounced } from "@/hooks/use-debounced";
-import { lecturerPaths } from "@/lib/api/lecturer";
+import { lecturerPaths, setQuestionReviewed } from "@/lib/api/lecturer";
 import { useApi } from "@/lib/api/use-api";
 import { formatNumber } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n";
-import type { Paged } from "@/types/admin";
 import type { Course } from "@/types/admin";
-import { DIFFICULTIES, QUESTION_TYPES, type BankSummaryRow, type Difficulty, type QuestionListItem, type QuestionType, type Topic } from "@/types/lecturer";
+import { DIFFICULTIES, QUESTION_TYPES, type BankSummaryRow, type Difficulty, type QuestionListItem, type QuestionPage, type QuestionType, type Topic } from "@/types/lecturer";
 
 const PAGE_SIZE = 20;
 
@@ -40,14 +39,16 @@ function Bank({ courseId }: { courseId: string }) {
   const [difficulty, setDifficulty] = useState<Difficulty | "">("");
   const [topicId, setTopicId] = useState("");
   const [archived, setArchived] = useState(false);
+  const [review, setReview] = useState<"" | "REVIEWED" | "DRAFT">("");
+  const [reviewing, setReviewing] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [adding, setAdding] = useState(false);
   const term = useDebounced(search.trim());
   const topics = useApi<{ items: Topic[] }>(lecturerPaths.topics(courseId));
   const summary = useApi<{ items: BankSummaryRow[] }>(lecturerPaths.bankSummary(courseId));
-  const questions = useApi<Paged<QuestionListItem>>(
-    lecturerPaths.questions(courseId, { type: type || undefined, difficulty: difficulty || undefined, topicId: topicId || undefined, search: term || undefined, archived: archived || undefined, page, pageSize: PAGE_SIZE }),
+  const questions = useApi<QuestionPage>(
+    lecturerPaths.questions(courseId, { type: type || undefined, difficulty: difficulty || undefined, topicId: topicId || undefined, search: term || undefined, archived: archived || undefined, review: review || undefined, page, pageSize: PAGE_SIZE }),
     { keepPrevious: true },
   );
   const filter = <T,>(set: (v: T) => void) => (v: T) => {
@@ -55,6 +56,15 @@ function Bank({ courseId }: { courseId: string }) {
     setPage(1);
   };
   const activeCount = summary.data?.items.reduce((s, r) => s + r.count, 0);
+  const progress = questions.data?.review;
+  const toggleReview = async (q: QuestionListItem) => {
+    setReviewing(q.id);
+    try {
+      await setQuestionReviewed(q.id, q.review.status !== "REVIEWED");
+    } finally {
+      setReviewing(null);
+    }
+  };
 
   const columns: Column<QuestionListItem>[] = [
     {
@@ -75,6 +85,20 @@ function Bank({ courseId }: { courseId: string }) {
     { key: "type", header: t("lecturer.common.type"), cell: (q) => (q.current ? <span className="whitespace-nowrap">{t(`admin.exams.questionTypes.${q.current.type}`)}</span> : "—") },
     { key: "difficulty", header: t("lecturer.common.difficulty"), cell: (q) => (q.current ? t(`admin.exams.difficulty.${q.current.difficulty}`) : "—") },
     { key: "marks", header: t("lecturer.common.marks"), align: "right", cell: (q) => <span className="tabular-nums">{formatNumber(q.current?.marks, locale, 2)}</span> },
+    {
+      key: "review",
+      header: t("lecturer.review.status"),
+      cell: (q) => (
+        <span className="flex flex-wrap items-center gap-2">
+          <Badge tone={q.review.status === "REVIEWED" ? "success" : "neutral"} dot>{t(`lecturer.review.${q.review.status}`)}</Badge>
+          {!q.isArchived && (
+            <Button variant="ghost" size="sm" loading={reviewing === q.id} onClick={() => toggleReview(q)}>
+              {q.review.status === "REVIEWED" ? t("lecturer.review.backToDraft") : t("lecturer.review.markReviewed")}
+            </Button>
+          )}
+        </span>
+      ),
+    },
     { key: "version", header: t("lecturer.questions.versions"), align: "right", cell: (q) => <span className="tabular-nums text-muted">v{q.current?.versionNumber ?? "—"}</span>, className: "hidden lg:table-cell" },
   ];
 
@@ -100,6 +124,15 @@ function Bank({ courseId }: { courseId: string }) {
             </Select>
           )}
         </Field>
+        <Field label={t("lecturer.review.status")}>
+          {({ id }) => (
+            <Select id={id} value={review} onChange={(e) => filter(setReview)(e.target.value as "" | "REVIEWED" | "DRAFT")}>
+              <option value="">{t("lecturer.review.all")}</option>
+              <option value="REVIEWED">{t("lecturer.review.REVIEWED")}</option>
+              <option value="DRAFT">{t("lecturer.review.DRAFT")}</option>
+            </Select>
+          )}
+        </Field>
         <Field label={t("lecturer.common.topic")}>
           {({ id }) => (
             <Select id={id} value={topicId} onChange={(e) => filter(setTopicId)(e.target.value)}>
@@ -110,7 +143,12 @@ function Bank({ courseId }: { courseId: string }) {
         </Field>
       </FilterBar>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="text-muted">{activeCount !== undefined ? t("lecturer.questions.summary", { count: activeCount }) : ""}</span>
+        <span className="flex flex-wrap items-center gap-3 text-muted">
+          {activeCount !== undefined ? t("lecturer.questions.summary", { count: activeCount }) : ""}
+          {progress && (
+            <Badge tone={progress.reviewed >= progress.target ? "success" : "warning"}>{t("lecturer.review.progress", { reviewed: progress.reviewed, target: progress.target })}</Badge>
+          )}
+        </span>
         <label className="inline-flex items-center gap-2 text-text">
           <input type="checkbox" checked={archived} onChange={(e) => filter(setArchived)(e.target.checked)} className="h-4 w-4 accent-[var(--accent-strong)]" />
           {t("lecturer.questions.showArchived")}

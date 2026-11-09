@@ -9,6 +9,7 @@ import { addQuestions, createCourse, createUser, enrol, loginAs, prisma, userAge
 
 export interface OpenExamOptions {
   students?: number;
+  examType?: "QUIZ" | "MIDTERM" | "FINAL";
   /** Minutes the window has been open already. */
   openedMinutesAgo?: number;
   windowMinutes?: number;
@@ -35,6 +36,7 @@ export async function openExam(o: OpenExamOptions = {}) {
   for (const r of rules) await addQuestions(lecturerAgent, course.id, r.poolSize, { type: r.questionType, difficulty: r.difficulty, marks: r.marksPerQuestion });
   const secondGrader = o.secondGrader ? await createUser("LECTURER") : null;
   const created = await lecturerAgent.post("/api/exams").send({
+    examType: o.examType ?? "QUIZ",
     courseId: course.id,
     title: "Fixture Exam",
     feeAmount: o.feeAmount ?? 0,

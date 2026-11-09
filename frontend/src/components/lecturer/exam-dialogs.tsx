@@ -102,7 +102,6 @@ export function ScheduleDialog({ examId, onClose }: { examId: string; onClose: (
   const invigilators = useApi<{ items: StaffMember[] }>(lecturerPaths.staff("INVIGILATOR"));
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
-  const [duration, setDuration] = useState("");
   const [roomIds, setRoomIds] = useState<string[]>([]);
   const [invigilatorIds, setInvigilatorIds] = useState<string[]>([]);
   const [touched, setTouched] = useState(false);
@@ -110,8 +109,9 @@ export function ScheduleDialog({ examId, onClose }: { examId: string; onClose: (
   const [busy, setBusy] = useState(false);
   const startIso = campusInputToIso(start);
   const endIso = campusInputToIso(end);
-  const minutes = Number(duration);
-  const durationOk = Number.isInteger(minutes) && minutes >= 5 && minutes <= 600;
+  // The duration is the window length, worked out from the start and end (read-only).
+  const minutes = startIso && endIso ? Math.floor((Date.parse(endIso) - Date.parse(startIso)) / 60_000) : 0;
+  const durationOk = minutes >= 5 && minutes <= 600;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -120,7 +120,7 @@ export function ScheduleDialog({ examId, onClose }: { examId: string; onClose: (
     setBusy(true);
     setError(null);
     try {
-      await requestSchedule(examId, { windowStart: startIso, windowEnd: endIso, durationMinutes: minutes, roomIds, invigilatorIds });
+      await requestSchedule(examId, { windowStart: startIso, windowEnd: endIso, roomIds, invigilatorIds });
       toast(t("lecturer.exams.requestedToast"));
       onClose();
     } catch (err) {
@@ -155,11 +155,11 @@ export function ScheduleDialog({ examId, onClose }: { examId: string; onClose: (
             {({ id, describedBy, invalid }) => <Input id={id} aria-describedby={describedBy} aria-invalid={invalid} type="datetime-local" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />}
           </Field>
         </div>
-        <Field label={t("lecturer.exams.duration")} hint={t("lecturer.exams.durationHint")} error={touched && !durationOk ? t("lecturer.exams.durationHint") : undefined} required>
-          {({ id, describedBy, invalid }) => <Input id={id} aria-describedby={describedBy} aria-invalid={invalid} type="number" min={5} max={600} step={1} inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} className="sm:w-40" />}
+        <Field label={t("lecturer.exams.duration")} hint={t("lecturer.exams.durationAuto")} error={touched && startIso && endIso && !durationOk ? t("lecturer.exams.durationHint") : undefined}>
+          {({ id, describedBy, invalid }) => <Input id={id} aria-describedby={describedBy} aria-invalid={invalid} readOnly value={minutes > 0 ? t("admin.minutes", { count: minutes }) : "—"} className="sm:w-48" />}
         </Field>
         {rooms.data ? (
-          <PickList legend={t("lecturer.exams.rooms")} hint={t("lecturer.exams.roomsHint")} items={rooms.data.items} selected={roomIds} onChange={setRoomIds} label={(r) => `${r.name} (${r.building})`} />
+          <PickList legend={t("lecturer.exams.rooms")} hint={t("lecturer.exams.roomsHint")} items={rooms.data.items.filter((r) => r.isActive)} selected={roomIds} onChange={setRoomIds} label={(r) => `${r.name} (${r.building}) · ${r.capacity ? t("admin.rooms.seats", { count: r.capacity }) : t("admin.rooms.capacityUnknown")}`} />
         ) : <Skeleton className="h-12 w-full" />}
         {invigilators.data ? (
           <PickList legend={t("lecturer.exams.invigilators")} items={invigilators.data.items} selected={invigilatorIds} onChange={setInvigilatorIds} label={(i) => i.fullName} />

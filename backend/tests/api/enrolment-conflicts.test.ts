@@ -14,7 +14,7 @@ async function courseWithExam(windowStart: Date, windowEnd: Date) {
   const [lecturer, agent] = await userAgent("LECTURER");
   const course = await createCourse(lecturer.id);
   await addQuestions(agent, course.id, 1, { type: "MCQ" });
-  const exam = await agent.post("/api/exams").send({ courseId: course.id, title: `Exam ${course.code}`, rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 2, questionCount: 1 }] });
+  const exam = await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: `Exam ${course.code}`, rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 2, questionCount: 1 }] });
   await agent.post(`/api/exams/${exam.body.exam.id}/publish`);
   const admin = await createUser("ADMIN");
   await prisma.examSchedule.create({

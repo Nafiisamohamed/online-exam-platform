@@ -4,7 +4,7 @@
  * else answers 404), so these functions never filter access themselves.
  * Screens use these functions for writes and the GET paths with useApi().
  */
-import type { ExamDetail, Schedule } from "@/types/admin";
+import type { ExamDetail, Schedule, ExamType } from "@/types/admin";
 import type {
   ExamPreview, ExamSettingsInput, GradingAnswer, QuestionDetail, QuestionImportPreview, QuestionImportResult, QuestionInput,
   QuestionType, Difficulty, RuleInput, ScheduleRequestInput, Topic, LecturerExam,
@@ -17,7 +17,7 @@ export const lecturerPaths = {
   courses: "/courses",
   course: (id: string) => `/courses/${id}`,
   enrolments: (courseId: string) => `/courses/${courseId}/enrolments`,
-  questions: (courseId: string, q: { type?: QuestionType; difficulty?: Difficulty; topicId?: string; search?: string; archived?: boolean; page?: number; pageSize?: number }) =>
+  questions: (courseId: string, q: { type?: QuestionType; difficulty?: Difficulty; topicId?: string; search?: string; archived?: boolean; review?: "REVIEWED" | "DRAFT"; page?: number; pageSize?: number }) =>
     `/courses/${courseId}/questions${query(q)}`,
   question: (id: string) => `/questions/${id}`,
   questionVersion: (id: string, versionId: string) => `/questions/${id}/versions/${versionId}`,
@@ -29,7 +29,7 @@ export const lecturerPaths = {
   exam: (id: string) => `/exams/${id}`,
   preview: (id: string) => `/exams/${id}/preview`,
   schedules: "/schedules",
-  rooms: "/rooms",
+  rooms: "/rooms?active=true",
   staff: (role: "LECTURER" | "INVIGILATOR") => `/staff?role=${role}`,
   grading: (examId: string, status?: string) => `/exams/${examId}/grading${query({ status })}`,
   gradingAnswer: (answerId: string) => `/grading/answers/${answerId}`,
@@ -90,7 +90,7 @@ export async function confirmQuestionImport(batchId: string, courseId: string) {
 
 // --- Exams and schedules ---------------------------------------------------------------
 
-export async function createExam(courseId: string, input: ExamSettingsInput & { title: string; rules?: RuleInput[] }) {
+export async function createExam(courseId: string, input: ExamSettingsInput & { title: string; examType: ExamType; rules?: RuleInput[] }) {
   const res = await api<{ exam: LecturerExam }>("/exams", { method: "POST", json: { courseId, ...input } });
   invalidate("/exams", "/analytics/dashboard");
   return res.exam;
@@ -174,3 +174,19 @@ export async function reopenResults(examId: string, reason: string) {
   return res;
 }
 
+
+/** The tick list of an exam: reviewed questions per rule, ticked or not. */
+export function questionPoolPath(examId: string) { return `/exams/${examId}/question-pool`; }
+
+/** Saves the unticked questions of a draft exam. */
+export async function setExcludedQuestions(examId: string, questionIds: string[]) {
+  const res = await api<{ exam: LecturerExam }>(`/exams/${examId}/excluded-questions`, { method: "PUT", json: { questionIds } });
+  invalidate(`/exams/${examId}`, "/exams");
+  return res.exam;
+}
+
+/** Marks a question reviewed, or sends it back to draft. */
+export async function setQuestionReviewed(id: string, reviewed: boolean) {
+  await api(`/questions/${id}/review`, { method: reviewed ? "POST" : "DELETE" });
+  invalidate(`/questions/${id}`, "/courses/");
+}

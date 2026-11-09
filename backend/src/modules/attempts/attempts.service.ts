@@ -35,7 +35,7 @@ import { AppError, badRequest, conflict, forbidden, notFound } from "../../lib/e
 import { num, num0 } from "../../lib/format.ts";
 import { audit } from "../../services/audit.ts";
 import { generateExam, NotEnoughQuestionsError } from "../../services/exam-generator.ts";
-import { loadRuleSpecs, rulesWithPools } from "../../services/exam-pool.ts";
+import { examPoolFilter, loadRuleSpecs, rulesWithPools } from "../../services/exam-pool.ts";
 import { submitAttempt, submitIfExpired, terminateLocked } from "../../services/submission.ts";
 
 /** Counted tab switches after which the student is warned (4.8). */
@@ -128,6 +128,7 @@ export async function listMyExams(user: AuthUser) {
     return {
       id: e.id,
       title: e.title,
+      examType: e.examType,
       instructions: e.instructions,
       course: e.course,
       totalQuestions: e.rules.reduce((s, r) => s + r.questionCount, 0),
@@ -179,7 +180,8 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
       // Re-check the window with this authoritative time (the check above used the API's synced clock).
       if (startedAt < schedule.windowStart) throw conflict("EXAM_NOT_OPEN_YET", "The exam window has not opened yet", { windowStart: schedule.windowStart });
       if (startedAt >= schedule.windowEnd) throw conflict("EXAM_WINDOW_CLOSED", "The exam window has closed", { windowEnd: schedule.windowEnd });
-      const pools = await rulesWithPools(exam.courseId, await loadRuleSpecs(examId, tx), examId, tx);
+      // Exams published since Phase 3 draw only reviewed questions; unticked questions are never drawn.
+      const pools = await rulesWithPools(exam.courseId, await loadRuleSpecs(examId, tx), examId, tx, await examPoolFilter(exam, tx));
       const items = generateExam(pools, { shuffleQuestions: exam.shuffleQuestions, shuffleOptions: exam.shuffleOptions });
       const baseDeadline = new Date(Math.min(startedAt.getTime() + schedule.durationMinutes * 60_000, schedule.windowEnd.getTime()));
       // The database trigger locks each drawn question version in this same transaction.

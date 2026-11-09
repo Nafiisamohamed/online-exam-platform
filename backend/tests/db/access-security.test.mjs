@@ -22,6 +22,7 @@ const APP_TABLES = [
   "payments", "sms_outbox", "notifications",
   "account_number_sequences",
   "academic_years", "faculty_lecturers", "student_registrations",
+  "exam_excluded_questions",
 ];
 // Add and read only (no UPDATE).
 const HISTORY_TABLES = ["audit_logs", "grade_revisions", "result_publications"];
@@ -30,6 +31,7 @@ const DELETABLE_TABLES = [
   "question_options", "accepted_answers", "rubric_criteria", "exam_rules", "exam_rule_topics",
   "schedule_rooms", "schedule_invigilators", "grading_scale",
   "faculty_lecturers", // a lecturer can be removed from a faculty
+  "exam_excluded_questions", // a lecturer can tick a question again
 ];
 
 describe("access security", () => {
@@ -37,7 +39,7 @@ describe("access security", () => {
   const actAsApp = () => db.q(`SET LOCAL ROLE exam_app`);
 
   describe("row-level security and the exam_app role", () => {
-    it("enables RLS on all 39 tables and on Prisma's migration history", async () => {
+    it("enables RLS on all 40 tables and on Prisma's migration history", async () => {
       const { rows } = await db.q(
         `SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE n.nspname = 'public' AND c.relkind = 'r'`,

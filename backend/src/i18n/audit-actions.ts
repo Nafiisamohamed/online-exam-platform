@@ -66,6 +66,9 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     REGISTRATION_CREATED: "arday u diiwaangeliyay sannad-dugsiyeed",
     REGISTRATION_UPDATED: "saxay diiwaangelinta arday",
     GROUP_ENROLLED: "koox semestar ku diiwaangeliyay maaddooyinkeeda",
+    EXAM_QUESTIONS_SELECTED: "beddelay doorashada su'aalaha imtixaan",
+    QUESTION_REVIEWED: "dib u eegay su'aal",
+    QUESTION_REVIEW_REMOVED: "su'aal ku celiyay qabyo",
   },
   en: {
     USER_CREATED: "created a user account",
@@ -127,6 +130,9 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     REGISTRATION_CREATED: "registered a student for an academic year",
     REGISTRATION_UPDATED: "corrected a student registration",
     GROUP_ENROLLED: "enrolled a semester group in its courses",
+    EXAM_QUESTIONS_SELECTED: "changed an exam's question selection",
+    QUESTION_REVIEWED: "reviewed a question",
+    QUESTION_REVIEW_REMOVED: "sent a question back to draft",
   },
 };
 
