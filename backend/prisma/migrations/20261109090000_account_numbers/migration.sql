@@ -6,17 +6,10 @@
 -- changes. The old student number is kept in legacy_number. Historical texts (old SMS bodies,
 -- audit details) are not rewritten.
 
--- 1. New columns and the counter table.
-ALTER TABLE "users" ADD COLUMN "username" TEXT, ADD COLUMN "legacy_number" TEXT;
+-- Everything runs in ONE transaction: if any step fails, nothing is changed.
+BEGIN;
 
-CREATE TABLE "account_number_sequences" (
-  "role"       "RoleName" NOT NULL,
-  "year"       INTEGER    NOT NULL CHECK ("year" BETWEEN 2000 AND 2999),
-  "last_value" INTEGER    NOT NULL CHECK ("last_value" >= 0),
-  CONSTRAINT "account_number_sequences_pkey" PRIMARY KEY ("role", "year")
-);
-
--- 2. Stop if any student has a number that is not in the known DEMO format: such a number is
+-- 1. Stop before changing anything if any student has a number that is not in the known DEMO format: such a number is
 --    never changed silently; it has to be decided first.
 DO $$
 DECLARE bad INTEGER;
@@ -25,6 +18,16 @@ BEGIN
    WHERE r."name" = 'STUDENT' AND (u."student_number" IS NULL OR u."student_number" !~ '^DEMO-[0-9]{4}-[0-9]+$');
   IF bad > 0 THEN RAISE EXCEPTION 'account numbering stopped: % student(s) without a DEMO-YYYY-NNNN number', bad; END IF;
 END $$;
+
+-- 2. New columns and the counter table.
+ALTER TABLE "users" ADD COLUMN "username" TEXT, ADD COLUMN "legacy_number" TEXT;
+
+CREATE TABLE "account_number_sequences" (
+  "role"       "RoleName" NOT NULL,
+  "year"       INTEGER    NOT NULL CHECK ("year" BETWEEN 2000 AND 2999),
+  "last_value" INTEGER    NOT NULL CHECK ("last_value" >= 0),
+  CONSTRAINT "account_number_sequences_pkey" PRIMARY KEY ("role", "year")
+);
 
 -- 3. Students keep the digits of their current number: DEMO-2026-0007 -> S-2026-007,
 --    DEMO-2026-0070 -> S-2026-070 (the year is the creation year, which is 2026 for all).
@@ -71,3 +74,5 @@ GRANT SELECT, INSERT, UPDATE ON "account_number_sequences" TO exam_app;
 ALTER TABLE "account_number_sequences" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "account_number_sequences_exam_app_access" ON "account_number_sequences"
   AS PERMISSIVE FOR ALL TO exam_app USING (true) WITH CHECK (true);
+
+COMMIT;
