@@ -17,7 +17,7 @@
 | LECTURER | Dr. Khadra Maxamuud Cilmi (BA110) | `khadra.cilmi@uni-demo.test` |
 | INVIGILATOR | Cabdiraxmaan Nuur Faarax | `cabdiraxmaan.faarax@uni-demo.test` |
 | INVIGILATOR | Deeqa Xuseen Aadan | `deeqa.aadan@uni-demo.test` |
-| STUDENT | Hodan Maxamed Cali … Yaasiin Ibraahim Guuleed (10 students) | `DEMO-2026-0001` … `DEMO-2026-0010` |
+| STUDENT | Hodan Maxamed Cali … Yaasiin Ibraahim Guuleed (10 students) | `S-2026-001` … `S-2026-010` |
 
 **Passwords**
 - Each account gets a random 16-character password, stored in the database only as a bcrypt hash (cost 12).
@@ -53,7 +53,7 @@ The script was rehearsed on an isolated database: the 6 new passwords work, the 
 | Area | Contents |
 |---|---|
 | Faculties and courses | Faculty of Computing (CS201 Database Systems, CS105 Introduction to Programming) and Faculty of Economics and Management (BA110 Principles of Accounting), semester `2026-Fall` |
-| Enrolments | 23. Student `DEMO-2026-0005` dropped CS201 **after** sitting the midterm, and their result is kept. |
+| Enrolments | 23. Student `S-2026-005` dropped CS201 **after** sitting the midterm, and their result is kept. |
 | Question banks | 29 questions: MCQ (4 and 5 options), True/False, short answer with accepted answers, and essays with rubrics. One CS201 question was edited after use and has a version 2, while the midterm keeps version 1. 2 import batches show a CSV import with one invalid and one duplicate row. |
 | Rooms | Lab A (Mogadishu campus, `10.10.4.0/24`) and Hall 2 (Hargeisa campus, `10.20.1.0/24`) |
 | CS201 Midterm | Held **yesterday**, 09:00–11:00 Mogadishu time, 60 minutes, approved. 5 students sat it, each with a **different random set of 9 questions with the same difficulty and marks mix** (24 marks), and 3 enrolled students were absent. Also included: a 10-minute time extension (power cut) for one student, tab-switch events (one student with 3 counted switches and an invigilator note), and one unanswered question. |
@@ -67,13 +67,13 @@ The script was rehearsed on an isolated database: the 6 new passwords work, the 
 
 | Student | Score |
 |---|---|
-| `DEMO-2026-0001` | 21.5/24 (B) |
-| `DEMO-2026-0002` | 20.5/24 (B) |
-| `DEMO-2026-0003` | 18.5/24 (C) |
-| `DEMO-2026-0004` | 13.5/24 (F) |
-| `DEMO-2026-0005` | 17.5/24 (C) |
+| `S-2026-001` | 21.5/24 (B) |
+| `S-2026-002` | 20.5/24 (B) |
+| `S-2026-003` | 18.5/24 (C) |
+| `S-2026-004` | 13.5/24 (F) |
+| `S-2026-005` | 17.5/24 (C) |
 
-`DEMO-2026-0004`'s result changed in the regrade, from 12.5 to 13.5.
+`S-2026-004`'s result changed in the regrade, from 12.5 to 13.5.
 
 **Dates are relative to the day the seed ran** (the midterm is the day before, the final 7 days after).
 
@@ -92,7 +92,7 @@ Checked after the run:
 
 | Adds | Contents |
 |---|---|
-| Students | 30 more (`DEMO-2026-0011` … `DEMO-2026-0040`), 40 in total, all enrolled in CS105. Passwords are appended to `backend/demo-accounts.local.md`. |
+| Students | 30 more (`S-2026-011` … `S-2026-040`), 40 in total, all enrolled in CS105. Passwords are appended to `backend/demo-accounts.local.md`. |
 | Questions | 15 more CS105 questions (MCQ, True/False, short answer), 44 in total |
 | Exam | **CS105 Practice Test 1**, held 3 days ago, 13:00–15:00. 38 students sat it (2 absent). Results are published and answer review is on. |
 | Analytics | Every question has 12–19 answers. One is answered correctly by everyone (over 95%) and one by about 10% (under 20%), so both highlights appear. The score distribution runs from 33% to 100%. |

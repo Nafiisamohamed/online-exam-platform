@@ -51,11 +51,11 @@ Every rule below is covered by the automated tests. See [testing.md](testing.md)
 - Foreign keys use `ON DELETE RESTRICT`, so history rows are never removed by cascade. The one exception is `exam_rule_topics`, which is deleted with its rule; a rule already used by an attempt cannot be deleted, because `attempt_questions` references it.
 - Money and marks use `DECIMAL`, never floating point.
 
-## Tables (35)
+## Tables (36)
 
 | Group | Tables |
 |---|---|
-| A. Users and access | `roles`, `users`, `audit_logs` |
+| A. Users and access | `roles`, `users`, `audit_logs`, `account_number_sequences` |
 | B. Courses and enrolment | `faculties`, `courses`, `enrolments` |
 | C. Question bank | `topics`, `questions`, `question_versions`, `question_options`, `accepted_answers`, `rubric_criteria`, `import_batches` |
 | D. Exams and scheduling | `exams`, `exam_rules`, `exam_rule_topics`, `exam_schedules`, `rooms`, `schedule_rooms`, `schedule_invigilators` |
@@ -77,6 +77,9 @@ Trigger errors use SQLSTATE `P0001`, and the error message is a stable code (for
 |---|---|---|---|
 | users | `users_login_identifier_chk` | A user has a student number or an email | 6.2 |
 | users | `users_token_version_chk` | Token version ≥ 0 | 6.2 |
+| users | `users_username_format_chk` | Username is `S-/T-/R-/I-` + 4-digit year + at least 3 digits (unique index `users_username_key`) | Phase 1 |
+| users | `users_student_number_is_username_chk` | A student number, when present, equals the username | Phase 1 |
+| account_number_sequences | `year` 2000–2999, `last_value` ≥ 0 | One counter per (role, year); the server increments it with `INSERT … ON CONFLICT DO UPDATE … RETURNING` inside the account's transaction | Phase 1 |
 | enrolments | `enrolments_dropped_at_chk` | `dropped_at` is set exactly when the status is DROPPED | 4.1 |
 | question_versions | `*_version_number_chk`, `*_marks_chk`, `*_text_chk` | Version ≥ 1, marks > 0, text not blank | 4.2 |
 | question_versions | `question_versions_locked_at_chk` | `locked_at` is set exactly when the version is locked | P4 |
@@ -187,7 +190,7 @@ The migration creates `exam_app` without a password. Each environment enables lo
 
 | Tables | Privileges |
 |---|---|
-| All 35 tables | SELECT, INSERT, UPDATE |
+| All 36 tables | SELECT, INSERT, UPDATE |
 | `audit_logs`, `grade_revisions`, `result_publications` | SELECT, INSERT only (the append-only triggers also block changes) |
 | `question_options`, `accepted_answers`, `rubric_criteria`, `exam_rules`, `exam_rule_topics`, `schedule_rooms`, `schedule_invigilators`, `grading_scale` | Also DELETE, for editing drafts. Locked versions and used rules stay protected by the triggers and foreign keys. |
 | `_prisma_migrations` | None |
@@ -196,8 +199,8 @@ The migration creates `exam_app` without a password. Each environment enables lo
 
 ### Row-level security
 
-- RLS is enabled on all 35 tables and on `_prisma_migrations`. The migration fails if any table in `public` is left without RLS.
-- Each of the 35 tables has exactly one policy, `<table>_exam_app_access`, applying **only to `exam_app`**, with `USING (true) WITH CHECK (true)`.
+- RLS is enabled on all 36 tables and on `_prisma_migrations`. The migration fails if any table in `public` is left without RLS.
+- Each of the 36 tables has exactly one policy, `<table>_exam_app_access`, applying **only to `exam_app`**, with `USING (true) WITH CHECK (true)`.
 - There is no policy for `PUBLIC`, `anon`, `authenticated` or `service_role`. A role without a policy sees no rows, even if it has been granted table privileges.
 - The owner is not restricted by RLS, so migrations and the Prisma CLI work as before.
 

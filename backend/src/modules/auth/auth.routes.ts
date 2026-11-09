@@ -2,7 +2,7 @@
  * Authentication endpoints (/api/auth). See docs/api.md#authentication.
  *
  * POST  /api/auth/login            log in; sets the HTTP-only session cookie
- * POST  /api/auth/logout           clears the session cookie
+ * POST  /api/auth/logout           ends the session on the server and clears the cookie
  * GET   /api/auth/me               the logged-in user's profile
  * POST  /api/auth/change-password  change password (also ends other sessions)
  * PATCH /api/auth/language         switch between Somali and English
@@ -13,7 +13,7 @@ import { authenticate, currentUser } from "../../middleware/auth.ts";
 import { loginLimiter } from "../../middleware/rate-limits.ts";
 import { validate } from "../../middleware/validate.ts";
 import { passwordRule } from "../../lib/passwords.ts";
-import { clearSession, issueSession } from "../../lib/session-token.ts";
+import { clearSession, issueSession, readSession, SESSION_COOKIE } from "../../lib/session-token.ts";
 import * as auth from "./auth.service.ts";
 
 export const authRouter = Router();
@@ -32,7 +32,9 @@ authRouter.post("/login", loginLimiter, validate({ body: loginBody }), async (re
 });
 
 /** Response 204. Always succeeds, even without a session. */
-authRouter.post("/logout", (_req, res) => {
+/** Response 204. The session token is revoked on the server (token version + 1), not just deleted in the browser. */
+authRouter.post("/logout", async (req, res) => {
+  await auth.logout(readSession(req.cookies?.[SESSION_COOKIE]), req);
   clearSession(res);
   res.status(204).end();
 });

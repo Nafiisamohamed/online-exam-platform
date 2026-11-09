@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import type { Profile } from "@/types/account";
 
 export function loginIdentifier(profile: Profile) {
-  return profile.studentNumber ?? profile.email ?? "";
+  return profile.username || profile.email || "";
 }
 
 export function ProfileIdentity({

@@ -16,11 +16,12 @@ async function setupCourse() {
 describe("user management", () => {
   it("lets only the admin create users, with a one-time temporary password and an SMS without it", async () => {
     const [, admin] = await userAgent("ADMIN");
-    const studentNumber = `S-${uid()}`;
-    const res = await admin.post("/api/users").send({ role: "STUDENT", fullName: "Ayaan Cabdi Xasan", phone: "061 512 3499", studentNumber });
+    // A typed number is ignored: the server always generates it.
+    const res = await admin.post("/api/users").send({ role: "STUDENT", fullName: "Ayaan Cabdi Xasan", phone: "061 512 3499", studentNumber: "MY-OWN-123" });
     expect(res.status).toBe(201);
     expect(res.body.temporaryPassword).toMatch(/^[A-Za-z2-9]{12}$/);
-    expect(res.body.user).toMatchObject({ studentNumber: studentNumber.toUpperCase(), phone: "+252615123499", mustChangePassword: true });
+    expect(res.body.user.username).toMatch(/^S-\d{4}-\d{3,}$/);
+    expect(res.body.user).toMatchObject({ studentNumber: res.body.user.username, phone: "+252615123499", mustChangePassword: true });
     expect(res.body.user.passwordHash).toBeUndefined();
 
     const sms = await prisma.smsOutbox.findFirstOrThrow({ where: { recipientId: res.body.user.id } });
@@ -28,9 +29,11 @@ describe("user management", () => {
     expect(sms.body).not.toContain(res.body.temporaryPassword);
     expect(sms.body.startsWith("[DEMO]")).toBe(true);
 
-    const again = await admin.post("/api/users").send({ role: "STUDENT", fullName: "Someone Else", phone: "+252615123400", studentNumber });
+    const email = `dup.${uid().toLowerCase()}@uni.test`;
+    expect((await admin.post("/api/users").send({ role: "LECTURER", fullName: "Lecturer One", phone: "+252615123400", email })).status).toBe(201);
+    const again = await admin.post("/api/users").send({ role: "LECTURER", fullName: "Lecturer Two", phone: "+252615123401", email });
     expect(again.status).toBe(409);
-    expect(again.body.error.code).toBe("STUDENT_NUMBER_TAKEN");
+    expect(again.body.error.code).toBe("EMAIL_TAKEN");
 
     const [, lecturer] = await userAgent("LECTURER");
     expect((await lecturer.get("/api/users")).status).toBe(403);
@@ -90,37 +93,40 @@ describe("CSV enrolment import", () => {
   it("previews rows with error codes, saves only valid rows and returns temporary passwords once", async () => {
     const { admin, course } = await setupCourse();
     const existing = await createUser("STUDENT", { fullName: "Faadumo Cali Warsame" });
-    const n1 = `IMP-${uid()}`;
-    const n2 = `IMP-${uid()}`;
+    const newName = `Cabdullaahi Xasan Nuur ${uid()}`;
     const csv = [
       "student_id,student_name,phone,course_codes",
-      `${n1},Cabdullaahi Xasan Nuur,+252615111111,${course.code}`,
-      `${n2},Maryan Yuusuf Cumar,0634222222,${course.code};NOPE101`,
-      `${n1},Duplicate Row,+252615333333,${course.code}`,
-      `,No Number,+252615444444,${course.code}`,
+      `,${newName},+252615111111,${course.code}`, // new student: the number is generated
+      `,Maryan Yuusuf Cumar,0634222222,${course.code};NOPE101`,
+      `,${newName},+252615111111,${course.code}`, // the same new student twice
+      `S-2099-999999999,No Such Student,+252615444444,${course.code}`, // numbers cannot be chosen
       `${existing.studentNumber},Faadumo Cali Warsame,+252615555555,${course.code}`,
       `BAD ID!,Bad Id,12,${course.code}`,
+      `,Faadumo Cali Warsame,+252615000000,${course.code}`, // already has an account
     ].join("\n");
     const preview = await admin.post("/api/imports/enrolments").field("semester", "2026-Fall").attach("file", Buffer.from(csv), "students.csv");
     expect(preview.status).toBe(201);
-    expect(preview.body.batch).toMatchObject({ totalRows: 6, validRows: 2, invalidRows: 4, status: "PREVIEW" });
+    expect(preview.body.batch).toMatchObject({ totalRows: 7, validRows: 2, invalidRows: 5, status: "PREVIEW" });
     const codes = (row: number) => preview.body.rows.find((r: any) => r.row === row).errors.map((e: any) => e.code);
     expect(codes(3)).toContain("COURSE_NOT_FOUND");
     expect(codes(4)).toContain("DUPLICATE_STUDENT_IN_FILE");
-    expect(codes(5)).toContain("STUDENT_ID_REQUIRED");
+    expect(codes(5)).toContain("STUDENT_NOT_FOUND");
     expect(codes(7)).toEqual(expect.arrayContaining(["STUDENT_ID_INVALID", "PHONE_INVALID"]));
+    expect(preview.body.rows.find((r: any) => r.row === 8).errors).toEqual([{ code: "STUDENT_ALREADY_EXISTS", params: { studentNumber: existing.studentNumber } }]);
 
     // Nothing is saved by the preview.
-    expect(await prisma.user.count({ where: { studentNumber: n1 } })).toBe(0);
+    expect(await prisma.user.count({ where: { fullName: newName } })).toBe(0);
 
     const confirm = await admin.post(`/api/imports/${preview.body.batch.id}/confirm`);
     expect(confirm.status).toBe(200);
     expect(confirm.body).toMatchObject({ savedRows: 2, newStudents: 1, enrolled: 2 });
     expect(confirm.body.temporaryPasswords).toHaveLength(1);
+    const n1 = confirm.body.temporaryPasswords[0].studentNumber;
+    expect(n1).toMatch(/^S-\d{4}-\d{3,}$/);
     const created = await prisma.user.findUniqueOrThrow({ where: { studentNumber: n1 } });
-    expect(created.mustChangePassword).toBe(true);
+    expect(created).toMatchObject({ username: n1, fullName: newName, mustChangePassword: true });
     expect(created.passwordHash).not.toContain(confirm.body.temporaryPasswords[0].temporaryPassword);
-    expect(await prisma.user.count({ where: { studentNumber: n2 } })).toBe(0);
+    expect(await prisma.user.count({ where: { fullName: "Maryan Yuusuf Cumar" } })).toBe(0);
 
     const login = await request(app).post("/api/auth/login").send({ identifier: n1, password: confirm.body.temporaryPasswords[0].temporaryPassword });
     expect(login.status).toBe(200);

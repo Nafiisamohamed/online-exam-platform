@@ -12,7 +12,8 @@
  * GET  /api/sms-outbox/:id
  *
  * Audit log (ADMIN; append-only):
- * GET  /api/audit-logs                    ?actorId, action, entityType, entityId, from, to, page, pageSize
+ * GET  /api/audit-logs                    ?actorId, search, role, action, entityType, entityId, from, to, page, pageSize
+ * GET  /api/audit-logs.csv?lang=so|en     ADMIN: the same filters as a CSV in the chosen language
  */
 import { Router } from "express";
 import { z } from "zod";
@@ -55,12 +56,36 @@ messagesRouter.get("/sms-outbox/:id", authenticate(), requireRole("ADMIN"), vali
   res.json({ message: await messages.getSms(req.valid.params.id) });
 });
 
+const auditFilters = {
+  actorId: zid.optional(),
+  search: z.string().trim().min(1).max(100).optional(),
+  role: z.enum(["ADMIN", "LECTURER", "STUDENT", "INVIGILATOR"]).optional(),
+  action: z.string().max(60).optional(),
+  entityType: z.string().max(60).optional(),
+  entityId: zid.optional(),
+  ...range,
+};
+
 messagesRouter.get(
   "/audit-logs",
   authenticate(),
   requireRole("ADMIN"),
-  validate({ query: pageQuery.extend({ actorId: zid.optional(), action: z.string().max(60).optional(), entityType: z.string().max(60).optional(), entityId: zid.optional(), ...range }) }),
+  validate({ query: pageQuery.extend(auditFilters) }),
   async (req, res) => {
     res.json(await messages.listAudit(req.valid.query));
+  },
+);
+
+/** Response: CSV file (newest first, at most AUDIT_EXPORT_LIMIT rows) in ?lang (default: the registrar's language). */
+messagesRouter.get(
+  "/audit-logs.csv",
+  authenticate(),
+  requireRole("ADMIN"),
+  validate({ query: z.object({ ...auditFilters, lang: z.enum(["so", "en"]).optional() }) }),
+  async (req, res) => {
+    const user = currentUser(req);
+    const { lang, ...filters } = req.valid.query;
+    const { filename, csv } = await messages.auditCsv(filters, lang ?? user.preferredLanguage, user.id, req);
+    res.type("text/csv").attachment(filename).send(csv);
   },
 );

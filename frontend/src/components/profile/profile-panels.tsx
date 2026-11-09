@@ -110,11 +110,8 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
       <CardContent className="pt-2">
         <dl className="divide-y divide-border">
           <DetailRow icon={UserRound} label={t("profile.fullName")} value={profile.fullName} />
-          {profile.studentNumber ? (
-            <DetailRow icon={BadgeCheck} label={t("profile.studentId")} value={profile.studentNumber} />
-          ) : (
-            <DetailRow icon={Mail} label={t("profile.email")} value={profile.email} />
-          )}
+          <DetailRow icon={BadgeCheck} label={profile.role === "STUDENT" ? t("profile.studentId") : t("profile.username")} value={profile.username} />
+          {profile.email && <DetailRow icon={Mail} label={t("profile.email")} value={profile.email} />}
           <DetailRow icon={Phone} label={t("profile.phone")} value={profile.phone} />
           <DetailRow icon={ShieldCheck} label={t("profile.role")} value={t(`roles.${profile.role}`)} />
           {profile.faculty && <DetailRow icon={Building2} label={t("profile.faculty")} value={profile.faculty} />}

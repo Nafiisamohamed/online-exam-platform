@@ -4,7 +4,7 @@
  *
  * Requires the base demo data (npm run db:seed:demo). It ADDS, and never
  * changes or deletes existing rows:
- *   - 30 more students (DEMO-2026-0011 ... 0040), enrolled in CS105;
+ *   - 30 more students (S-2026-011 ... 040), enrolled in CS105;
  *   - 15 more CS105 questions (MCQ, True/False, short answer);
  *   - "CS105 Practice Test 1", held 3 days ago, with an approved schedule:
  *     38 of the 40 CS105 students sat it (2 absent), each with their own random
@@ -61,7 +61,7 @@ const LAST = ["Warsame", "Samatar", "Guuleed", "Ducaale", "Raage", "Muuse", "Xir
 const PREFIX = ["61", "62", "63", "65", "68", "77"];
 const NEW_STUDENTS = FIRST.map((first, i) => ({
   n: i + 11,
-  number: `DEMO-2026-${String(i + 11).padStart(4, "0")}`,
+  number: `S-2026-${String(i + 11).padStart(3, "0")}`,
   name: `${first} ${MIDDLE[i % 10]} ${LAST[(i * 3) % 10]}`,
   phone: `+252${PREFIX[i % PREFIX.length]}${String(4100000 + i * 7919).slice(0, 7)}`,
   lang: i % 4 === 0 ? "en" : "so",
@@ -117,7 +117,7 @@ async function main() {
     const lecturer = staff["mustafe.jibriil@uni-demo.test"];
     const invigilator = staff["cabdiraxmaan.faarax@uni-demo.test"];
     if (!admin || !lecturer || !invigilator) throw new Error("Run npm run db:seed:demo first (base demo data not found).");
-    if ((await q(`SELECT 1 FROM exams WHERE title = $1`, [EXAM_TITLE])).rowCount || (await q(`SELECT 1 FROM users WHERE student_number = 'DEMO-2026-0011'`)).rowCount) {
+    if ((await q(`SELECT 1 FROM exams WHERE title = $1`, [EXAM_TITLE])).rowCount || (await q(`SELECT 1 FROM users WHERE username = 'S-2026-011'`)).rowCount) {
       console.log("The analytics demo data is already there. Nothing was changed.");
       return;
     }
@@ -141,16 +141,21 @@ async function main() {
     const students = [];
     for (const a of accounts) {
       const id = (await one(
-        `INSERT INTO users (role_id, student_number, full_name, phone, password_hash, preferred_language, updated_at) VALUES ($1, $2, $3, $4, $5, $6, now()) RETURNING id`,
+        `INSERT INTO users (role_id, username, student_number, full_name, phone, password_hash, preferred_language, updated_at) VALUES ($1, $2, $2, $3, $4, $5, $6, now()) RETURNING id`,
         [studentRole, a.number, a.name, a.phone, a.hash, a.lang],
       )).id;
       await q(`INSERT INTO enrolments (student_id, course_id, enrolled_at) VALUES ($1, $2, $3)`, [id, course.id, eat(-20, 9)]);
       students.push({ id, number: a.number, phone: a.phone, lang: a.lang });
     }
+    // Account-number counters continue after the numbers given above (S-/T-/R-/I-2026-NNN).
+    await q(`INSERT INTO account_number_sequences (role, year, last_value)
+             SELECT r.name, split_part(u.username, '-', 2)::int, max(split_part(u.username, '-', 3)::int)
+               FROM users u JOIN roles r ON r.id = u.role_id GROUP BY 1, 2
+             ON CONFLICT (role, year) DO UPDATE SET last_value = GREATEST(account_number_sequences.last_value, EXCLUDED.last_value)`);
     await audit(admin, "ENROLMENTS_IMPORTED", "course", course.id, { semester: "2026-Fall", rows: accounts.length }, eat(-20, 9));
     const existing = (await q(
       `SELECT u.id, u.student_number AS number, u.phone, u.preferred_language AS lang FROM users u JOIN enrolments e ON e.student_id = u.id
-        WHERE e.course_id = $1 AND e.status = 'ACTIVE' AND u.student_number <= 'DEMO-2026-0010' ORDER BY u.student_number`, [course.id],
+        WHERE e.course_id = $1 AND e.status = 'ACTIVE' AND u.student_number <= 'S-2026-010' ORDER BY u.student_number`, [course.id],
     )).rows;
     const takers = [...existing, ...students].map((s, i) => ({ ...s, ability: 0.3 + ((i * 37) % 65) / 100 }));
 
@@ -285,8 +290,8 @@ async function main() {
     await audit(lecturer, "RESULTS_PUBLISHED", "exam", exam, { publication: 1, attempts: results.length }, publishedAt);
     await q("COMMIT");
 
-    const lines = ["", `## Added by db:seed:demo:analytics (${new Date().toISOString()})`, "", "| Role | Name | Login | Password |", "|---|---|---|---|",
-      ...accounts.map((a) => `| STUDENT | ${a.name} | ${a.number} | \`${a.password}\` |`), ""];
+    const lines = ["", `## Added by db:seed:demo:analytics (${new Date().toISOString()})`, "", "| Role | Name | Username | Email | Password |", "|---|---|---|---|---|",
+      ...accounts.map((a) => `| STUDENT | ${a.name} | ${a.number} | - | \`${a.password}\` |`), ""];
     fs.appendFileSync(ACCOUNTS_FILE, lines.join("\n"), { mode: 0o600 });
     const counts = [...usage.values()];
     console.log(`Added ${accounts.length} students, 15 questions and "${EXAM_TITLE}" with ${results.length} graded, published attempts.`);

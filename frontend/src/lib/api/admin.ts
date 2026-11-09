@@ -8,6 +8,16 @@ import type {
 } from "@/types/admin";
 import type { Role } from "@/types/account";
 import { api, query } from "./client";
+
+/** Filters of the Activity History (GET /api/audit-logs and .csv). Dates are ISO strings. */
+export type AuditQuery = {
+  search?: string;
+  role?: "ADMIN" | "LECTURER" | "STUDENT" | "INVIGILATOR";
+  action?: string;
+  entityType?: string;
+  from?: string;
+  to?: string;
+};
 import { invalidate } from "./use-api";
 
 /** GET paths, for useApi(). */
@@ -24,7 +34,9 @@ export const paths = {
   examAnalytics: (id: string) => `/exams/${id}/analytics`,
   schedules: (q: { status?: string; from?: string; to?: string } = {}) => `/schedules${query(q)}`,
   dashboard: "/analytics/dashboard",
-  auditLogs: (q: { page?: number; pageSize?: number; action?: string; entityType?: string } = {}) => `/audit-logs${query(q)}`,
+  auditLogs: (q: AuditQuery & { page?: number; pageSize?: number } = {}) => `/audit-logs${query(q)}`,
+  /** Activity History as CSV, written by the server in `lang`. */
+  auditCsv: (q: AuditQuery, lang: "so" | "en") => `/audit-logs.csv${query({ ...q, lang })}`,
   /** Downloads (opened by the browser, not fetched as JSON). */
   enrolmentTemplate: "/imports/templates/enrolments.csv",
   gradesCsv: (examId: string, lang: "so" | "en") => `/exams/${examId}/grades.csv?lang=${lang}`,

@@ -61,7 +61,7 @@ export default function UsersPage() {
         </Link>
       ),
     },
-    { key: "login", header: t("admin.users.login"), cell: (u) => <span className="break-all">{u.studentNumber ?? u.email ?? "—"}</span> },
+    { key: "login", header: t("admin.users.login"), cell: (u) => <span className="break-all"><span className="font-medium text-foreground">{u.username}</span>{u.email && <span className="block text-xs text-muted">{u.email}</span>}</span> },
     { key: "role", header: t("admin.users.role"), cell: (u) => <RoleBadge role={u.role} /> },
     { key: "phone", header: t("admin.users.phone"), cell: (u) => <span className="whitespace-nowrap tabular-nums">{u.phone}</span>, className: "hidden lg:table-cell" },
     { key: "status", header: t("admin.status"), cell: (u) => <ActiveBadge active={u.isActive} /> },

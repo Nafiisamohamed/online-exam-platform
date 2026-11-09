@@ -21,7 +21,7 @@ export const importsRouter = Router();
 importsRouter.use(authenticate());
 
 importsRouter.get("/templates/enrolments.csv", requireRole("ADMIN"), (_req, res) => {
-  res.type("text/csv").attachment("enrolment-template.csv").send(toCsv(ENROLMENT_COLUMNS, [["DEMO-2026-0101", "Hodan Maxamed Cali", "+252615123401", "CS201;CS105"]]));
+  res.type("text/csv").attachment("enrolment-template.csv").send(toCsv(ENROLMENT_COLUMNS, [["", "Hodan Maxamed Cali", "+252615123401", "CS201;CS105"]]));
 });
 
 /** Multipart: file (CSV), semester (e.g. "2026-Fall"). Response 201: { batch, rows }. */

@@ -38,8 +38,8 @@ const ACCOUNTS = [
   { role: "LECTURER", login: "axmed.samatar@uni-demo.test", use: "CS201 question bank, CSV question import, exam builder, grading, results, analytics" },
   { role: "LECTURER", login: "mustafe.jibriil@uni-demo.test", use: "Blind second grader for CS201 essays; CS105 analytics" },
   { role: "INVIGILATOR", login: "cabdiraxmaan.faarax@uni-demo.test", use: "Live view, notes, time extensions" },
-  { role: "STUDENT", login: "DEMO-2026-0001", use: "Student 1 (Demo 2, 3, 4, 5)" },
-  { role: "STUDENT", login: "DEMO-2026-0002", use: "Student 2 (Demo 2: different question set)" },
+  { role: "STUDENT", login: "S-2026-001", use: "Student 1 (Demo 2, 3, 4, 5)" },
+  { role: "STUDENT", login: "S-2026-002", use: "Student 2 (Demo 2: different question set)" },
 ];
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 const newPassword = () => Array.from({ length: 14 }, () => ALPHABET[crypto.randomInt(ALPHABET.length)]).join("") + crypto.randomInt(10);
@@ -53,7 +53,7 @@ async function main() {
   try {
     const found = [];
     for (const a of ACCOUNTS) {
-      const col = a.login.includes("@") ? "email" : "student_number";
+      const col = a.login.includes("@") ? "email" : "username";
       const r = await client.query(`SELECT u.id, u.full_name, r.name AS role, u.is_active FROM users u JOIN roles r ON r.id = u.role_id WHERE u.${col} = $1`, [a.login]);
       if (!r.rows[0]) throw new Error(`Demo account ${a.login} not found. Run npm run db:seed:demo first.`);
       if (r.rows[0].role !== a.role || !r.rows[0].is_active) throw new Error(`Demo account ${a.login} is not an active ${a.role}.`);
