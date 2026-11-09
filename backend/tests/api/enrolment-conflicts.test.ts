@@ -68,8 +68,8 @@ describe("enrolment schedule conflicts", () => {
     const csv = [
       "student_id,student_name,phone,course_codes",
       `${existing.studentNumber},Xaliimo Cali Nuur,+252615000101,${b.code}`,
-      `NEW-${Date.now()},Bile Xasan Faarax,+252615000102,${a.code};${b.code}`,
-      `${existing.studentNumber}X,Muna Cumar Aadan,+252615000103,${a.code};${c.code}`,
+      `,Bile Xasan Faarax,+252615000102,${a.code};${b.code}`,
+      `,Muna Cumar Aadan,+252615000103,${a.code};${c.code}`,
     ].join("\n");
     const preview = await admin.post("/api/imports/enrolments").field("semester", "2026-Fall").attach("file", Buffer.from(csv), "e.csv");
     expect(preview.status).toBe(201);

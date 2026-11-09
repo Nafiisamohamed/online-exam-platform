@@ -74,24 +74,29 @@ Every error has the same shape:
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
-| POST | `/api/auth/login` | none | `{ identifier, password }`: a student number for students, an email for staff | `200 { user }` and the cookie. Errors: `401 INVALID_CREDENTIALS`, `401 TEMP_PASSWORD_EXPIRED`, `429` |
-| POST | `/api/auth/logout` | none | — | `204` (cookie cleared) |
+| POST | `/api/auth/login` | none | `{ identifier, password }`: the username (`S-/T-/R-/I-YYYY-NNN`, any letter case) or, for staff, the email | `200 { user }` and the cookie. Errors: `401 INVALID_CREDENTIALS`, `401 TEMP_PASSWORD_EXPIRED`, `429` |
+| POST | `/api/auth/logout` | none | — | `204`. Ends the session **on the server** (token version + 1, recorded as `LOGOUT`), so the cookie and any copy of it stop working on every device; the cookie is also cleared. Harmless without a session. |
 | GET | `/api/auth/me` | any | — | `200 { user }` |
 | POST | `/api/auth/change-password` | any | `{ currentPassword, newPassword }`: at least 8 characters, with a letter and a digit | `200 { user }` and a new cookie. Errors: `400 WRONG_CURRENT_PASSWORD`, `400 PASSWORD_UNCHANGED` |
 | PATCH | `/api/auth/language` | any | `{ language: "so" \| "en" }` | `200 { user }` |
 
-`user` contains `{ id, role, fullName, email, studentNumber, phone, preferredLanguage, mustChangePassword }`. It never includes the password hash.
+`user` contains `{ id, role, username, fullName, email, studentNumber, phone, preferredLanguage, mustChangePassword }`. A student's `studentNumber` equals their `username`; staff have `studentNumber: null`. It never includes the password hash.
 
 ## Users
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
 | GET | `/api/users` | ADMIN | query: `role`, `search`, `active`, `page`, `pageSize` | paged users |
-| POST | `/api/users` | ADMIN | `{ role, fullName, phone, email? (staff), studentNumber? (students), preferredLanguage? }` | `201 { user, temporaryPassword }`. Errors: `409 STUDENT_NUMBER_TAKEN`, `409 EMAIL_TAKEN` |
+| POST | `/api/users` | ADMIN | `{ role, fullName, phone, email? (required for staff), preferredLanguage? }`. No number or username: the server generates it. | `201 { user, temporaryPassword }`. Errors: `400 EMAIL_REQUIRED`, `409 EMAIL_TAKEN` |
 | GET | `/api/users/:id` | ADMIN | — | `{ user }` |
 | PATCH | `/api/users/:id` | ADMIN | `{ fullName?, phone?, preferredLanguage?, isActive? }` | `{ user }`. Deactivating ends the user's sessions. |
 | POST | `/api/users/:id/reset-password` | ADMIN | — | `{ temporaryPassword }` |
 | GET | `/api/staff?role=LECTURER\|INVIGILATOR` | ADMIN, LECTURER | — | `{ items: [{ id, fullName, email }] }` |
+
+**Usernames (automatic account numbers)**
+- Format: `S-YYYY-NNN` (student), `T-YYYY-NNN` (lecturer), `R-YYYY-NNN` (registrar), `I-YYYY-NNN` (invigilator). YYYY is the current year in Mogadishu; NNN has at least 3 digits (`…-999` is followed by `…-1000`).
+- The next number of the role and year is taken from `account_number_sequences` inside the transaction that creates the account, so simultaneous creations get consecutive, never equal numbers, and a failed creation uses no number.
+- `search` on `GET /api/users` matches name, email and username.
 
 **Phone numbers** must be Somali mobile numbers. They are stored as `+2526XXXXXXXX` or `+2527XXXXXXXX`; `0615123401` and `615123401` are accepted too.
 
@@ -122,7 +127,7 @@ Both imports work the same way: **upload → preview → confirm**. Only valid r
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
 | GET | `/api/imports/templates/enrolments.csv` | ADMIN | — | CSV template |
-| POST | `/api/imports/enrolments` | ADMIN | multipart: `file`, `semester` | `201 { batch, rows }` |
+| POST | `/api/imports/enrolments` | ADMIN | multipart: `file`, `semester` | `201 { batch, rows }`. Columns `student_id, student_name, phone, course_codes`: leave `student_id` **empty for a new student** (the number is generated on confirm); fill it only with an existing student's number. Row errors include `STUDENT_ID_INVALID`, `STUDENT_NOT_FOUND {studentNumber}`, `STUDENT_ALREADY_EXISTS {studentNumber}` (a new row with the name and phone of an existing student), `DUPLICATE_STUDENT_IN_FILE {firstRow}` |
 | GET | `/api/imports/templates/questions.csv` | LECTURER | — | CSV template |
 | POST | `/api/courses/:courseId/question-imports` | course lecturer | multipart: `file` | `201 { batch, rows }` |
 | GET | `/api/imports/:id` | uploader, ADMIN | — | `{ batch, rows }` |
@@ -336,7 +341,8 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 | POST | `/api/notifications/:id/read`, `/api/notifications/read-all` | any (own) | `{ read: true }` / `{ marked }` |
 | GET | `/api/sms-outbox` | ADMIN | paged messages plus `counts` per status, `simulated: true`. Query: `status`, `templateKey`, `recipientId`, `from`, `to` |
 | GET | `/api/sms-outbox/:id` | ADMIN | `{ message }` |
-| GET | `/api/audit-logs` | ADMIN | paged entries `{ actionCode, entityType, entityId, details, ipAddress, createdAt, actor }`. Query: `actorId`, `action`, `entityType`, `entityId`, `from`, `to` |
+| GET | `/api/audit-logs` | ADMIN | paged entries `{ actionCode, entityType, entityId, details, ipAddress, createdAt, actor: { id, fullName, email, username, studentNumber, role } }`. Query: `actorId`, `search` (name, username or email of the person), `role`, `action`, `entityType`, `entityId`, `from`, `to` |
+| GET | `/api/audit-logs.csv?lang=so\|en` | ADMIN | Activity History as CSV with the same filters (newest first, at most 5000 rows). Headings, roles, actions and record types are in the chosen language; times in Mogadishu time. Recorded as `AUDIT_EXPORTED`. |
 
 **SMS outbox**
 - Every message starts with `[DEMO]` and is written in the recipient's language.

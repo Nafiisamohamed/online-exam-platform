@@ -28,15 +28,25 @@ export const uid = () => `${Date.now().toString(36)}${(seq++).toString(36)}`.toU
 export const PASSWORD = "Passw0rd-test";
 let cachedHash: string | null = null;
 
-/** Creates a user with password PASSWORD. Students get a student number, staff an email. */
+const PREFIX: Record<RoleName, string> = { STUDENT: "S", LECTURER: "T", ADMIN: "R", INVIGILATOR: "I" };
+let numberSeq = 0;
+/**
+ * A unique test username in the real format. Year 2099 keeps fixtures apart from the numbers the
+ * server generates for the current year, so tests that check generated numbers are not disturbed.
+ */
+export const testUsername = (role: RoleName) => `${PREFIX[role]}-2099-${Date.now()}${(numberSeq++).toString().padStart(3, "0")}`;
+
+/** Creates a user with password PASSWORD. Everyone gets a username; students' student number is it, staff get an email. */
 export async function createUser(role: RoleName, extra: Partial<{ fullName: string; phone: string; mustChangePassword: boolean; tempPasswordExpiresAt: Date; isActive: boolean; preferredLanguage: "so" | "en" }> = {}) {
   cachedHash ??= await hashPassword(PASSWORD);
   const r = await prisma.role.findUniqueOrThrow({ where: { name: role } });
   const id = uid();
+  const username = testUsername(role);
   return prisma.user.create({
     data: {
       roleId: r.id,
-      studentNumber: role === "STUDENT" ? `T-${id}` : null,
+      username,
+      studentNumber: role === "STUDENT" ? username : null,
       email: role === "STUDENT" ? null : `${role.toLowerCase()}.${id.toLowerCase()}@test.local`,
       fullName: extra.fullName ?? `${role} ${id}`,
       phone: extra.phone ?? "+252615000000",

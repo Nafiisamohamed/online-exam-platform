@@ -60,7 +60,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
         │  restricted role exam_app (no owner rights), TLS for Supabase
         ▼
  PostgreSQL 17: campus server (primary) or Supabase (hosted copy)
-   35 tables, CHECK constraints, triggers and row-level security as a second line of defence
+   36 tables, CHECK constraints, triggers and row-level security as a second line of defence
 ```
 
 **Layers**
@@ -188,7 +188,7 @@ erDiagram
   users ||--o{ audit_logs : "performed"
 ```
 
-The full list of 35 tables is in [docs/database.md](docs/database.md#tables-35).
+The full list of 36 tables is in [docs/database.md](docs/database.md#tables-36).
 
 ## Run the API
 
@@ -251,12 +251,16 @@ Every endpoint, with method, path, roles, request, response and error codes: **[
 
 `npm run db:seed:demo` creates fictional accounts for every role (Somali names, `.test` email addresses that can never receive mail):
 
-| Role | Login |
-|---|---|
-| Admin / Registrar | `registrar@uni-demo.test` |
-| Lecturer | `axmed.samatar@uni-demo.test`, `mustafe.jibriil@uni-demo.test`, `khadra.cilmi@uni-demo.test` |
-| Invigilator | `cabdiraxmaan.faarax@uni-demo.test`, `deeqa.aadan@uni-demo.test` |
-| Student | `DEMO-2026-0001` … `DEMO-2026-0010` |
+Everyone signs in with their **username** (an automatic account number); staff can also use their email address.
+
+| Role | Username | Email |
+|---|---|---|
+| Admin / Registrar | `R-2026-001` | `registrar@uni-demo.test` |
+| Lecturer | `T-2026-001`, `T-2026-002`, `T-2026-003` | `axmed.samatar@uni-demo.test`, `khadra.cilmi@uni-demo.test`, `mustafe.jibriil@uni-demo.test` |
+| Invigilator | `I-2026-001`, `I-2026-002` | `cabdiraxmaan.faarax@uni-demo.test`, `deeqa.aadan@uni-demo.test` |
+| Student | `S-2026-001` … `S-2026-010` | – |
+
+**Account numbers.** The server gives every new account the next number of its role and year: `S-YYYY-NNN` (student), `T-` (lecturer), `R-` (registrar), `I-` (invigilator), with YYYY the current year in Mogadishu. After `S-2026-005` comes `S-2026-006`; after `-999` comes `-1000`. Numbers are never typed, also not in the CSV student import (leave `student_id` empty for new students). They come from one counter per role and year in the database, taken inside the transaction that creates the account, so two accounts created at the same moment never share a number. Accounts that existed before numbering kept their identity, password and history; their old student number (e.g. `DEMO-2026-0007`) is kept as `legacy_number`.
 
 **Passwords**
 - Each account gets a random password, stored only as a bcrypt hash.

@@ -8,6 +8,8 @@
  *   password (it says to collect it from the registrar).
  * - Deactivating an account or resetting its password ends its sessions.
  * - Users are never deleted, because exam history refers to them.
+ * - The username (S-/T-/R-/I-YYYY-NNN) is generated here, never typed (services/account-numbers.ts).
+ *   A student's student number is their username.
  */
 import type { Request } from "express";
 import { env } from "../../config/env.ts";
@@ -21,6 +23,7 @@ import { paged } from "../../lib/format.ts";
 import { generateTempPassword, hashPassword } from "../../lib/passwords.ts";
 import { audit } from "../../services/audit.ts";
 import { queueSms } from "../../services/messaging.ts";
+import { nextAccountNumber } from "../../services/account-numbers.ts";
 
 type UserRow = { role: { name: RoleName } } & Record<string, unknown>;
 /** API shape of a user: the role as a plain name. tokenVersion is internal and dropped. */
@@ -31,7 +34,6 @@ export interface NewUser {
   fullName: string;
   phone: string;
   email?: string;
-  studentNumber?: string;
   preferredLanguage?: Language;
 }
 
@@ -42,22 +44,24 @@ export function tempPasswordExpiry(): Date {
 
 /**
  * Creates one account with a temporary password.
+ * The username comes from the role's counter in the same transaction, so it is never duplicated.
  * @returns { user, temporaryPassword }  (the password is shown only this once)
- * @throws 400 STUDENT_NUMBER_REQUIRED / EMAIL_REQUIRED, 409 STUDENT_NUMBER_TAKEN / EMAIL_TAKEN
+ * @throws 400 EMAIL_REQUIRED, 409 EMAIL_TAKEN
  */
 export async function createUser(input: NewUser, actorId: string, req: Request) {
   const isStudent = input.role === "STUDENT";
-  if (isStudent && !input.studentNumber) throw badRequest("STUDENT_NUMBER_REQUIRED", "Students need a student number");
   if (!isStudent && !input.email) throw badRequest("EMAIL_REQUIRED", "Staff accounts need an email address");
   const temporaryPassword = generateTempPassword();
   const passwordHash = await hashPassword(temporaryPassword);
   const role = await usersRepo.findRole(input.role);
   try {
     const user = await transaction(async (tx) => {
+      const username = await nextAccountNumber(tx, input.role);
       const created = await usersRepo.insertUser(
         {
           roleId: role.id,
-          studentNumber: isStudent ? input.studentNumber!.toUpperCase() : null,
+          username,
+          studentNumber: isStudent ? username : null,
           email: isStudent ? null : input.email!.toLowerCase(),
           fullName: input.fullName,
           phone: input.phone,
@@ -77,13 +81,12 @@ export async function createUser(input: NewUser, actorId: string, req: Request) 
     });
     return { user: toUser(user), temporaryPassword };
   } catch (error) {
-    if (isUniqueViolation(error, "student_number")) throw conflict("STUDENT_NUMBER_TAKEN", "This student number is already used");
     if (isUniqueViolation(error, "email")) throw conflict("EMAIL_TAKEN", "This email address is already used");
     throw error;
   }
 }
 
-/** Lists users with optional role and search filters (name, email or student number). */
+/** Lists users with optional role and search filters (name, email or username). */
 export async function listUsers(q: { role?: RoleName; search?: string; active?: boolean; page: number; pageSize: number }) {
   const where = {
     ...(q.role ? { role: { name: q.role } } : {}),
@@ -93,7 +96,7 @@ export async function listUsers(q: { role?: RoleName; search?: string; active?: 
           OR: [
             { fullName: { contains: q.search, mode: "insensitive" as const } },
             { email: { contains: q.search, mode: "insensitive" as const } },
-            { studentNumber: { contains: q.search, mode: "insensitive" as const } },
+            { username: { contains: q.search, mode: "insensitive" as const } },
           ],
         }
       : {}),

@@ -66,7 +66,7 @@ function PreviewRows({ rows }: { rows: EnrolmentImportRow[] }) {
         <span className="block min-w-0">
           <span className="block font-semibold text-foreground">{r.data.fullName || "—"}</span>
           <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-            {r.data.studentNumber || "—"}
+            {r.data.studentNumber || t("admin.enrolment.numberOnSave")}
             <Badge tone={r.data.existingStudent ? "neutral" : "sky"}>{r.data.existingStudent ? t("admin.enrolment.existingStudent") : t("admin.enrolment.newStudent")}</Badge>
           </span>
         </span>

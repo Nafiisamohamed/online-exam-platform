@@ -101,7 +101,15 @@ const STUDENTS = [
   { n: 8, name: "Bashiir Aadan Muuse", phone: "+252618890108", lang: "so", ability: 0.5 },
   { n: 9, name: "Nimco Cabdi Raage", phone: "+252613901209", lang: "so", ability: 0.85 },
   { n: 10, name: "Yaasiin Ibraahim Guuleed", phone: "+252614012310", lang: "so", ability: 0.55 },
-].map((s) => ({ ...s, number: `DEMO-2026-${String(s.n).padStart(4, "0")}` }));
+].map((s) => ({ ...s, number: `S-2026-${String(s.n).padStart(3, "0")}` }));
+
+// Staff usernames: R-/T-/I-2026-NNN in name order within each role (the same rule the
+// account-numbers migration applies to existing accounts).
+const STAFF_PREFIX = { ADMIN: "R", LECTURER: "T", INVIGILATOR: "I" };
+for (const role of Object.keys(STAFF_PREFIX)) {
+  STAFF.filter((s) => s.role === role).sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((s, i) => { s.username = `${STAFF_PREFIX[role]}-2026-${String(i + 1).padStart(3, "0")}`; });
+}
 
 const mcq = (difficulty, text, options, correct = 0) => ({ type: "MCQ", difficulty, marks: 2, text, options, correct });
 const tf = (text, isTrue) => ({ type: "TRUE_FALSE", difficulty: "EASY", marks: 1, text, options: ["TRUE", "FALSE"], correct: isTrue ? 0 : 1 });
@@ -234,8 +242,8 @@ async function main() {
 
     console.log("Hashing demo passwords (bcrypt cost 12)...");
     const accounts = [];
-    for (const s of STAFF) accounts.push({ ...s, login: s.email, password: strongPassword() });
-    for (const s of STUDENTS) accounts.push({ ...s, key: `s${s.n}`, role: "STUDENT", login: s.number, password: strongPassword() });
+    for (const s of STAFF) accounts.push({ ...s, login: s.username, password: strongPassword() });
+    for (const s of STUDENTS) accounts.push({ ...s, key: `s${s.n}`, role: "STUDENT", username: s.number, login: s.number, password: strongPassword() });
     for (const a of accounts) a.hash = await bcrypt.hash(a.password, BCRYPT_COST);
 
     await q("BEGIN");
@@ -248,11 +256,16 @@ async function main() {
     const U = {};
     for (const a of accounts) {
       U[a.key] = (await one(
-        `INSERT INTO users (role_id, student_number, email, full_name, phone, password_hash, preferred_language, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, now()) RETURNING id`,
-        [roleIds[a.role], a.role === "STUDENT" ? a.number : null, a.role === "STUDENT" ? null : a.email, a.name, a.phone, a.hash, a.lang],
+        `INSERT INTO users (role_id, username, student_number, email, full_name, phone, password_hash, preferred_language, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now()) RETURNING id`,
+        [roleIds[a.role], a.username, a.role === "STUDENT" ? a.number : null, a.role === "STUDENT" ? null : a.email, a.name, a.phone, a.hash, a.lang],
       )).id;
     }
+    // Account-number counters continue after the numbers given above (S-/T-/R-/I-2026-NNN).
+    await q(`INSERT INTO account_number_sequences (role, year, last_value)
+             SELECT r.name, split_part(u.username, '-', 2)::int, max(split_part(u.username, '-', 3)::int)
+               FROM users u JOIN roles r ON r.id = u.role_id GROUP BY 1, 2
+             ON CONFLICT (role, year) DO UPDATE SET last_value = GREATEST(account_number_sequences.last_value, EXCLUDED.last_value)`);
     for (const [i, [letter, min]] of GRADING_SCALE.entries()) {
       await q(`INSERT INTO grading_scale (letter, min_percentage, sort_order) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [letter, min, i + 1]);
     }
@@ -627,9 +640,11 @@ async function main() {
       "",
       `Database host: ${new URL(url).hostname}  |  Created: ${new Date().toISOString()}`,
       "",
-      "| Role | Name | Login | Password |",
-      "|---|---|---|---|",
-      ...accounts.map((a) => `| ${a.role} | ${a.name} | ${a.login} | \`${a.password}\` |`),
+      "Sign in with the username, or (staff) the email address.",
+      "",
+      "| Role | Name | Username | Email | Password |",
+      "|---|---|---|---|---|",
+      ...accounts.map((a) => `| ${a.role} | ${a.name} | ${a.login} | ${a.role === "STUDENT" ? "-" : a.email} | \`${a.password}\` |`),
       "",
     ];
     fs.writeFileSync(ACCOUNTS_FILE, lines.join("\n"), { mode: 0o600 });

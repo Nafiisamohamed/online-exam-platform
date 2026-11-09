@@ -20,6 +20,7 @@ const APP_TABLES = [
   "exam_attempts", "attempt_questions", "answers", "focus_events", "time_extensions", "invigilator_notes",
   "essay_marks", "essay_criterion_marks", "grading_scale", "grades", "result_publications", "grade_revisions",
   "payments", "sms_outbox", "notifications",
+  "account_number_sequences",
 ];
 // Add and read only (no UPDATE).
 const HISTORY_TABLES = ["audit_logs", "grade_revisions", "result_publications"];
@@ -34,7 +35,7 @@ describe("access security", () => {
   const actAsApp = () => db.q(`SET LOCAL ROLE exam_app`);
 
   describe("row-level security and the exam_app role", () => {
-    it("enables RLS on all 35 tables and on Prisma's migration history", async () => {
+    it("enables RLS on all 36 tables and on Prisma's migration history", async () => {
       const { rows } = await db.q(
         `SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE n.nspname = 'public' AND c.relkind = 'r'`,

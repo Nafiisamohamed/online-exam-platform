@@ -44,7 +44,7 @@ const SessionContext = createContext<SessionValue | null>(null);
 export const SESSION_CHECK_MS = 30_000;
 
 /** Placeholder so consumers always get a Profile; never displayed while signed out. */
-const NO_PROFILE: Profile = { id: "", role: "STUDENT", fullName: "", email: null, studentNumber: null, phone: "", preferredLanguage: "so", mustChangePassword: false };
+const NO_PROFILE: Profile = { id: "", role: "STUDENT", username: "", fullName: "", email: null, studentNumber: null, phone: "", preferredLanguage: "so", mustChangePassword: false };
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>({ status: "loading" });

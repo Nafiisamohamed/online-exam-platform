@@ -2,6 +2,9 @@
  * Enrolment CSV import (section 4.1, Admin / Registrar).
  *
  * File columns: student_id, student_name, phone, course_codes
+ *   student_id: leave it EMPTY for a new student: the server creates the account and gives it
+ *   the next number (S-YYYY-NNN). Fill it only with the number of an EXISTING student, to
+ *   enrol that student. Numbers are never chosen in the file.
  *   course_codes holds one or more codes separated by ";" "|" or spaces,
  *   e.g. "CS201;CS105". Codes are looked up in the semester the admin chooses.
  *
@@ -9,13 +12,15 @@
  * 1. preview: every row is validated and the results are stored in an
  *    import_batches row (status PREVIEW). Errors are codes, not sentences (P10).
  * 2. confirm: the rows are checked again and only VALID rows are saved:
- *    new students are created with temporary passwords (Q1) and enrolled;
+ *    new students are created with an automatic number and a temporary password (Q1) and enrolled;
  *    existing students are only enrolled. The temporary passwords are returned
  *    once, for the registrar to print or download, and stored only as hashes.
  *
- * Row error codes: STUDENT_ID_REQUIRED, STUDENT_ID_INVALID, STUDENT_NAME_REQUIRED,
+ * Row error codes: STUDENT_ID_INVALID, STUDENT_NOT_FOUND {studentNumber}, STUDENT_NAME_REQUIRED,
  * PHONE_INVALID, COURSE_CODES_REQUIRED, COURSE_NOT_FOUND {code},
  * DUPLICATE_STUDENT_IN_FILE {firstRow}, STUDENT_NAME_MISMATCH {existingName},
+ * STUDENT_ALREADY_EXISTS {studentNumber}: a row without a number has the name and phone of an
+ * existing student (use that student's number instead of creating a second account),
  * SCHEDULE_CONFLICT {course, exam, otherCourse, otherExam}: one of the new
  * courses has an upcoming exam at the same time as another exam of the student.
  */
@@ -23,7 +28,8 @@ import type { Request } from "express";
 import { transaction } from "../../db/prisma.ts";
 import { findCoursesInSemester, findEnrolment, findOverlappingSchedules, insertEnrolment, lockScheduling, setEnrolmentStatus } from "../../repositories/courses.repository.ts";
 import { findImportBatch, insertImportBatch, lockImportBatch, markImportConfirmed } from "../../repositories/imports.repository.ts";
-import { findRole, findStudentsByNumbers, insertUser } from "../../repositories/users.repository.ts";
+import { findRole, findStudentsByNumbers, findStudentsByPhones, insertUser } from "../../repositories/users.repository.ts";
+import { ACCOUNT_NUMBER_RE, nextAccountNumber } from "../../services/account-numbers.ts";
 import { enrolmentConflicts } from "../courses/courses.service.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
 import { normalizeText } from "../../lib/format.ts";
@@ -51,6 +57,8 @@ async function validateRows(rows: Record<string, string>[], semester: string): P
   const numbers = rows.map((r) => (r.student_id ?? "").trim().toUpperCase()).filter(Boolean);
   const existing = await findStudentsByNumbers(numbers);
   const existingByNumber = new Map(existing.map((u) => [u.studentNumber!, u]));
+  const phones = rows.map((r) => normalizeSomaliPhone(r.phone ?? "")).filter((p): p is string => !!p);
+  const samePhone = await findStudentsByPhones([...new Set(phones)]);
   const firstRow = new Map<string, number>();
 
   const results: EnrolmentRow[] = [];
@@ -62,15 +70,21 @@ async function validateRows(rows: Record<string, string>[], semester: string): P
     const phone = normalizeSomaliPhone(raw.phone ?? "");
     const courseCodes = [...new Set((raw.course_codes ?? "").split(/[;|\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean))];
 
-    if (!studentNumber) errors.push({ code: "STUDENT_ID_REQUIRED" });
-    else if (!/^[A-Z0-9-]{3,30}$/.test(studentNumber)) errors.push({ code: "STUDENT_ID_INVALID" });
+    if (studentNumber && !ACCOUNT_NUMBER_RE.test(studentNumber)) errors.push({ code: "STUDENT_ID_INVALID" });
+    else if (studentNumber && !existingByNumber.has(studentNumber)) errors.push({ code: "STUDENT_NOT_FOUND", params: { studentNumber } });
     if (!fullName) errors.push({ code: "STUDENT_NAME_REQUIRED" });
     if (!phone) errors.push({ code: "PHONE_INVALID" });
     if (courseCodes.length === 0) errors.push({ code: "COURSE_CODES_REQUIRED" });
     for (const code of courseCodes) if (!courseByCode.has(code)) errors.push({ code: "COURSE_NOT_FOUND", params: { code } });
-    if (studentNumber) {
-      if (firstRow.has(studentNumber)) errors.push({ code: "DUPLICATE_STUDENT_IN_FILE", params: { firstRow: firstRow.get(studentNumber)! } });
-      else firstRow.set(studentNumber, row);
+    // The same student twice in one file: same number, or (new students) same name and phone.
+    const fileKey = studentNumber || (fullName && phone ? `new:${normalizeText(fullName)}|${phone}` : "");
+    if (fileKey) {
+      if (firstRow.has(fileKey)) errors.push({ code: "DUPLICATE_STUDENT_IN_FILE", params: { firstRow: firstRow.get(fileKey)! } });
+      else firstRow.set(fileKey, row);
+    }
+    if (!studentNumber && fullName && phone) {
+      const twin = samePhone.find((s) => s.phone === phone && normalizeText(s.fullName) === normalizeText(fullName));
+      if (twin) errors.push({ code: "STUDENT_ALREADY_EXISTS", params: { studentNumber: twin.studentNumber! } });
     }
     const known = existingByNumber.get(studentNumber);
     if (known && fullName && normalizeText(known.fullName) !== normalizeText(fullName)) {
@@ -147,22 +161,26 @@ export async function confirmEnrolmentImport(batchId: string, actorId: string, r
 
     let enrolled = 0;
     let reactivated = 0;
+    const created: { row: number; studentNumber: string; studentId: string }[] = [];
     for (const c of credentials) {
+      const username = await nextAccountNumber(tx, "STUDENT");
       const u = await insertUser(
         {
-          roleId: role.id, studentNumber: c.row.data.studentNumber, fullName: c.row.data.fullName, phone: c.row.data.phone,
+          roleId: role.id, username, studentNumber: username, fullName: c.row.data.fullName, phone: c.row.data.phone,
           passwordHash: c.hash, mustChangePassword: true, tempPasswordExpiresAt: tempPasswordExpiry(),
         },
         tx,
       );
       await queueSms(tx, { id: u.id, phone: u.phone, preferredLanguage: u.preferredLanguage }, "ACCOUNT_CREATED", { studentNumber: u.studentNumber! }, { type: "user", id: u.id });
+      created.push({ row: c.row.row, studentNumber: username, studentId: u.id });
     }
-    const students = await findStudentsByNumbers(valid.map((r) => r.data.studentNumber), tx);
+    const students = await findStudentsByNumbers(valid.map((r) => r.data.studentNumber).filter(Boolean), tx);
     const idByNumber = new Map(students.map((s) => [s.studentNumber!, s.id]));
+    const idByRow = new Map(created.map((c) => [c.row, c.studentId]));
     // Same lock as schedule approval: no approval can create a clash while these enrolments are written.
     await lockScheduling(tx);
     for (const r of valid) {
-      const studentId = idByNumber.get(r.data.studentNumber)!;
+      const studentId = r.data.studentNumber ? idByNumber.get(r.data.studentNumber)! : idByRow.get(r.row)!;
       const courseIds = r.data.courseCodes.map((code) => courseByCode.get(code)!);
       const clashes = await enrolmentConflicts(tx, studentId, courseIds);
       if (clashes.length) throw conflict("ENROLMENT_SCHEDULE_CONFLICT", "A schedule changed since the preview; preview the file again", { row: r.row, conflicts: clashes });
@@ -182,16 +200,18 @@ export async function confirmEnrolmentImport(batchId: string, actorId: string, r
       actorId, action: "ENROLMENTS_IMPORTED", entityType: "import_batch", entityId: batchId,
       details: { semester: batch.semester, validRows: valid.length, newStudents: credentials.length, enrolled, reactivated }, req,
     });
-    return { enrolled, reactivated };
+    return { enrolled, reactivated, created };
   });
+  const numberByRow = new Map(result.created.map((c) => [c.row, c.studentNumber]));
 
   return {
     ...summary(fresh),
     savedRows: valid.length,
     newStudents: credentials.length,
-    ...result,
+    enrolled: result.enrolled,
+    reactivated: result.reactivated,
     rows: fresh,
     /** Shown once. Give each student their password privately; it is never stored in plain text. */
-    temporaryPasswords: credentials.map((c) => ({ studentNumber: c.row.data.studentNumber, fullName: c.row.data.fullName, temporaryPassword: c.temporaryPassword })),
+    temporaryPasswords: credentials.map((c) => ({ studentNumber: numberByRow.get(c.row.row)!, fullName: c.row.data.fullName, temporaryPassword: c.temporaryPassword })),
   };
 }

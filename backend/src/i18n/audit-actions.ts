@@ -1,0 +1,144 @@
+/**
+ * Names of audit-log actions in Somali and English, for the Activity History export
+ * (GET /api/audit-logs.csv?lang=so|en). Codes without a label are exported as the code itself.
+ * Keep in step with the "audit.actions" labels of the registrar screens.
+ */
+import type { Language } from "../generated/prisma/enums.ts";
+
+export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
+  so: {
+    USER_CREATED: "sameeyay akoon isticmaale",
+    USER_UPDATED: "wax ka beddelay akoon isticmaale",
+    PASSWORD_RESET: "dib u dejiyay eray sir ah",
+    PASSWORD_CHANGED: "beddelay erayga sirta ah",
+    LOGIN_SUCCESS: "soo galay",
+    LOGIN_FAILED: "isku day gelitaan oo fashilmay",
+    FACULTY_CREATED: "ku daray kulliyad",
+    FACULTY_UPDATED: "beddelay magaca kulliyad",
+    COURSE_CREATED: "sameeyay maado",
+    COURSE_UPDATED: "wax ka beddelay maado",
+    ENROLMENT_CREATED: "diiwaangeliyay arday",
+    ENROLMENT_REACTIVATED: "dib u diiwaangeliyay arday",
+    ENROLMENT_DROPPED: "ka saaray arday",
+    ENROLMENTS_IMPORTED: "soo geliyay diiwaangelinno",
+    EXAM_CREATED: "sameeyay imtixaan",
+    EXAM_UPDATED: "wax ka beddelay imtixaan",
+    EXAM_RULES_UPDATED: "beddelay xeerarka su'aalaha imtixaanka",
+    EXAM_PUBLISHED: "daabacay imtixaan",
+    SCHEDULE_REQUESTED: "codsaday jadwal imtixaan",
+    SCHEDULE_APPROVED: "oggolaaday jadwal imtixaan",
+    SCHEDULE_REJECTED: "diiday jadwal imtixaan",
+    SCHEDULE_CANCELLED: "joojiyay jadwal imtixaan",
+    RESULTS_PUBLISHED: "daabacay natiijooyin",
+    RESULTS_REOPENED: "dib u furay saxitaanka",
+    GRADES_EXPORTED: "dhoofiyay darajooyin",
+    QUESTION_CREATED: "ku daray su'aal",
+    QUESTION_UPDATED: "wax ka beddelay su'aal",
+    QUESTIONS_IMPORTED: "soo geliyay su'aalo",
+    ROOM_CREATED: "ku daray qol imtixaan",
+    ROOM_UPDATED: "wax ka beddelay qol imtixaan",
+    GRADING_SCALE_UPDATED: "beddelay miisaanka darajooyinka",
+    PAYMENT_SUCCEEDED: "dhammaystiray lacag bixin",
+    TIME_EXTENSION_GRANTED: "siiyay waqti dheeraad ah",
+    ANSWER_GRADED: "saxay jawaab",
+    ESSAY_MARKED: "saxay qormo",
+    DISCREPANCY_RESOLVED: "xalliyay kala duwanaansho saxitaan",
+    ATTEMPT_STARTED: "bilaabay imtixaan",
+    ATTEMPT_SUBMITTED: "gudbiyay imtixaan",
+    ATTEMPT_AUTO_SUBMITTED: "si toos ah loo gudbiyay imtixaan waqtiga ugu dambeeya",
+    ATTEMPT_TERMINATED: "imtixaan la joojiyay (xadka beddelka tabka)",
+    INVIGILATOR_NOTE_ADDED: "ku daray qoraal ilaalin",
+    RESULTS_REPUBLISHED: "dib u daabacay natiijooyin",
+    QUESTION_ARCHIVED: "kaydiyay su'aal",
+    QUESTION_RESTORED: "soo celiyay su'aal",
+    PAYMENT_STARTED: "bilaabay lacag bixin",
+    PAYMENT_CONFIRMED: "xaqiijiyay lacag bixin",
+    PAYMENT_CANCELLED: "joojiyay lacag bixin",
+    PAYMENT_FAILED: "lacag bixin ayaa ku fashilantay",
+    PAYMENT_WRONG_PIN: "geliyay PIN khaldan",
+    LOGOUT: "wuu ka baxay",
+    AUDIT_EXPORTED: "soo dejiyay taariikhda hawlaha",
+  },
+  en: {
+    USER_CREATED: "created a user account",
+    USER_UPDATED: "updated a user account",
+    PASSWORD_RESET: "reset a password",
+    PASSWORD_CHANGED: "changed their password",
+    LOGIN_SUCCESS: "signed in",
+    LOGIN_FAILED: "failed sign-in attempt",
+    FACULTY_CREATED: "added a faculty",
+    FACULTY_UPDATED: "renamed a faculty",
+    COURSE_CREATED: "created a course",
+    COURSE_UPDATED: "updated a course",
+    ENROLMENT_CREATED: "enrolled a student",
+    ENROLMENT_REACTIVATED: "re-enrolled a student",
+    ENROLMENT_DROPPED: "dropped a student",
+    ENROLMENTS_IMPORTED: "imported enrolments",
+    EXAM_CREATED: "created an examination",
+    EXAM_UPDATED: "updated an examination",
+    EXAM_RULES_UPDATED: "changed exam question rules",
+    EXAM_PUBLISHED: "published an examination",
+    SCHEDULE_REQUESTED: "requested an exam schedule",
+    SCHEDULE_APPROVED: "approved an exam schedule",
+    SCHEDULE_REJECTED: "rejected an exam schedule",
+    SCHEDULE_CANCELLED: "cancelled an exam schedule",
+    RESULTS_PUBLISHED: "published results",
+    RESULTS_REOPENED: "reopened grading",
+    GRADES_EXPORTED: "exported grades",
+    QUESTION_CREATED: "added a question",
+    QUESTION_UPDATED: "edited a question",
+    QUESTIONS_IMPORTED: "imported questions",
+    ROOM_CREATED: "added an exam room",
+    ROOM_UPDATED: "updated an exam room",
+    GRADING_SCALE_UPDATED: "changed the grading scale",
+    PAYMENT_SUCCEEDED: "completed a payment",
+    TIME_EXTENSION_GRANTED: "granted extra time",
+    ANSWER_GRADED: "graded an answer",
+    ESSAY_MARKED: "marked an essay",
+    DISCREPANCY_RESOLVED: "resolved a grading discrepancy",
+    ATTEMPT_STARTED: "started an exam",
+    ATTEMPT_SUBMITTED: "submitted an exam",
+    ATTEMPT_AUTO_SUBMITTED: "auto-submitted an exam at the deadline",
+    ATTEMPT_TERMINATED: "exam attempt terminated (tab-switch limit)",
+    INVIGILATOR_NOTE_ADDED: "added an invigilation note",
+    RESULTS_REPUBLISHED: "republished results",
+    QUESTION_ARCHIVED: "archived a question",
+    QUESTION_RESTORED: "restored a question",
+    PAYMENT_STARTED: "started a payment",
+    PAYMENT_CONFIRMED: "confirmed a payment",
+    PAYMENT_CANCELLED: "cancelled a payment",
+    PAYMENT_FAILED: "had a payment fail",
+    PAYMENT_WRONG_PIN: "entered a wrong payment PIN",
+    LOGOUT: "signed out",
+    AUDIT_EXPORTED: "exported the activity history",
+  },
+};
+
+/** Role names in the export. */
+export const ROLE_LABELS: Record<Language, Record<string, string>> = {
+  so: { ADMIN: "Diiwaangeliye", LECTURER: "Macallin", STUDENT: "Arday", INVIGILATOR: "Ilaaliye imtixaan" },
+  en: { ADMIN: "Registrar", LECTURER: "Lecturer", STUDENT: "Student", INVIGILATOR: "Invigilator" },
+};
+
+/** Column headings of the Activity History CSV. */
+export const ACTIVITY_CSV_HEADER: Record<Language, string[]> = {
+  so: ["Taariikhda iyo waqtiga (Muqdisho)", "Qofka", "Magaca isticmaalaha", "Doorka", "Falka", "Nooca diiwaanka", "Aqoonsiga diiwaanka"],
+  en: ["Date and time (Mogadishu)", "User", "Username", "Role", "Action", "Record type", "Record ID"],
+};
+
+/** Shown in the export for entries without a person (failed sign-ins, automatic jobs). */
+export const SYSTEM_ACTOR: Record<Language, string> = { so: "Nidaamka", en: "System" };
+
+/** Record types in the export (unknown types are exported as they are). */
+export const ENTITY_LABELS: Record<Language, Record<string, string>> = {
+  so: {
+    user: "Akoon", course: "Maaddo", faculty: "Kulliyad", exam: "Imtixaan", exam_schedule: "Jadwalka imtixaanka",
+    exam_attempt: "Isku dayga imtixaanka", answer: "Jawaab", question: "Su'aal", import_batch: "Soo dejin", payment: "Lacag bixin",
+    room: "Qol", grading_scale: "Miisaanka darajooyinka", audit_log: "Taariikhda hawlaha", enrolment: "Diiwaangelin",
+  },
+  en: {
+    user: "Account", course: "Course", faculty: "Faculty", exam: "Examination", exam_schedule: "Exam schedule",
+    exam_attempt: "Exam attempt", answer: "Answer", question: "Question", import_batch: "Import", payment: "Payment",
+    room: "Room", grading_scale: "Grading scale", audit_log: "Activity history", enrolment: "Enrolment",
+  },
+};

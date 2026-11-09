@@ -1,8 +1,8 @@
 /**
  * Authentication service: login, password change and language preference.
  *
- * Login names: students use their student number (e.g. DEMO-2026-0001), staff
- * use their email address. A failed login always returns the same
+ * Login names: everyone can use their username (S-/T-/R-/I-YYYY-NNN, e.g. S-2026-001);
+ * staff can also use their email address. A failed login always returns the same
  * INVALID_CREDENTIALS error, whether the account is missing, inactive or the
  * password is wrong, and takes the same time (a dummy bcrypt comparison runs
  * for unknown names), so accounts cannot be discovered.
@@ -23,6 +23,7 @@ import { audit } from "../../services/audit.ts";
 export interface Profile {
   id: string;
   role: string;
+  username: string;
   fullName: string;
   email: string | null;
   studentNumber: string | null;
@@ -36,6 +37,7 @@ function toProfile(u: { role: { name: string } } & Omit<Profile, "role">): Profi
   return {
     id: u.id,
     role: u.role.name,
+    username: u.username,
     fullName: u.fullName,
     email: u.email,
     studentNumber: u.studentNumber,
@@ -45,12 +47,12 @@ function toProfile(u: { role: { name: string } } & Omit<Profile, "role">): Profi
   };
 }
 
-/** Finds a user by email (contains "@") or by student number. */
+/** Finds a user by email (contains "@") or by username (a student's username is their student number). */
 function findByIdentifier(identifier: string) {
   const id = identifier.trim();
   return id.includes("@")
     ? usersRepo.findUserForLoginWithPassword({ email: id.toLowerCase() })
-    : usersRepo.findUserForLoginWithPassword({ studentNumber: id.toUpperCase() });
+    : usersRepo.findUserForLoginWithPassword({ username: id.toUpperCase() });
 }
 
 /**
@@ -72,6 +74,19 @@ export async function login(identifier: string, password: string, req: Request) 
   }
   await audit(null, { actorId: user.id, action: "LOGIN_SUCCESS", entityType: "user", entityId: user.id, req });
   return { profile: toProfile({ ...user, role: user.role }), tokenVersion: user.tokenVersion };
+}
+
+/**
+ * Signs out on the server: the session's token version is incremented, so the cookie (and any
+ * copy of it) stops working at once, on every device of this user. Does nothing for a missing,
+ * invalid or already ended session.
+ */
+export async function logout(claims: { sub: string; ver: number } | null, req: Request) {
+  if (!claims) return;
+  await transaction(async (tx) => {
+    if ((await usersRepo.revokeSessions(claims.sub, claims.ver, tx)) === 0) return;
+    await audit(tx, { actorId: claims.sub, action: "LOGOUT", entityType: "user", entityId: claims.sub, req });
+  });
 }
 
 /** The user's public profile (no password hash). */

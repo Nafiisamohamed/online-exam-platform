@@ -130,9 +130,8 @@ function UserView({ user }: { user: AdminUser }) {
             <DetailList
               items={[
                 { label: t("admin.users.role"), value: t(`roles.${user.role}`) },
-                user.role === "STUDENT"
-                  ? { label: t("admin.users.studentNumber"), value: user.studentNumber ?? "—" }
-                  : { label: t("admin.users.email"), value: user.email ?? "—" },
+                { label: t("admin.users.username"), value: user.username },
+                ...(user.role === "STUDENT" ? [] : [{ label: t("admin.users.email"), value: user.email ?? "—" }]),
                 { label: t("admin.users.phone"), value: user.phone },
                 { label: t("admin.users.preferredLanguage"), value: t(`language.${user.preferredLanguage}`) },
                 { label: t("admin.created"), value: formatDate(user.createdAt, locale) },
@@ -182,7 +181,7 @@ function UserView({ user }: { user: AdminUser }) {
         closeLabel={t("common.close")}
         footer={<Button onClick={() => setTempPassword(null)}>{t("admin.users.done")}</Button>}
       >
-        {tempPassword && <TemporaryPassword name={user.fullName} login={user.studentNumber ?? user.email} password={tempPassword} />}
+        {tempPassword && <TemporaryPassword name={user.fullName} login={user.username} password={tempPassword} />}
       </Modal>
     </>
   );

@@ -12,14 +12,20 @@ export async function roleId(db, name) {
   return (await db.one(`SELECT id FROM roles WHERE name = $1`, [name])).id;
 }
 
-/** Creates a user. Students get a student number; staff get an email. */
+const PREFIX = { STUDENT: "S", LECTURER: "T", ADMIN: "R", INVIGILATOR: "I" };
+let numberSeq = 0;
+/** A unique username in the real format (year 2099, so it never meets a generated number). */
+export const testUsername = (role) => `${PREFIX[role]}-2099-${Date.now()}${String(numberSeq++).padStart(3, "0")}`;
+
+/** Creates a user with a username; a student's student number is the username, staff get an email. */
 export async function createUser(db, role = "STUDENT") {
   const isStudent = role === "STUDENT";
+  const username = testUsername(role);
   return db.one(
-    `INSERT INTO users (role_id, student_number, email, full_name, phone, password_hash, updated_at)
-     VALUES ($1, $2, $3, 'Test User', '+252615000000', 'not-a-real-hash', now())
+    `INSERT INTO users (role_id, username, student_number, email, full_name, phone, password_hash, updated_at)
+     VALUES ($1, $2, $3, $4, 'Test User', '+252615000000', 'not-a-real-hash', now())
      RETURNING id, preferred_language`,
-    [await roleId(db, role), isStudent ? `S-${uid()}` : null, isStudent ? null : `${uid()}@uni.test`],
+    [await roleId(db, role), username, isStudent ? username : null, isStudent ? null : `${uid()}@uni.test`],
   );
 }
 
