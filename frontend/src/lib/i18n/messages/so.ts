@@ -38,6 +38,7 @@ export const so: Messages = {
     grading: "Saxitaanka",
     results: "Natiijooyinka",
     allResults: "Natiijooyinka oo dhan",
+    sms: "Maareynta SMS",
     analytics: "Falanqeyn",
     payments: "Lacag bixinta",
     myExams: "Imtixaannadayda",

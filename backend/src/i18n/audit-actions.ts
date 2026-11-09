@@ -72,6 +72,10 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     SEMESTER_FEE_CREATED: "dejiyay khidmad semestar",
     SEMESTER_FEE_UPDATED: "beddelay khidmad semestar",
     PAYMENT_REMINDERS_SENT: "diray xusuusin lacag bixin",
+    SMS_TEMPLATE_CREATED: "sameeyay qaab fariin SMS",
+    SMS_TEMPLATE_UPDATED: "beddelay qaab fariin SMS",
+    SMS_GROUP_SENT: "u diray fariin koox",
+    SMS_RETRIED: "mar kale isku dayay SMS",
   },
   en: {
     USER_CREATED: "created a user account",
@@ -139,6 +143,10 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     SEMESTER_FEE_CREATED: "set a semester fee",
     SEMESTER_FEE_UPDATED: "changed a semester fee",
     PAYMENT_REMINDERS_SENT: "sent payment reminders",
+    SMS_TEMPLATE_CREATED: "created an SMS template",
+    SMS_TEMPLATE_UPDATED: "changed an SMS template",
+    SMS_GROUP_SENT: "sent a group message",
+    SMS_RETRIED: "retried an SMS",
   },
 };
 
@@ -163,12 +171,12 @@ export const ENTITY_LABELS: Record<Language, Record<string, string>> = {
     user: "Akoon", course: "Maaddo", faculty: "Kulliyad", exam: "Imtixaan", exam_schedule: "Jadwalka imtixaanka",
     exam_attempt: "Isku dayga imtixaanka", answer: "Jawaab", question: "Su'aal", import_batch: "Soo dejin", payment: "Lacag bixin",
     room: "Qol", grading_scale: "Miisaanka darajooyinka", audit_log: "Taariikhda hawlaha", enrolment: "Diiwaangelin",
-    academic_year: "Sannad-dugsiyeed", student_registration: "Diiwaangelinta ardayga", semester_fee: "Khidmadda semestarka",
+    academic_year: "Sannad-dugsiyeed", student_registration: "Diiwaangelinta ardayga", semester_fee: "Khidmadda semestarka", sms_template: "Qaabka fariinta SMS", sms: "SMS",
   },
   en: {
     user: "Account", course: "Course", faculty: "Faculty", exam: "Examination", exam_schedule: "Exam schedule",
     exam_attempt: "Exam attempt", answer: "Answer", question: "Question", import_batch: "Import", payment: "Payment",
     room: "Room", grading_scale: "Grading scale", audit_log: "Activity history", enrolment: "Enrolment",
-    academic_year: "Academic year", student_registration: "Student registration", semester_fee: "Semester fee",
+    academic_year: "Academic year", student_registration: "Student registration", semester_fee: "Semester fee", sms_template: "SMS template", sms: "SMS",
   },
 };
