@@ -23,11 +23,12 @@ import { transaction } from "../../db/prisma.ts";
 import { findExpiredAttemptsOfExam } from "../../repositories/attempts.repository.ts";
 import { findExamWithCourse, lockExam, updateExam } from "../../repositories/exams.repository.ts";
 import * as resultsRepo from "../../repositories/results.repository.ts";
+import type { ResultSearchFilter } from "../../repositories/results.repository.ts";
 import type { Language } from "../../generated/prisma/enums.ts";
 import { formatDateTime, LABELS } from "../../i18n/messages.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { badRequest, conflict, notFound } from "../../lib/errors.ts";
-import { num, num0 } from "../../lib/format.ts";
+import { num, num0, paged } from "../../lib/format.ts";
 import { buildPdf } from "../../lib/pdf.ts";
 import { toCsv } from "../../lib/uploads.ts";
 import { manageableExam } from "../../services/access.ts";
@@ -297,4 +298,27 @@ export async function attemptReview(user: AuthUser, examId: string, attemptId: s
       };
     }),
   };
+}
+
+/**
+ * Registrar's read-only results search (Phase 5): every submitted or terminated attempt with its
+ * marks (if graded), the exam's publication state and how many times it was published. The
+ * registrar can only look: publishing, changing marks and reopening stay with the lecturer.
+ */
+export async function searchResults(f: ResultSearchFilter & { page: number; pageSize: number }) {
+  const [rows, total] = await resultsRepo.searchResults(f, (f.page - 1) * f.pageSize, f.pageSize);
+  const items = rows.map((r) => ({
+    attemptId: r.id,
+    attemptStatus: r.status,
+    submittedAt: r.submittedAt,
+    student: r.student,
+    exam: { id: r.exam.id, title: r.exam.title, examType: r.exam.examType, resultsStatus: r.exam.resultsStatus },
+    course: { id: r.exam.course.id, code: r.exam.course.code, name: r.exam.course.name, semesterNumber: r.exam.course.semesterNumber },
+    faculty: r.exam.course.faculty,
+    academicYear: r.exam.course.academicYear,
+    grade: r.grade ? { totalScore: Number(r.grade.totalScore), maxScore: Number(r.grade.maxScore), percentage: Number(r.grade.percentage), letterGrade: r.grade.letterGrade } : null,
+    lastPublication: r.exam.publications[0] ?? null,
+    revisions: r._count.gradeRevisions,
+  }));
+  return paged(items, total, f.page, f.pageSize);
 }

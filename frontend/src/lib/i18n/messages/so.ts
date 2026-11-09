@@ -37,6 +37,7 @@ export const so: Messages = {
     exams: "Imtixaannada",
     grading: "Saxitaanka",
     results: "Natiijooyinka",
+    allResults: "Natiijooyinka oo dhan",
     analytics: "Falanqeyn",
     payments: "Lacag bixinta",
     myExams: "Imtixaannadayda",

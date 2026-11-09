@@ -383,3 +383,19 @@ export interface FeeStatusPage {
   counts: Record<"PAID" | "PARTIAL" | "UNPAID" | "NO_FEE", number>;
   missingFees: { faculty: { id: string; code: string; name: string }; semesterNumber: number }[];
 }
+
+/** GET /api/results-search (registrar, read only): one row per submitted or terminated attempt. */
+export interface ResultSearchRow {
+  attemptId: string;
+  attemptStatus: "SUBMITTED" | "TERMINATED";
+  submittedAt: string | null;
+  student: { id: string; fullName: string; username: string };
+  exam: { id: string; title: string; examType: ExamType; resultsStatus: ResultsStatus };
+  course: { id: string; code: string; name: string; semesterNumber: number | null };
+  faculty: { id: string; code: string };
+  academicYear: { id: string; name: string } | null;
+  grade: { totalScore: number; maxScore: number; percentage: number; letterGrade: string } | null;
+  lastPublication: { publicationNumber: number; publishedAt: string } | null;
+  revisions: number;
+}
+export interface ResultSearchPage { items: ResultSearchRow[]; total: number; page: number; pageSize: number }
