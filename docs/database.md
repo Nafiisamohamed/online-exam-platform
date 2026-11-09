@@ -51,17 +51,17 @@ Every rule below is covered by the automated tests. See [testing.md](testing.md)
 - Foreign keys use `ON DELETE RESTRICT`, so history rows are never removed by cascade. The one exception is `exam_rule_topics`, which is deleted with its rule; a rule already used by an attempt cannot be deleted, because `attempt_questions` references it.
 - Money and marks use `DECIMAL`, never floating point.
 
-## Tables (39)
+## Tables (42)
 
 | Group | Tables |
 |---|---|
 | A. Users and access | `roles`, `users`, `audit_logs`, `account_number_sequences` |
 | B. Courses and enrolment | `academic_years`, `faculties`, `faculty_lecturers`, `courses`, `student_registrations`, `enrolments` |
 | C. Question bank | `topics`, `questions`, `question_versions`, `question_options`, `accepted_answers`, `rubric_criteria`, `import_batches` |
-| D. Exams and scheduling | `exams`, `exam_rules`, `exam_rule_topics`, `exam_schedules`, `rooms`, `schedule_rooms`, `schedule_invigilators` |
+| D. Exams and scheduling | `exams`, `exam_rules`, `exam_rule_topics`, `exam_excluded_questions`, `exam_schedules`, `rooms`, `schedule_rooms`, `schedule_invigilators` |
 | E. Attempts | `exam_attempts`, `attempt_questions`, `answers`, `focus_events`, `time_extensions`, `invigilator_notes` |
 | F. Grading and results | `essay_marks`, `essay_criterion_marks`, `grading_scale`, `grades`, `result_publications`, `grade_revisions` |
-| G. Payments and messages (simulated) | `payments`, `sms_outbox`, `notifications` |
+| G. Payments and messages (simulated) | `semester_fees`, `payments`, `sms_templates`, `sms_outbox`, `notifications` |
 
 Analytics (difficulty index, discrimination, score statistics) are calculated with queries and have no tables.
 
@@ -193,17 +193,17 @@ The migration creates `exam_app` without a password. Each environment enables lo
 
 | Tables | Privileges |
 |---|---|
-| All 39 tables | SELECT, INSERT, UPDATE |
+| All 42 tables | SELECT, INSERT, UPDATE |
 | `audit_logs`, `grade_revisions`, `result_publications` | SELECT, INSERT only (the append-only triggers also block changes) |
-| `question_options`, `accepted_answers`, `rubric_criteria`, `exam_rules`, `exam_rule_topics`, `schedule_rooms`, `schedule_invigilators`, `grading_scale` | Also DELETE, for editing drafts. Locked versions and used rules stay protected by the triggers and foreign keys. |
+| `question_options`, `accepted_answers`, `rubric_criteria`, `exam_rules`, `exam_rule_topics`, `schedule_rooms`, `schedule_invigilators`, `grading_scale`, `exam_excluded_questions` | Also DELETE, for editing drafts. Locked versions and used rules stay protected by the triggers and foreign keys. |
 | `_prisma_migrations` | None |
 
 `exam_app` has no TRUNCATE, REFERENCES or TRIGGER privilege and owns no objects. It therefore **cannot switch off triggers, drop constraints or alter tables**, so the database rules hold even if the application had a bug or an SQL injection.
 
 ### Row-level security
 
-- RLS is enabled on all 39 tables and on `_prisma_migrations`. The migration fails if any table in `public` is left without RLS.
-- Each of the 39 tables has exactly one policy, `<table>_exam_app_access`, applying **only to `exam_app`**, with `USING (true) WITH CHECK (true)`.
+- RLS is enabled on all 42 tables and on `_prisma_migrations`. The migration fails if any table in `public` is left without RLS.
+- Each of the 42 tables has exactly one policy, `<table>_exam_app_access`, applying **only to `exam_app`**, with `USING (true) WITH CHECK (true)`.
 - There is no policy for `PUBLIC`, `anon`, `authenticated` or `service_role`. A role without a policy sees no rows, even if it has been granted table privileges.
 - The owner is not restricted by RLS, so migrations and the Prisma CLI work as before.
 

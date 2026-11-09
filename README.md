@@ -9,7 +9,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 - invigilators can watch the session live;
 - lecturers get question analytics.
 
-> **Status:** the database and the **backend API are complete and tested**. The **frontend foundation** (design system, app shell for the four roles, light and dark mode, Somali/English, profile page and chart components) is in place, and the **registrar (admin) dashboard** is built on the live API: overview, users, faculties, courses, enrolment with CSV import, examination oversight, and reports. The **lecturer dashboard** is built too: question bank with CSV import, exam builder, schedule requests, grading (including blind second grading), results publication and analytics. The **student dashboard** is built: courses, examinations with countdowns, the **exam screen** (server-synced timer, autosave with recovery, tab-switch reporting, submission), published results with the result slip, and exam-fee payments (simulated). The **invigilator dashboard** is built: assigned sessions, a live monitoring table (not started / in progress / disconnected / submitted), tab-switch log, individual time extensions and session notes. **Sign-in and account** are complete: every page needs a signed-in session (visitors are sent to `/sign-in` and return to the page they asked for), temporary passwords must be changed first, and the profile page changes the password.
+> **Status:** complete and running. One application, one codebase, one database: the backend API, the database (PostgreSQL 17 on Supabase, 9 migrations, 42 tables) and the screens for all four roles (registrar, lecturer, student, invigilator) in Somali and English, with light and dark mode. Payments and SMS are **simulated**: no money moves and no real text message is sent. A step-by-step guide for trying everything by hand is in [docs/manual-testing.md](docs/manual-testing.md).
 
 ![CI](https://github.com/Nafiisamohamed/online-exam-platform/actions/workflows/ci.yml/badge.svg)
 
@@ -19,33 +19,31 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 
 | Area | Brief | Status |
 |---|---|---|
-| Four roles with server-side permission checks on every request | 2, 6.2 | ✅ Done (API) |
-| Faculties, courses, enrolment, CSV student import, dropping without losing results; academic years, Semesters 1–8, lecturers assigned to faculties, student registration per year and semester, enrolling a semester group | 4.1 | ✅ Done |
-| Question bank (MCQ, True/False, short answer, essay), images, versions for used questions | 4.2 | ✅ Done (API) |
-| CSV question import with preview, error reasons and duplicate skipping | 4.3 | ✅ Done (API) |
-| Exam builder with difficulty rules, enough-questions check and a sample preview | 4.4 | ✅ Done (API) |
-| Scheduling: request and approval; conflicts blocked for students, rooms and invigilators | 4.5 | ✅ Done (API) |
+| Four roles (registrar, lecturer, student, invigilator) with server-side permission checks on every request; automatic account numbers (`S-`, `T-`, `R-`, `I-YYYY-NNN`); sign-in by username; server-side sign-out | 2, 6.2 | ✅ Done |
+| Academic years, Semesters 1–8, faculties with assigned lecturers, courses per year and semester, student registration and enrolling a whole semester group; CSV student import | 4.1 | ✅ Done |
+| Question bank (MCQ, True/False, short answer, essay), images, versions for used questions; **question review** (only reviewed questions go into newly published exams) | 4.2 | ✅ Done |
+| CSV question import with preview, error reasons and duplicate skipping | 4.3 | ✅ Done |
+| Exam builder: **exam type** (Quiz, Midterm, Final), question rules by type, difficulty and marks, enough-questions check, unticking individual questions, sample preview | 4.4 | ✅ Done |
+| Scheduling: lecturer request, registrar approval; duration worked out from the window; **rooms with capacity** (summed; unknown capacity needs confirmation; too small blocks approval); conflicts blocked | 4.5 | ✅ Done |
 | **Fair randomized exams**: different sets, equal difficulty and marks | 3 | ✅ Done, tested |
 | **Server-side deadline**: late answers rejected, automatic submission | 3, 4.7 | ✅ Done, tested |
 | **Recovery**: same questions, saved answers and remaining time after a reload | 3, 4.7 | ✅ Done, tested |
-| Tab-switch logging (only losses of 1 second or more count); **the 3rd counted switch terminates the attempt** (saved answers kept and sent to the lecturer) | 4.8 | ✅ Done. Project policy, stricter than the brief (which asks for a warning after 3 and leaves any penalty to the lecturer). |
-| Invigilator live view, disconnected after 30 s, notes, extensions of up to 15 min | 4.9 | ✅ Done (API) |
-| Automatic grading; unmatched short answers marked "Needs review" | 4.10 | ✅ Done |
-| Essay grading with a rubric; optional blind second grader | 4.11 | ✅ Done (API) |
-| Results with full publication history, change notifications, answer review | 4.12 | ✅ Done (API) |
-| Difficulty index, discrimination, statistics, CSV grade export | 4.13 | ✅ Done (API) |
-| Dashboard charts from real queries | 6.7 | 🟡 Partial: data endpoints done; the charts are drawn by the frontend |
-| Somali and English | 6.8 | 🟡 Partial: SMS, notifications, PDFs and CSV headers are translated by the server; the screens are frontend work |
-| Simulated EVC Plus, Zaad and eDahab payments, with a receipt | 7 | ✅ Done (API) |
-| Simulated SMS outbox | 7 | ✅ Done |
-| Audit log of sensitive actions | 6.2 | ✅ Done |
-| Automated tests (one command) and CI | 6.4 | ✅ Done: 257 tests, GitHub Actions |
-| Screens (Next.js, mobile layout, language switch) | 6.1, 6.8 | ⏳ Next stage |
+| Tab-switch logging (only losses of 1 second or more count); **the 3rd counted switch terminates the attempt** (saved answers kept and sent to the lecturer) | 4.8 | ✅ Done. Project policy, stricter than the brief. |
+| Invigilator live view, disconnected after 30 s, notes, extensions of up to 15 min | 4.9 | ✅ Done |
+| Automatic grading; unmatched short answers marked "Needs review"; essay rubric; optional blind second grader | 4.10, 4.11 | ✅ Done |
+| **Grading** (marking) and **Results** (publish, revise with a reason, publication history, CSV export) as separate lecturer pages; registrar **read-only results search** | 4.12 | ✅ Done |
+| Difficulty index, discrimination, statistics, dashboard charts from real queries | 4.13, 6.7 | ✅ Done |
+| **Semester fees** per faculty, year and semester; partial payments with simulated EVC Plus, Zaad and eDahab; receipts; **exam eligibility** (Quiz 30 %, Midterm 50 %, Final 100 % of the fee paid); registrar paid / partly paid / unpaid lists and reminders | 7 | ✅ Done (simulated) |
+| **SMS Management**: Somali and English templates, group messages by role, faculty, year, semester or course, outbox with statuses and retry; in-app notifications | 7 | ✅ Done (simulated) |
+| **Activity History**: who did what and when, with filters and a Somali or English CSV export | 6.2 | ✅ Done |
+| Manual testing guide with five demo scenarios: [docs/manual-testing.md](docs/manual-testing.md) | – | ✅ Done |
+| Somali and English everywhere (screens, SMS, notifications, PDFs, CSV headers) | 6.8 | ✅ Done |
+| Automated tests (one command) and CI | 6.4 | ✅ Done: 301 backend + 46 frontend tests, GitHub Actions |
 
 ## Architecture
 
 ```
- Browser (Next.js, next stage)
+ Browser (Next.js 16, frontend/)
         │  HTTPS / JSON, HTTP-only session cookie
         ▼
  Express API  backend/src
@@ -60,7 +58,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
         │  restricted role exam_app (no owner rights), TLS for Supabase
         ▼
  PostgreSQL 17: campus server (primary) or Supabase (hosted copy)
-   39 tables, CHECK constraints, triggers and row-level security as a second line of defence
+   42 tables, CHECK constraints, triggers and row-level security as a second line of defence
 ```
 
 **Layers**
@@ -90,6 +88,9 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | payments | `src/modules/payments` |
 | messages | `src/modules/messages` |
 | analytics | `src/modules/analytics` |
+| academic structure | `src/modules/academic` |
+| semester fees and eligibility | `src/modules/fees`, `src/services/eligibility.ts` |
+| SMS Management | `src/modules/sms` |
 | rooms | `src/modules/rooms` |
 | grading scale | `src/modules/grading-scale` |
 
@@ -121,7 +122,7 @@ You need **Node.js 20 or newer** and **Git**. Docker and a PostgreSQL installati
 git clone https://github.com/Nafiisamohamed/online-exam-platform.git
 cd online-exam-platform/backend
 npm install            # also generates the Prisma Client
-npm test               # 257 tests on a throwaway PostgreSQL 17, started automatically
+npm test               # 301 tests on a throwaway PostgreSQL 17, started automatically
 ```
 
 ## Database setup
@@ -133,7 +134,7 @@ npm test               # 257 tests on a throwaway PostgreSQL 17, started automat
 3. Run, from `backend/`:
 
 ```bash
-npm run db:migrate        # prisma migrate deploy: applies the 3 migrations
+npm run db:migrate        # prisma migrate deploy: applies the 9 migrations
 npm run db:app-password   # enables the restricted exam_app login and writes DATABASE_URL
 npm run db:seed:demo      # optional demo data: Somali names, real cities, USD fees
 npm run db:seed:demo:analytics  # optional: 30 more students and a 38-student exam for analytics (loaded on Supabase)
@@ -156,19 +157,27 @@ More on the database:
 ```mermaid
 erDiagram
   roles ||--o{ users : has
+  academic_years ||--o{ courses : "offered in"
   faculties ||--o{ courses : offers
+  faculties ||--o{ faculty_lecturers : has
+  users ||--o{ faculty_lecturers : "lecturer of"
+  users ||--o{ student_registrations : "registered (year, semester)"
+  academic_years ||--o{ student_registrations : for
+  faculties ||--o{ student_registrations : in
   users ||--o{ courses : teaches
   courses ||--o{ enrolments : has
   users ||--o{ enrolments : "is enrolled"
   courses ||--o{ questions : "question bank"
-  questions ||--|{ question_versions : "versions"
+  questions ||--|{ question_versions : "versions (reviewed one marked)"
   question_versions ||--o{ question_options : has
   question_versions ||--o{ accepted_answers : has
   question_versions ||--o{ rubric_criteria : has
-  courses ||--o{ exams : has
+  courses ||--o{ exams : "Quiz / Midterm / Final"
   exams ||--|{ exam_rules : "selection rules"
+  exams ||--o{ exam_excluded_questions : "unticked questions"
   exams ||--o{ exam_schedules : "requested / approved"
   exam_schedules ||--o{ schedule_rooms : in
+  rooms ||--o{ schedule_rooms : "capacity"
   exam_schedules ||--o{ schedule_invigilators : watched-by
   exams ||--o{ exam_attempts : "one per student"
   users ||--o{ exam_attempts : sits
@@ -181,14 +190,18 @@ erDiagram
   exam_attempts ||--o| grades : "working grade"
   exams ||--o{ result_publications : published
   result_publications ||--|{ grade_revisions : "permanent snapshots"
+  academic_years ||--o{ semester_fees : "fee per faculty and semester"
+  faculties ||--o{ semester_fees : for
+  semester_fees ||--o{ payments : "paid in parts"
+  exams ||--o{ payments : "older exam fees (history)"
   users ||--o{ payments : pays
-  exams ||--o{ payments : "fee for"
   users ||--o{ sms_outbox : receives
+  users ||--o{ sms_templates : "writes (registrar)"
   users ||--o{ notifications : receives
   users ||--o{ audit_logs : "performed"
 ```
 
-The full list of 39 tables is in [docs/database.md](docs/database.md#tables-39).
+The full list of 42 tables is in [docs/database.md](docs/database.md#tables-42).
 
 ## Run the API
 
@@ -232,7 +245,7 @@ npm run build && npm start   # production build
 
 ```bash
 cd backend
-npm test            # everything: 150 database + 80 API + 27 unit tests
+npm test            # everything: database, API and unit tests (301)
 npm run test:api    # API only
 npm run test:unit   # pure logic only
 npm run verify:db   # non-destructive checks against an existing database, e.g. Supabase
@@ -277,29 +290,28 @@ See [docs/demo-data.md](docs/demo-data.md) for the full dataset.
 | Area | How it is handled |
 |---|---|
 | Passwords | bcrypt (cost 12). Temporary passwords must be changed at first login and expire after 7 days. |
-| Sessions | JWT in an HTTP-only, SameSite=Strict cookie. A password change or deactivation ends all sessions. Signing out clears the cookie in the browser; the signed token itself is stateless, so a copy of it would stay valid until it expires (see the limitations below). |
+| Sessions | JWT in an HTTP-only, SameSite=Strict cookie. Signing out ends the session on the server (the token stops working at once). A password change or deactivation ends all sessions. |
 | Permissions | The role and record ownership are checked on the server for every request. Other people's records return 404. |
 | Input | Validated with zod. Uploads are size-limited and type-checked. CSV exports are protected against spreadsheet formulas. |
 | Rate limits | On the API, the login and the demo PIN |
 | Audit log | Sensitive actions are logged (append-only). Secrets are removed from log details. |
 | Database role | The API connects as `exam_app`: not the owner, no RLS bypass, can't disable triggers or alter tables |
-| Simulated services | Payments and SMS can only run simulated: the server refuses to start otherwise |
+| Simulated services | Payments and SMS can only run simulated: the server refuses to start otherwise, every SMS starts with `[DEMO]` and receipts say "Simulated payment – no money was transferred." |
 | Secrets | `.env` is ignored by git. `.env.example` contains placeholders only. |
 
 ## Known limitations
 
 | Limitation | Notes |
 |---|---|
-| Frontend modules not built | Every menu entry opens a finished page. The registrar reviews, approves and rejects lecturers' schedule requests under **Schedule requests** (`/admin/schedules`). There are no separate registrar screens for exam rooms, payments, the SMS outbox or the audit log (the API supports them). |
-| Sign-out does not revoke the token | `POST /api/auth/logout` only clears the cookie. The session token is stateless (8 hours), so a copy of it taken before sign-out keeps working until it expires, or until the password is changed or the account is deactivated. Revoking it on logout would need a backend change (bumping the user's token version), which also ends the same user's other devices, so it was left for the owner to decide. |
-| Invigilator dashboard limits (from the API) | Invigilators see only status: no questions, answers or marks. The backend does not give them the exam’s instructions or the enrolled count outside the live list, and has no separate “incident” record, so observations are the session notes (author and time recorded by the server). The live list is polled every 5 seconds; there is no push channel. |
-| Profile limits (from the API) | A profile cannot be edited except for the language used for SMS and notifications (PATCH /api/auth/language) and the password; there is no photo upload. The faculty shown for a student is the faculty of their enrolled courses (the profile endpoint has no faculty field). |
-| Lecturer dashboard limits (from the API) | Lecturers see enrolled students per course (read-only) and per-exam results; there is no per-student profile endpoint for them. The audit log is registrar-only, so the lecturer overview shows the lecturer's own notifications as recent activity. |
-| Registrar dashboard limits (from the API) | The backend has no faculty delete or deactivate, no course status, and no list of all enrolments (they are listed per course). Reports have no date filter, and PDF export exists only for students. The screens say so instead of offering these. |
-| Somali texts | The Somali translations in `frontend/src/lib/i18n/messages/so.ts` should be reviewed by a native speaker. |
+| Simulated payments and SMS | There is no connection to EVC Plus, Zaad, eDahab, Hormuud or Somtel. Payments move no money; SMS statuses (queued, sent, delivered, failed) are produced by a simulator. |
+| No real fees configured | Semester fees start empty: the registrar enters the amounts the university decides. Until a fee is set, students are not blocked from exams and the registrars get a notification. |
+| Older courses and exams | Courses created before academic years existed have no year or semester, so fee eligibility does not apply to them. The 9 exams from before exam types were added keep the types the owner approved. |
 | Tab-switch termination | The brief (4.8) asks for a warning after 3 switches and leaves the penalty to the lecturer. This project terminates the attempt at the 3rd counted switch instead (on request). It is one constant, `MAX_COUNTED_FOCUS_LOSSES` in `backend/src/modules/attempts/attempts.service.ts`. |
-| No network restriction | Students can take examinations from any device and connection; rooms are for scheduling only. The client address is recorded in the audit log and on each attempt; behind a reverse proxy, set `TRUST_PROXY=true` so it shows the real address. |
-| Clock offset | The browser shows the time remaining from the server's timer. Network delay of a few hundred milliseconds isn't compensated, so the last-chance warnings appear slightly early. |
+| No network restriction | Students can take examinations from any device and connection; rooms are for scheduling and capacity only. The client address is recorded on each attempt and in Activity History; behind a reverse proxy, set `TRUST_PROXY=true`. |
+| Live views poll | The invigilator live list and notifications refresh every few seconds; there is no push channel. |
+| Profile | Users can change only their password and the language of SMS and notifications; there is no photo upload. |
+| Somali texts | The Somali translations should be reviewed by a native speaker. |
 | Short-answer matching | It ignores only case and extra spaces, as the brief says. Punctuation differences go to "Needs review". |
-| Backup and restore | The exact procedure is in [docs/backup-restore.md](docs/backup-restore.md). It has not been rehearsed yet: the development machine has no PostgreSQL client tools, and Docker and a local installation are excluded. Rehearse it on the campus server. |
+| Clock offset | The browser shows the time remaining from the server's timer. Network delay of a few hundred milliseconds isn't compensated, so last-chance warnings appear slightly early. |
+| Backup and restore | Backups are taken with `pg_dump` 17 and were restored and compared table by table before every database change. The procedure is in [docs/backup-restore.md](docs/backup-restore.md). |
 | Not built | Real payment and SMS gateways, webcam proctoring and plagiarism checking are out of scope, as the brief says. |
