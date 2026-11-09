@@ -40,6 +40,70 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | Somali and English everywhere (screens, SMS, notifications, PDFs, CSV headers) | 6.8 | ✅ Done |
 | Automated tests (one command) and CI | 6.4 | ✅ Done: 301 backend + 46 frontend tests, GitHub Actions |
 
+## Screenshots
+
+Taken from the running application (English, light mode) with the fictional demo data. Every screen is also available in Somali and in dark mode.
+
+### Registrar
+
+**Dashboard:** accounts, courses and examinations at a glance, with charts from live data.
+
+<img src="docs/screenshots/registrar-dashboard.png" alt="Registrar dashboard" width="100%">
+
+**Payment management:** the fee of each faculty and semester, and who has paid in full, in part or not at all, with payment reminders.
+
+<img src="docs/screenshots/registrar-fees.png" alt="Semester fees and payment status" width="100%">
+
+**Results (read only):** search every student's results by faculty, year, semester, course, exam type and publication status.
+
+<img src="docs/screenshots/registrar-results.png" alt="Registrar results search" width="100%">
+
+### Lecturer
+
+**Dashboard:** courses, examinations, grading still to do and average scores.
+
+<img src="docs/screenshots/lecturer-dashboard.png" alt="Lecturer dashboard" width="100%">
+
+**Question bank:** questions per course with type, difficulty, marks, review status and versions; CSV import in the second tab.
+
+<img src="docs/screenshots/lecturer-question-bank.png" alt="Question bank" width="100%">
+
+**Exam management:** exam type, workflow from publishing to registrar approval, settings and the schedule with rooms and invigilators.
+
+<img src="docs/screenshots/lecturer-exam-management.png" alt="Exam management" width="100%">
+
+**Grading:** examinations with answers that still need marks; multiple choice and matching short answers are graded automatically.
+
+<img src="docs/screenshots/lecturer-grading.png" alt="Grading" width="100%">
+
+**Results:** publish, reopen with a reason, publication history, every student's grade and the CSV export.
+
+<img src="docs/screenshots/lecturer-results.png" alt="Results and publication history" width="100%">
+
+### Student
+
+**Dashboard:** examinations that are open now, upcoming ones and published results.
+
+<img src="docs/screenshots/student-dashboard.png" alt="Student dashboard" width="100%">
+
+**Examination interface:** server-synchronised timer, automatic saving of every answer, question navigator and flags for review.
+
+<img src="docs/screenshots/student-exam-interface.png" alt="Examination interface" width="100%">
+
+**Payments:** the semester fee, what has been paid and what is left, the rules per exam type and the payment history with receipts (simulated payments).
+
+<img src="docs/screenshots/student-payments.png" alt="Student payments" width="100%">
+
+### Invigilator
+
+**Dashboard:** assigned sessions, students taking an examination now and who needs attention.
+
+<img src="docs/screenshots/invigilator-dashboard.png" alt="Invigilator dashboard" width="100%">
+
+**Live monitoring:** every student of a session with status, time left, answers and tab switches, refreshed every 5 seconds.
+
+<img src="docs/screenshots/invigilator-live-monitoring.png" alt="Live monitoring" width="100%">
+
 ## Architecture
 
 ```
