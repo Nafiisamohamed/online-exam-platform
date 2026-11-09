@@ -3,11 +3,13 @@
  *
  * GET   /api/faculties                                  ADMIN, LECTURER
  * POST  /api/faculties                                  ADMIN
- * PATCH /api/faculties/:id                              ADMIN
+ * PATCH /api/faculties/:id                              ADMIN  { code?, name? }
+ * DELETE /api/faculties/:id                             ADMIN  refused while courses, registrations or fees belong to it
  * GET   /api/courses                                    any role (scoped to the user)
  * POST  /api/courses                                    ADMIN  { facultyId, code, name, academicYearId, semesterNumber, lecturerId }
  * GET   /api/courses/:id                                ADMIN, course lecturer, enrolled student
  * PATCH /api/courses/:id                                ADMIN
+ * DELETE /api/courses/:id                               ADMIN  refused while it has exams, enrolments, questions, topics or imports
  * GET   /api/courses/:id/enrolments                     ADMIN, course lecturer
  * POST  /api/courses/:id/enrolments                     ADMIN  { studentId } or { studentNumber }
  * POST  /api/courses/:id/enrolments/:studentId/drop     ADMIN  keeps past results
@@ -36,8 +38,17 @@ facultiesRouter.post("/", requireRole("ADMIN"), validate({ body: z.object({ code
   res.status(201).json({ faculty: await courses.createFaculty(req.valid.body, currentUser(req).id, req) });
 });
 
-facultiesRouter.patch("/:id", requireRole("ADMIN"), validate({ params: idParams, body: z.object({ name: trimmed(200) }) }), async (req, res) => {
-  res.json({ faculty: await courses.updateFaculty(req.valid.params.id, req.valid.body, currentUser(req).id, req) });
+facultiesRouter.patch(
+  "/:id",
+  requireRole("ADMIN"),
+  validate({ params: idParams, body: z.object({ code: code.optional(), name: trimmed(200).optional() }).refine((v) => v.code !== undefined || v.name !== undefined, "send code or name") }),
+  async (req, res) => {
+    res.json({ faculty: await courses.updateFaculty(req.valid.params.id, req.valid.body, currentUser(req).id, req) });
+  },
+);
+
+facultiesRouter.delete("/:id", requireRole("ADMIN"), validate({ params: idParams }), async (req, res) => {
+  res.json(await courses.deleteFaculty(req.valid.params.id, currentUser(req).id, req));
 });
 
 coursesRouter.use(authenticate());
@@ -55,6 +66,10 @@ coursesRouter.post(
     res.status(201).json({ course: await courses.createCourse(req.valid.body, currentUser(req).id, req) });
   },
 );
+
+coursesRouter.delete("/:id", requireRole("ADMIN"), validate({ params: idParams }), async (req, res) => {
+  res.json(await courses.deleteCourse(req.valid.params.id, currentUser(req).id, req));
+});
 
 coursesRouter.get("/:id", validate({ params: idParams }), async (req, res) => {
   res.json({ course: await courses.getCourse(currentUser(req), req.valid.params.id) });

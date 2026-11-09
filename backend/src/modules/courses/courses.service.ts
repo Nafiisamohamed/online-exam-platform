@@ -47,13 +47,39 @@ export async function createFaculty(data: { code: string; name: string }, actorI
   }
 }
 
-/** Renames a faculty. @throws 404 FACULTY_NOT_FOUND */
-export async function updateFaculty(id: string, data: { name?: string }, actorId: string, req: Request) {
-  if (!(await coursesRepo.findFaculty(id))) throw notFound("FACULTY_NOT_FOUND");
+/** Changes a faculty's code or name. @throws 404 FACULTY_NOT_FOUND, 409 FACULTY_CODE_TAKEN */
+export async function updateFaculty(id: string, data: { code?: string; name?: string }, actorId: string, req: Request) {
+  const before = await coursesRepo.findFaculty(id);
+  if (!before) throw notFound("FACULTY_NOT_FOUND");
+  const change = { ...(data.code ? { code: data.code.toUpperCase() } : {}), ...(data.name ? { name: data.name } : {}) };
+  try {
+    return await transaction(async (tx) => {
+      const f = await coursesRepo.updateFaculty(id, change, tx);
+      await audit(tx, { actorId, action: "FACULTY_UPDATED", entityType: "faculty", entityId: id, details: { previous: { code: before.code, name: before.name }, now: change }, req });
+      return f;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw conflict("FACULTY_CODE_TAKEN", "A faculty with this code exists");
+    throw error;
+  }
+}
+
+/**
+ * Deletes a faculty created by mistake. Refused while courses, student registrations or semester
+ * fees belong to it (those are kept); its lecturer assignments are removed with it.
+ * @throws 404 FACULTY_NOT_FOUND, 409 FACULTY_IN_USE { courses, registrations, semesterFees }
+ */
+export async function deleteFaculty(id: string, actorId: string, req: Request) {
+  const f = await coursesRepo.findFaculty(id);
+  if (!f) throw notFound("FACULTY_NOT_FOUND");
   return transaction(async (tx) => {
-    const f = await coursesRepo.updateFaculty(id, data, tx);
-    await audit(tx, { actorId, action: "FACULTY_UPDATED", entityType: "faculty", entityId: id, req });
-    return f;
+    const links = await coursesRepo.countFacultyLinks(id, tx);
+    if (links.courses || links.registrations || links.semesterFees) {
+      throw conflict("FACULTY_IN_USE", "This faculty still has courses, registrations or fees", { courses: links.courses, registrations: links.registrations, semesterFees: links.semesterFees });
+    }
+    const lecturers = await coursesRepo.deleteFaculty(id, tx);
+    await audit(tx, { actorId, action: "FACULTY_DELETED", entityType: "faculty", entityId: id, details: { code: f.code, name: f.name, lecturerAssignmentsRemoved: lecturers }, req });
+    return { deleted: true as const };
   });
 }
 
@@ -210,5 +236,22 @@ export async function dropStudent(courseId: string, studentId: string, actorId: 
     const updated = await coursesRepo.setEnrolmentStatus(e.id, "DROPPED", now(), tx);
     await audit(tx, { actorId, action: "ENROLMENT_DROPPED", entityType: "course", entityId: courseId, details: { student: student?.studentNumber }, req });
     return updated;
+  });
+}
+
+/**
+ * Deletes a course created by mistake. Refused while it has examinations, enrolments (also dropped
+ * ones), questions, topics or imports: those records are kept.
+ * @throws 404 COURSE_NOT_FOUND, 409 COURSE_IN_USE { exams, enrolments, questions, topics, imports }
+ */
+export async function deleteCourse(id: string, actorId: string, req: Request) {
+  const c = await coursesRepo.findCourse(id);
+  if (!c) throw notFound("COURSE_NOT_FOUND");
+  return transaction(async (tx) => {
+    const links = await coursesRepo.countCourseLinks(id, tx);
+    if (Object.values(links).some((n) => n > 0)) throw conflict("COURSE_IN_USE", "This course still has linked records", links);
+    await coursesRepo.deleteCourse(id, tx);
+    await audit(tx, { actorId, action: "COURSE_DELETED", entityType: "course", entityId: id, details: { code: c.code, name: c.name, facultyId: c.facultyId, academicYearId: c.academicYearId, semesterNumber: c.semesterNumber }, req });
+    return { deleted: true as const };
   });
 }

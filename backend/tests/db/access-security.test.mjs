@@ -34,6 +34,7 @@ const DELETABLE_TABLES = [
   "schedule_rooms", "schedule_invigilators", "grading_scale",
   "faculty_lecturers", // a lecturer can be removed from a faculty
   "exam_excluded_questions", // a lecturer can tick a question again
+  "faculties", "courses", // the registrar deletes ones created by mistake (foreign keys refuse linked ones)
 ];
 
 describe("access security", () => {

@@ -127,10 +127,16 @@ export async function createFaculty(input: { code: string; name: string }) {
   return res.faculty;
 }
 
-export async function renameFaculty(id: string, name: string) {
-  const res = await api<{ faculty: Faculty }>(`/faculties/${id}`, { method: "PATCH", json: { name } });
+export async function updateFaculty(id: string, patch: { code?: string; name?: string }) {
+  const res = await api<{ faculty: Faculty }>(`/faculties/${id}`, { method: "PATCH", json: patch });
   invalidate("/faculties", "/courses", "/audit-logs");
   return res.faculty;
+}
+
+/** Deletes a faculty created by mistake (refused while courses, registrations or fees belong to it). */
+export async function deleteFaculty(id: string) {
+  await api(`/faculties/${id}`, { method: "DELETE" });
+  invalidate("/faculties", "/courses", "/audit-logs");
 }
 
 // --- Courses --------------------------------------------------------------------------
@@ -139,6 +145,12 @@ export async function createCourse(input: NewCourseInput) {
   const res = await api<{ course: Course }>("/courses", { method: "POST", json: input });
   invalidate("/courses", "/faculties", "/analytics/dashboard", "/audit-logs");
   return res.course;
+}
+
+/** Deletes a course created by mistake (refused while it has exams, enrolments, questions, topics or imports). */
+export async function deleteCourse(id: string) {
+  await api(`/courses/${id}`, { method: "DELETE" });
+  invalidate("/courses", "/faculties", "/analytics/dashboard", "/audit-logs");
 }
 
 export async function updateCourse(id: string, patch: Partial<Pick<NewCourseInput, "name" | "lecturerId" | "facultyId" | "academicYearId" | "semesterNumber">>) {

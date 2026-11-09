@@ -120,6 +120,8 @@ Every error has the same shape:
 | POST | `/api/courses/:id/enrolments` | ADMIN | `{ studentId }` or `{ studentNumber }` | `201 { enrolment }`. Also reactivates a dropped student. Errors: `409 ALREADY_ENROLLED`, `409 ENROLMENT_SCHEDULE_CONFLICT { conflicts: [{ course, exam, otherCourse, otherExam }] }` |
 | POST | `/api/courses/:id/enrolments/:studentId/drop` | ADMIN | — | `{ enrolment }`. Status becomes `DROPPED`; past attempts and results are kept. |
 
+**Deleting (registrar):** `DELETE /api/faculties/:id` deletes a faculty created by mistake together with its lecturer assignments; refused with `409 FACULTY_IN_USE { courses, registrations, semesterFees }` while any of those exist. `DELETE /api/courses/:id` deletes a course created by mistake; refused with `409 COURSE_IN_USE { exams, enrolments, questions, topics, imports }` while any exist (dropped enrolments count). `PATCH /api/faculties/:id` accepts `{ code?, name? }`. Both deletes are recorded in Activity History.
+
 ## Academic structure
 
 | Method | Path | Role | Request | Response |

@@ -76,6 +76,8 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     SMS_TEMPLATE_UPDATED: "beddelay qaab fariin SMS",
     SMS_GROUP_SENT: "u diray fariin koox",
     SMS_RETRIED: "mar kale isku dayay SMS",
+    FACULTY_DELETED: "tirtiray kulliyad",
+    COURSE_DELETED: "tirtiray koorso",
   },
   en: {
     USER_CREATED: "created a user account",
@@ -147,6 +149,8 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     SMS_TEMPLATE_UPDATED: "changed an SMS template",
     SMS_GROUP_SENT: "sent a group message",
     SMS_RETRIED: "retried an SMS",
+    FACULTY_DELETED: "deleted a faculty",
+    COURSE_DELETED: "deleted a course",
   },
 };
 

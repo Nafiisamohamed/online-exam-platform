@@ -25,7 +25,7 @@ export function insertFaculty(data: { code: string; name: string }, db: Db = pri
   return db.faculty.create({ data });
 }
 
-export function updateFaculty(id: string, data: { name?: string }, db: Db = prisma) {
+export function updateFaculty(id: string, data: { code?: string; name?: string }, db: Db = prisma) {
   return db.faculty.update({ where: { id }, data });
 }
 
@@ -106,4 +106,38 @@ export async function findOverlappingSchedules(newCourseIds: string[], withCours
 /** Serialises enrolment changes with schedule approvals, so the two cannot race. */
 export async function lockScheduling(db: Db) {
   await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('exam_schedule_approval'))`;
+}
+
+/** Records that keep a faculty in use (it can't be deleted while any exist). Lecturer assignments are counted separately. */
+export async function countFacultyLinks(facultyId: string, db: Db = prisma) {
+  const [courses, registrations, semesterFees, lecturers] = await Promise.all([
+    db.course.count({ where: { facultyId } }),
+    db.studentRegistration.count({ where: { facultyId } }),
+    db.semesterFee.count({ where: { facultyId } }),
+    db.facultyLecturer.count({ where: { facultyId } }),
+  ]);
+  return { courses, registrations, semesterFees, lecturers };
+}
+
+/** Deletes a faculty and its lecturer assignments (only called when nothing else links to it). */
+export async function deleteFaculty(facultyId: string, db: Db) {
+  const lecturers = await db.facultyLecturer.deleteMany({ where: { facultyId } });
+  await db.faculty.delete({ where: { id: facultyId } });
+  return lecturers.count;
+}
+
+/** Records that keep a course in use (it can't be deleted while any exist). Dropped enrolments count too. */
+export async function countCourseLinks(courseId: string, db: Db = prisma) {
+  const [exams, enrolments, questions, topics, imports] = await Promise.all([
+    db.exam.count({ where: { courseId } }),
+    db.enrolment.count({ where: { courseId } }),
+    db.question.count({ where: { courseId } }),
+    db.topic.count({ where: { courseId } }),
+    db.importBatch.count({ where: { courseId } }),
+  ]);
+  return { exams, enrolments, questions, topics, imports };
+}
+
+export function deleteCourse(courseId: string, db: Db) {
+  return db.course.delete({ where: { id: courseId } });
 }
