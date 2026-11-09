@@ -2,11 +2,11 @@
 
 /**
  * Exam settings shared by the create page and the "Edit settings" dialog:
- * instructions, shuffling, answer review, fee and the optional blind second
+ * instructions, shuffling, answer review and the optional blind second
  * grader. After publishing the backend fixes shuffling and the fee
  * (EXAM_PUBLISHED_LOCKED), so those fields are disabled then.
  */
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Select, Textarea } from "@/components/ui/form";
 import { lecturerPaths } from "@/lib/api/lecturer";
 import { useApi } from "@/lib/api/use-api";
 import { useI18n } from "@/lib/i18n/i18n";
@@ -49,8 +49,6 @@ export function settingsInput(d: SettingsDraft, locked = false): ExamSettingsInp
       : {
           shuffleQuestions: d.shuffleQuestions,
           shuffleOptions: d.shuffleOptions,
-          feeAmount: Number(d.feeAmount) || 0,
-          ...(d.feeCurrency.trim() ? { feeCurrency: d.feeCurrency.trim().toUpperCase() } : {}),
         }),
   };
 }
@@ -82,14 +80,7 @@ export function ExamSettingsFields({ value, onChange, locked }: { value: Setting
         <Check checked={value.shuffleOptions} onChange={(v) => set("shuffleOptions", v)} label={t("lecturer.exams.shuffleOptions")} disabled={locked} />
         <Check checked={value.allowAnswerReview} onChange={(v) => set("allowAnswerReview", v)} label={t("lecturer.exams.answerReview")} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("lecturer.exams.fee")} hint={t("lecturer.exams.feeHint")}>
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} type="number" min={0} max={100000} step={0.01} inputMode="decimal" value={value.feeAmount} onChange={(e) => set("feeAmount", e.target.value)} disabled={locked} />}
-        </Field>
-        <Field label={t("lecturer.exams.currency")} hint={t("lecturer.exams.currencyHint")}>
-          {({ id, describedBy }) => <Input id={id} aria-describedby={describedBy} value={value.feeCurrency} onChange={(e) => set("feeCurrency", e.target.value.toUpperCase())} maxLength={3} placeholder="USD" disabled={locked} />}
-        </Field>
-      </div>
+      {/* Fees are per semester since Phase 4 (registrar: Fees page); exams no longer have their own fee. */}
       <Field label={t("lecturer.exams.secondGrader")} hint={t("lecturer.exams.secondGraderHint")}>
         {({ id, describedBy }) => (
           <Select id={id} aria-describedby={describedBy} value={value.secondGraderId} onChange={(e) => set("secondGraderId", e.target.value)}>

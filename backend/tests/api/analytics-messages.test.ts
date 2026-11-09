@@ -73,11 +73,11 @@ describe("notifications, SMS outbox and audit log", () => {
     const bad = await createUser("STUDENT", { phone: "+25261" });
     await prisma.smsOutbox.create({ data: { recipientId: bad.id, phone: "+25261", language: "so", templateKey: "RESULTS_PUBLISHED", params: { course: "X" }, body: "[DEMO] test", senderId: "ONLINE-EXAM-SYSTEM" } });
     expect(goodSms.status).toBe("QUEUED");
-    await deliverQueuedSms();
+    await deliverQueuedSms(100_000); // the whole queue: other tests queue SMS too
     expect((await prisma.smsOutbox.findUniqueOrThrow({ where: { id: goodSms.id } })).status).toBe("SENT");
     expect((await prisma.smsOutbox.findFirstOrThrow({ where: { recipientId: bad.id } })).status).toBe("FAILED");
     await prisma.smsOutbox.update({ where: { id: goodSms.id }, data: { sentAt: new Date(Date.now() - 10_000) } });
-    await deliverQueuedSms();
+    await deliverQueuedSms(100_000); // the whole queue: other tests queue SMS too
     expect((await prisma.smsOutbox.findUniqueOrThrow({ where: { id: goodSms.id } })).status).toBe("DELIVERED");
 
     const outbox = await admin.get(`/api/sms-outbox?recipientId=${good.body.user.id}`);

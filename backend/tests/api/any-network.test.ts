@@ -55,7 +55,7 @@ describe("examinations can be taken from any network", () => {
     const notOpen = await openExam({ students: 1, openedMinutesAgo: -30, networkRanges: ["10.10.4.0/24"] });
     const early = await (await studentFrom(notOpen.students[0])).post(`/api/exams/${notOpen.examId}/attempts`).set("X-Forwarded-For", "10.10.4.20");
     expect(early.body.error.code).toBe("EXAM_NOT_OPEN_YET");
-    const paid = await openExam({ students: 1, feeAmount: 5 });
+    const paid = await openExam({ students: 1, semesterFee: 400 });
     const unpaid = await (await studentFrom(paid.students[0])).post(`/api/exams/${paid.examId}/attempts`).set("X-Forwarded-For", "203.0.113.5");
     expect(unpaid.status).toBe(402);
     const [outsider] = await userAgent("STUDENT");

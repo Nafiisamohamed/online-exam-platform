@@ -176,10 +176,11 @@ describe("attempt security", () => {
     // A room with network ranges never blocks a student (see any-network.test.ts for many addresses).
     const room = await openExam({ students: 1, networkRanges: ["10.10.4.0/24"] });
     expect((await room.studentAgents[0].post(`/api/exams/${room.examId}/attempts`)).status).toBe(201);
-    const paid = await openExam({ students: 1, feeAmount: 5 });
+    // Phase 4: a quiz needs 30% of the semester fee paid.
+    const paid = await openExam({ students: 1, semesterFee: 400 });
     const unpaid = await paid.studentAgents[0].post(`/api/exams/${paid.examId}/attempts`);
     expect(unpaid.status).toBe(402);
-    expect(unpaid.body.error).toMatchObject({ code: "PAYMENT_REQUIRED", details: { amount: 5, currency: "USD" } });
+    expect(unpaid.body.error).toMatchObject({ code: "FEE_REQUIREMENT_NOT_MET", details: { requiredPercent: 30, requiredAmount: 120, paid: 0, stillToPay: 120, currency: "USD" } });
     const [, outsider] = await userAgent("STUDENT");
     expect((await outsider.post(`/api/exams/${paid.examId}/attempts`)).body.error.code).toBe("NOT_ENROLLED");
   });
@@ -261,9 +262,9 @@ describe("submission and automatic grading (4.10)", () => {
   });
 
   it("lists the student's exams with window, fee and attempt state", async () => {
-    const { examId, studentAgents } = await openExam({ students: 1, feeAmount: 5 });
+    const { examId, studentAgents } = await openExam({ students: 1, semesterFee: 400, examType: "MIDTERM" });
     const list = await studentAgents[0].get("/api/my/exams");
     const item = list.body.items.find((e: any) => e.id === examId);
-    expect(item).toMatchObject({ state: "OPEN", canStart: false, fee: { amount: 5, currency: "USD", required: true, paid: false } });
+    expect(item).toMatchObject({ state: "OPEN", canStart: false, examType: "MIDTERM", eligibility: { eligible: false, reason: "NOT_ENOUGH_PAID", requiredPercent: 50, requiredAmount: 200, outstanding: 400 } });
   });
 });

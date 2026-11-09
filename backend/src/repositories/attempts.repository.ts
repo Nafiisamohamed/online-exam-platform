@@ -44,7 +44,7 @@ export function findStudentExams(studentId: string, db: Db = prisma) {
       ],
     },
     include: {
-      course: { select: { id: true, code: true, name: true } },
+      course: { select: { id: true, code: true, name: true, academicYearId: true, semesterNumber: true } },
       schedules: { where: { status: "APPROVED" }, select: { id: true, windowStart: true, windowEnd: true, durationMinutes: true } },
       attempts: { where: { studentId }, select: { id: true, status: true, deadline: true, submittedAt: true } },
       payments: { where: { studentId, status: "SUCCESS" }, select: { receiptNumber: true } },

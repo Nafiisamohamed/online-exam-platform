@@ -1,7 +1,7 @@
 /**
  * Simulated payment endpoints (section 7). See docs/api.md#payments-simulated.
  *
- * POST /api/payments                     STUDENT { examId, provider, phone, idempotencyKey } (201 new, 200 same payment)
+ * POST /api/payments                     STUDENT { semesterFeeId, amount, provider, phone, idempotencyKey } (201 new, 200 same payment)
  * GET  /api/payments                     STUDENT own; ADMIN all (examId, status, provider)
  * GET  /api/payments/:id                 owner or ADMIN
  * POST /api/payments/:id/confirm         STUDENT { accept: true | false }  (Yes / No)
@@ -28,7 +28,7 @@ paymentsRouter.use(authenticate());
 
 /** `.strict()` rejects extra fields such as "amount", so a changed price can never be sent. */
 const createBody = z
-  .object({ examId: zid, provider: z.enum(["EVC_PLUS", "ZAAD", "EDAHAB"]), phone: phoneField, idempotencyKey: zid })
+  .object({ semesterFeeId: zid, amount: z.number().positive().max(100_000), provider: z.enum(["EVC_PLUS", "ZAAD", "EDAHAB"]), phone: phoneField, idempotencyKey: zid })
   .strict();
 
 paymentsRouter.post("/", requireRole("STUDENT"), validate({ body: createBody }), async (req, res) => {

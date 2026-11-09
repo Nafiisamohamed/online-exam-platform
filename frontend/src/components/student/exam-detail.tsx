@@ -107,18 +107,9 @@ function DetailBody({ exam }: { exam: MyExam }) {
               </ul>
             )}
             {opensIn && <p className="rounded-xl bg-accent-soft px-3 py-2 text-center text-sm font-semibold text-accent-foreground" role="timer">{t("student.common.opensIn", { time: opensIn.text })}</p>}
-            {exam.fee.required && (
-              exam.fee.paid ? (
-                <p className="flex items-center gap-1.5 text-sm text-success"><CheckCircle2 className="h-4 w-4" aria-hidden />{t("student.common.feePaid", { receipt: exam.fee.receiptNumber ?? "—" })}</p>
-              ) : (
-                <div className="space-y-2">
-                  <Alert tone="warning">{t("student.exams.payFirst")} ({exam.fee.amount} {exam.fee.currency})</Alert>
-                  {(exam.state === "UPCOMING" || exam.state === "OPEN") && <Button variant="secondary" className="w-full" leftIcon={<CreditCard className="h-4 w-4" />} onClick={() => setPaying(true)}>{t("student.payments.pay")}</Button>}
-                </div>
-              )
-            )}
+            <FeeRequirement exam={exam} onPay={() => setPaying(true)} />
             <FormError error={error} />
-            {error instanceof ApiError && error.code === "PAYMENT_REQUIRED" && <Button variant="secondary" className="w-full" onClick={() => setPaying(true)}>{t("student.payments.pay")}</Button>}
+            {error instanceof ApiError && error.code === "FEE_REQUIREMENT_NOT_MET" && exam.eligibility.fee && <Button variant="secondary" className="w-full" onClick={() => setPaying(true)}>{t("student.fees.pay")}</Button>}
 
             {started && (
               <>
@@ -158,7 +149,12 @@ function DetailBody({ exam }: { exam: MyExam }) {
         loading={busy}
         onConfirm={begin}
       />
-      {paying && <PayDialog exam={exam} onClose={() => { setPaying(false); setError(null); invalidate(studentPaths.myExams); }} />}
+      {paying && exam.eligibility.fee && (
+        <PayDialog
+          target={{ feeId: exam.eligibility.fee.id, label: t("student.fees.forExam", { exam: exam.title }), outstanding: exam.eligibility.outstanding, currency: exam.eligibility.fee.currency, suggested: exam.eligibility.stillToPay || exam.eligibility.outstanding }}
+          onClose={() => { setPaying(false); setError(null); invalidate(studentPaths.myExams); invalidate(studentPaths.myFees); }}
+        />
+      )}
     </>
   );
 }
@@ -174,5 +170,20 @@ export function StudentExamDetail({ params }: { params: Promise<{ examId: string
         return exam ? <DetailBody exam={exam} /> : <Card><EmptyState title={t("errors.EXAM_NOT_FOUND")} /></Card>;
       }}
     </QueryState>
+  );
+}
+
+/** The semester-fee rule for this exam (worked out by the server): what is needed and what is still to pay. */
+function FeeRequirement({ exam, onPay }: { exam: MyExam; onPay: () => void }) {
+  const { t } = useI18n();
+  const e = exam.eligibility;
+  if (!e.fee) return null;
+  const amount = (n: number) => `${n.toFixed(2)} ${e.fee!.currency}`;
+  if (e.eligible) return <p className="flex items-center gap-1.5 text-sm text-success"><CheckCircle2 className="h-4 w-4" aria-hidden />{t("student.fees.requirementMet", { percent: e.requiredPercent, paid: amount(e.paid), total: amount(e.fee.amount) })}</p>;
+  return (
+    <div className="space-y-2">
+      <Alert tone="warning">{t("student.fees.requirementNotMet", { type: t(`examTypes.${e.examType}`), percent: e.requiredPercent, required: amount(e.requiredAmount), paid: amount(e.paid), more: amount(e.stillToPay) })}</Alert>
+      {(exam.state === "UPCOMING" || exam.state === "OPEN") && <Button variant="secondary" className="w-full" leftIcon={<CreditCard className="h-4 w-4" />} onClick={onPay}>{t("student.fees.pay")}</Button>}
+    </div>
   );
 }

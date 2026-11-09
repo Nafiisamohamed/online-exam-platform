@@ -55,10 +55,10 @@ export function ExamCard({ exam, serverNow }: { exam: MyExam; serverNow: number 
           <span className="text-muted">{t("student.common.questions", { count: exam.totalQuestions })} · {t("student.common.marks", { marks: exam.totalMarks })}</span>
           {timeTo && <span className="font-semibold text-accent-strong">{timeTo}</span>}
         </div>
-        {exam.fee.required && (
-          <p className={exam.fee.paid ? "text-xs text-success" : "flex items-center gap-1 text-xs font-semibold text-warning"}>
-            {!exam.fee.paid && <CreditCard className="h-3.5 w-3.5" aria-hidden />}
-            {exam.fee.paid ? t("student.common.feePaid", { receipt: exam.fee.receiptNumber ?? "—" }) : t("student.common.feeDue", { amount: exam.fee.amount, currency: exam.fee.currency })}
+        {exam.eligibility.fee && !exam.eligibility.eligible && (
+          <p className="flex items-center gap-1 text-xs font-semibold text-warning">
+            <CreditCard className="h-3.5 w-3.5" aria-hidden />
+            {t("student.fees.cardDue", { percent: exam.eligibility.requiredPercent, more: `${exam.eligibility.stillToPay.toFixed(2)} ${exam.eligibility.fee.currency}` })}
           </p>
         )}
       </Link>
