@@ -1,6 +1,6 @@
 /** Users, faculties, courses, enrolment, CSV enrolment import, rooms and grading scale (4.1, 4.5, D6, Q1). */
 import { describe, expect, it } from "vitest";
-import { app, createUser, loginAs, prisma, request, uid, userAgent } from "./helpers.ts";
+import { app, assignToFaculty, createUser, loginAs, prisma, request, testAcademicYear, uid, userAgent } from "./helpers.ts";
 
 async function setupCourse() {
   const [, admin] = await userAgent("ADMIN");
@@ -8,9 +8,11 @@ async function setupCourse() {
   const f = await admin.post("/api/faculties").send({ code: `F${uid()}`.slice(0, 18), name: "Faculty of Testing" });
   expect(f.status).toBe(201);
   const code = `C${uid()}`.slice(0, 18);
-  const c = await admin.post("/api/courses").send({ facultyId: f.body.faculty.id, code, name: "Test Course", semester: "2026-Fall", lecturerId: lecturer.id });
+  const year = await testAcademicYear();
+  await assignToFaculty(f.body.faculty.id, lecturer.id);
+  const c = await admin.post("/api/courses").send({ facultyId: f.body.faculty.id, code, name: "Test Course", academicYearId: year.id, semesterNumber: 1, lecturerId: lecturer.id });
   expect(c.status).toBe(201);
-  return { admin, lecturer, facultyId: f.body.faculty.id, course: c.body.course };
+  return { admin, lecturer, facultyId: f.body.faculty.id, course: c.body.course, year };
 }
 
 describe("user management", () => {
@@ -55,8 +57,8 @@ describe("user management", () => {
 
 describe("courses and enrolment", () => {
   it("rejects a duplicate course code in the same semester", async () => {
-    const { admin, facultyId, course, lecturer } = await setupCourse();
-    const dup = await admin.post("/api/courses").send({ facultyId, code: course.code, name: "Again", semester: "2026-Fall", lecturerId: lecturer.id });
+    const { admin, facultyId, course, lecturer, year } = await setupCourse();
+    const dup = await admin.post("/api/courses").send({ facultyId, code: course.code, name: "Again", academicYearId: year.id, semesterNumber: 1, lecturerId: lecturer.id });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe("COURSE_EXISTS");
   });
@@ -104,7 +106,7 @@ describe("CSV enrolment import", () => {
       `BAD ID!,Bad Id,12,${course.code}`,
       `,Faadumo Cali Warsame,+252615000000,${course.code}`, // already has an account
     ].join("\n");
-    const preview = await admin.post("/api/imports/enrolments").field("semester", "2026-Fall").attach("file", Buffer.from(csv), "students.csv");
+    const preview = await admin.post("/api/imports/enrolments").field("semester", course.semester).attach("file", Buffer.from(csv), "students.csv");
     expect(preview.status).toBe(201);
     expect(preview.body.batch).toMatchObject({ totalRows: 7, validRows: 2, invalidRows: 5, status: "PREVIEW" });
     const codes = (row: number) => preview.body.rows.find((r: any) => r.row === row).errors.map((e: any) => e.code);

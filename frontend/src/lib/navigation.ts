@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3, BookOpenCheck, Building2, CalendarCheck2, CalendarClock, ClipboardCheck, CreditCard, FileQuestion,
   GraduationCap, LayoutDashboard, MonitorPlay, ScrollText,
-  UserRound, Users, Award, NotebookPen, History,
+  UserRound, Users, Award, NotebookPen, History, CalendarRange, ClipboardList,
 } from "lucide-react";
 import type { MessageKey } from "@/lib/i18n/i18n";
 import type { Role } from "@/types/account";
@@ -34,8 +34,10 @@ export const NAVIGATION: Record<Role, NavSection[]> = {
     {
       title: "nav.sections.academics",
       items: [
+        { label: "nav.academicYears", href: "/admin/academic-years", icon: CalendarRange },
         { label: "nav.faculties", href: "/admin/faculties", icon: Building2 },
         { label: "nav.courses", href: "/admin/courses", icon: BookOpenCheck },
+        { label: "nav.registrations", href: "/admin/registrations", icon: ClipboardList },
         { label: "nav.students", href: "/admin/enrolment", icon: GraduationCap },
         { label: "nav.users", href: "/admin/users", icon: Users },
       ],

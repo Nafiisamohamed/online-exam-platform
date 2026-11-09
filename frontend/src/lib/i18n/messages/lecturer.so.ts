@@ -133,6 +133,13 @@ export const lecturerSo: Widen<typeof lecturerEn> = {
   },
 
   courses: {
+    facultiesHint: "Dooro mid ka mid ah kulliyadahaaga si aad u aragto maaddooyinka aad halkaas ka dhigto.",
+    noFaculties: "Weli laguma darin kulliyad.",
+    noFacultiesHint: "Diiwaangeliyaha ayaa macallimiinta ku dara kulliyadaha.",
+    myFaculties: "Kulliyadahayga",
+    allFaculties: "Dhammaan kulliyadahayga",
+    courseCount: "{count} maaddo",
+    noCoursesInFaculty: "Kulliyaddan wax maaddo ah kama dhigtid.",
     title: "Maadooyinkayga",
     subtitle: "Maadooyinka aad dhigto, ardaydooda iyo imtixaannadooda.",
     studentsTitle: "Ardayda diiwaangashan",

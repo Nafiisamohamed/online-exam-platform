@@ -62,8 +62,13 @@ export interface Course {
   facultyId: string;
   code: string;
   name: string;
+  /** Label: "2026/2027 S1" (since Phase 2) or an older label such as "2026-Fall". */
   semester: string;
   lecturerId: string;
+  /** Both set, or both null for a course created before academic years existed. */
+  academicYearId: string | null;
+  semesterNumber: number | null;
+  academicYear: { id: string; name: string; isCurrent: boolean } | null;
   createdAt: string;
   updatedAt: string;
   faculty: { id: string; code: string; name: string };
@@ -76,9 +81,56 @@ export interface NewCourseInput {
   facultyId: string;
   code: string;
   name: string;
-  semester: string;
+  academicYearId: string;
+  semesterNumber: number;
   lecturerId: string;
 }
+
+/** GET /api/academic-years */
+export interface AcademicYear {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isCurrent: boolean;
+  courses: number;
+  registrations: number;
+}
+
+/** GET /api/faculties/:id/lecturers */
+export interface FacultyLecturer {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string | null;
+  isActive: boolean;
+  assignedAt: string;
+  coursesInFaculty: number;
+}
+
+/** GET /api/registrations: a student's faculty and semester in one academic year. */
+export interface Registration {
+  id: string;
+  semesterNumber: number;
+  createdAt: string;
+  updatedAt: string;
+  student: { id: string; fullName: string; username: string; studentNumber: string | null; isActive: boolean };
+  academicYear: { id: string; name: string; isCurrent: boolean };
+  faculty: { id: string; code: string; name: string };
+}
+
+/** POST /api/registrations/enrol-group */
+export interface GroupEnrolResult {
+  students: number;
+  courses: number;
+  enrolled: number;
+  reactivated: number;
+  alreadyEnrolled: number;
+  skipped: { student: string; conflicts: unknown[] }[];
+}
+
+/** The eight semesters of a degree. */
+export const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 export type EnrolmentStatus = "ACTIVE" | "DROPPED";
 

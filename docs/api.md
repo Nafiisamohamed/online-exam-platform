@@ -112,13 +112,31 @@ Every error has the same shape:
 | GET | `/api/faculties` | ADMIN, LECTURER | — | `{ items }` |
 | POST | `/api/faculties` | ADMIN | `{ code, name }` | `201 { faculty }`. Error: `409 FACULTY_CODE_TAKEN` |
 | PATCH | `/api/faculties/:id` | ADMIN | `{ name }` | `{ faculty }` |
-| GET | `/api/courses` | any | query: `semester`, `facultyId` | `{ items }`. The list depends on the role: the admin sees all, a lecturer their own courses, a student their active enrolments, an invigilator none. |
-| POST | `/api/courses` | ADMIN | `{ facultyId, code, name, semester: "2026-Fall", lecturerId }` | `201 { course }`. Error: `409 COURSE_EXISTS` (same code and semester) |
+| GET | `/api/courses` | any | query: `semester` (label), `facultyId`, `academicYearId`, `semesterNumber` | `{ items }`. The list depends on the role: the admin sees all, a lecturer their own courses, a student their active enrolments, an invigilator none. |
+| POST | `/api/courses` | ADMIN | `{ facultyId, code, name, academicYearId, semesterNumber: 1-8, lecturerId }`. The lecturer must be assigned to the faculty. The server sets the label `semester` to e.g. `"2026/2027 S1"`. | `201 { course }`. Errors: `400 LECTURER_NOT_IN_FACULTY`, `400 ACADEMIC_YEAR_NOT_FOUND`, `409 COURSE_EXISTS` (same code and semester) |
 | GET | `/api/courses/:id` | ADMIN, course lecturer, enrolled student | — | `{ course }` |
-| PATCH | `/api/courses/:id` | ADMIN | `{ name?, lecturerId?, facultyId? }` | `{ course }` |
+| PATCH | `/api/courses/:id` | ADMIN | `{ name?, lecturerId?, facultyId?, academicYearId? + semesterNumber? }` (year and semester together; used to complete courses created before academic years) | `{ course }`. A lecturer change is audited with the previous and new lecturer. Errors: `400 LECTURER_NOT_IN_FACULTY` |
 | GET | `/api/courses/:id/enrolments` | ADMIN, course lecturer | query: `status` | `{ items: [{ id, status, enrolledAt, droppedAt, student }] }` |
 | POST | `/api/courses/:id/enrolments` | ADMIN | `{ studentId }` or `{ studentNumber }` | `201 { enrolment }`. Also reactivates a dropped student. Errors: `409 ALREADY_ENROLLED`, `409 ENROLMENT_SCHEDULE_CONFLICT { conflicts: [{ course, exam, otherCourse, otherExam }] }` |
 | POST | `/api/courses/:id/enrolments/:studentId/drop` | ADMIN | — | `{ enrolment }`. Status becomes `DROPPED`; past attempts and results are kept. |
+
+## Academic structure
+
+| Method | Path | Role | Request | Response |
+|---|---|---|---|---|
+| GET | `/api/academic-years` | ADMIN, LECTURER | — | `{ items: [{ id, name, startDate, endDate, isCurrent, courses, registrations }] }` |
+| POST | `/api/academic-years` | ADMIN | `{ name: "2026/2027", startDate, endDate, isCurrent? }` | `201 { academicYear }`. Errors: `400 ACADEMIC_YEAR_NAME_INVALID`, `400 ACADEMIC_YEAR_DATES_INVALID`, `409 ACADEMIC_YEAR_EXISTS` |
+| PATCH | `/api/academic-years/:id` | ADMIN | `{ startDate?, endDate? }` | `{ academicYear }` |
+| POST | `/api/academic-years/:id/activate` | ADMIN | — | `{ academicYear }`: now the only current year |
+| GET | `/api/faculties/:id/lecturers` | ADMIN | — | `{ items: [{ id, fullName, username, email, isActive, assignedAt, coursesInFaculty }] }` |
+| POST | `/api/faculties/:id/lecturers` | ADMIN | `{ lecturerId }` | `201`. Errors: `400 LECTURER_INVALID`, `409 LECTURER_ALREADY_ASSIGNED` |
+| DELETE | `/api/faculties/:id/lecturers/:lecturerId` | ADMIN | — | `204`. Error: `409 LECTURER_TEACHES_IN_FACULTY { courses }` |
+| GET | `/api/registrations` | ADMIN | query: `academicYearId`, `facultyId`, `semesterNumber`, `search`, `page`, `pageSize` | paged `{ id, semesterNumber, student, academicYear, faculty }` |
+| POST | `/api/registrations` | ADMIN | `{ studentId \| studentNumber, academicYearId, facultyId, semesterNumber }` | `201 { registration }`. A student may have several semesters in one academic year, each once. Error: `409 REGISTRATION_EXISTS` |
+| PATCH | `/api/registrations/:id` | ADMIN | `{ facultyId?, semesterNumber? }` | `{ registration }`: corrects a registration (audited with the previous values). Errors: `404 REGISTRATION_NOT_FOUND`, `409 REGISTRATION_EXISTS` |
+| POST | `/api/registrations/enrol-group` | ADMIN | `{ academicYearId, facultyId, semesterNumber }` | `{ students, courses, enrolled, reactivated, alreadyEnrolled, skipped: [{ student, conflicts }] }`. Uses the same rules as single enrolment, including the exam clash check. Error: `400 GROUP_HAS_NO_COURSES` |
+| GET | `/api/my/academic` | STUDENT | — | `{ current, registrations }`: own faculty, academic year and semester |
+| GET | `/api/my/faculties` | LECTURER | — | `{ items: [{ id, code, name, myCourses }] }`: own faculties |
 
 ## CSV imports
 

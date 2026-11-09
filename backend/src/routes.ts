@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { databaseReachable } from "./db/prisma.ts";
 import { now } from "./db/clock.ts";
+import { academicRouter } from "./modules/academic/academic.routes.ts";
 import { analyticsRouter } from "./modules/analytics/analytics.routes.ts";
 import { attemptsRouter } from "./modules/attempts/attempts.routes.ts";
 import { authRouter } from "./modules/auth/auth.routes.ts";
@@ -35,6 +36,8 @@ apiRouter.get("/health", async (_req, res) => {
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/users", usersRouter);
 apiRouter.use("/staff", staffRouter);
+// Academic years, faculty lecturers (/faculties/:id/lecturers), registrations, /my/academic, /my/faculties.
+apiRouter.use(academicRouter);
 // Question bank routes include /courses/:courseId/... and /imports/templates/...,
 // so they are mounted before the course and import routers.
 apiRouter.use(questionsRouter);

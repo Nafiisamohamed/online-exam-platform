@@ -3,6 +3,7 @@
 /** Course rows (GET /api/courses), used by the course list and the faculty detail page. */
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { Course } from "@/types/admin";
@@ -22,7 +23,13 @@ export function CourseTable({ rows, loading, hideFaculty, hideLecturer, empty, a
       ),
     },
     ...(hideFaculty ? [] : [{ key: "faculty", header: t("admin.courses.faculty"), cell: (c: Course) => <span title={c.faculty.name}>{c.faculty.code}</span> }]),
-    { key: "semester", header: t("admin.courses.semester"), cell: (c) => <span className="whitespace-nowrap">{c.semester}</span> },
+    {
+      key: "semester",
+      header: t("admin.academic.yearAndSemester"),
+      cell: (c) => c.academicYear && c.semesterNumber
+        ? <span className="whitespace-nowrap">{c.academicYear.name} · {t("admin.academic.semesterN", { n: c.semesterNumber })}</span>
+        : <span className="flex flex-col items-start gap-1"><span className="whitespace-nowrap text-muted">{c.semester}</span><Badge tone="warning">{t("admin.academic.needsYear")}</Badge></span>,
+    },
     ...(hideLecturer ? [] : [{ key: "lecturer", header: t("admin.courses.lecturer"), cell: (c: Course) => <Link href={`/admin/users/${c.lecturer.id}`} className="hover:text-accent-strong">{c.lecturer.fullName}</Link> }]),
     { key: "students", header: t("admin.courses.students"), align: "right", cell: (c) => <span className="tabular-nums">{c.activeStudents}</span> },
     ...(actions ? [{ key: "actions", header: <span className="sr-only">{t("table.actions")}</span>, align: "right" as const, cell: actions }] : []),

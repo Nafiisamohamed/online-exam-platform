@@ -3,9 +3,7 @@
  * docs/api.md exactly; screens use these functions (writes) and the GET paths
  * below with useApi() (reads), so no component builds URLs or bodies itself.
  */
-import type {
-  AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty, Schedule,
-} from "@/types/admin";
+import type { AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty, Schedule, AcademicYear, Registration, GroupEnrolResult } from "@/types/admin";
 import type { Role } from "@/types/account";
 import { api, query } from "./client";
 
@@ -26,7 +24,10 @@ export const paths = {
   user: (id: string) => `/users/${id}`,
   staff: (role: "LECTURER" | "INVIGILATOR") => `/staff?role=${role}`,
   faculties: "/faculties",
-  courses: (q: { semester?: string; facultyId?: string } = {}) => `/courses${query(q)}`,
+  courses: (q: { semester?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number } = {}) => `/courses${query(q)}`,
+  academicYears: "/academic-years",
+  facultyLecturers: (facultyId: string) => `/faculties/${facultyId}/lecturers`,
+  registrations: (q: { academicYearId?: string; facultyId?: string; semesterNumber?: number; search?: string; page?: number; pageSize?: number } = {}) => `/registrations${query(q)}`,
   course: (id: string) => `/courses/${id}`,
   enrolments: (courseId: string, status?: "ACTIVE" | "DROPPED") => `/courses/${courseId}/enrolments${query({ status })}`,
   exams: (q: { courseId?: string; status?: "DRAFT" | "PUBLISHED" } = {}) => `/exams${query(q)}`,
@@ -65,6 +66,55 @@ export async function resetPassword(id: string) {
 
 // --- Faculties ------------------------------------------------------------------------
 
+// --- Academic structure (Phase 2) -------------------------------------------------------
+
+export async function createAcademicYear(input: { name: string; startDate: string; endDate: string; isCurrent?: boolean }) {
+  const res = await api<{ academicYear: AcademicYear }>("/academic-years", { method: "POST", json: input });
+  invalidate("/academic-years", "/audit-logs");
+  return res.academicYear;
+}
+
+export async function updateAcademicYear(id: string, patch: { startDate?: string; endDate?: string }) {
+  const res = await api<{ academicYear: AcademicYear }>(`/academic-years/${id}`, { method: "PATCH", json: patch });
+  invalidate("/academic-years", "/audit-logs");
+  return res.academicYear;
+}
+
+export async function activateAcademicYear(id: string) {
+  const res = await api<{ academicYear: AcademicYear }>(`/academic-years/${id}/activate`, { method: "POST" });
+  invalidate("/academic-years", "/audit-logs");
+  return res.academicYear;
+}
+
+export async function assignLecturer(facultyId: string, lecturerId: string) {
+  await api(`/faculties/${facultyId}/lecturers`, { method: "POST", json: { lecturerId } });
+  invalidate(`/faculties/${facultyId}/lecturers`, "/audit-logs");
+}
+
+export async function unassignLecturer(facultyId: string, lecturerId: string) {
+  await api(`/faculties/${facultyId}/lecturers/${lecturerId}`, { method: "DELETE" });
+  invalidate(`/faculties/${facultyId}/lecturers`, "/audit-logs");
+}
+
+export async function registerStudent(input: { studentNumber: string; academicYearId: string; facultyId: string; semesterNumber: number }) {
+  const res = await api<{ registration: Registration }>("/registrations", { method: "POST", json: input });
+  invalidate("/registrations", "/academic-years", "/audit-logs");
+  return res.registration;
+}
+
+/** Corrects a registration's faculty or semester (the student and academic year stay). */
+export async function updateRegistration(id: string, patch: { facultyId?: string; semesterNumber?: number }) {
+  const res = await api<{ registration: Registration }>(`/registrations/${id}`, { method: "PATCH", json: patch });
+  invalidate("/registrations", "/audit-logs");
+  return res.registration;
+}
+
+export async function enrolGroup(group: { academicYearId: string; facultyId: string; semesterNumber: number }) {
+  const res = await api<GroupEnrolResult>("/registrations/enrol-group", { method: "POST", json: group });
+  invalidate("/courses", "/registrations", "/audit-logs");
+  return res;
+}
+
 export async function createFaculty(input: { code: string; name: string }) {
   const res = await api<{ faculty: Faculty }>("/faculties", { method: "POST", json: input });
   invalidate("/faculties", "/audit-logs");
@@ -85,7 +135,7 @@ export async function createCourse(input: NewCourseInput) {
   return res.course;
 }
 
-export async function updateCourse(id: string, patch: Partial<Pick<NewCourseInput, "name" | "lecturerId" | "facultyId">>) {
+export async function updateCourse(id: string, patch: Partial<Pick<NewCourseInput, "name" | "lecturerId" | "facultyId" | "academicYearId" | "semesterNumber">>) {
   const res = await api<{ course: Course }>(`/courses/${id}`, { method: "PATCH", json: patch });
   invalidate("/courses", "/faculties", "/exams", "/audit-logs");
   return res.course;

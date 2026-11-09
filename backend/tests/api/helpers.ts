@@ -59,6 +59,23 @@ export async function createUser(role: RoleName, extra: Partial<{ fullName: stri
   });
 }
 
+/**
+ * An academic year for tests (2100/2101 … 2899/2900), created or reused by name. Sharing a year
+ * between tests is harmless; only its id is used.
+ */
+export async function testAcademicYear(start = 2100 + Math.floor(Math.random() * 800)) {
+  const name = `${start}/${start + 1}`;
+  return prisma.academicYear.upsert({
+    where: { name }, update: {},
+    create: { name, startDate: new Date(`${start}-09-01`), endDate: new Date(`${start + 1}-07-31`) },
+  });
+}
+
+/** Assigns a lecturer to a faculty (needed before they can teach a course there). */
+export async function assignToFaculty(facultyId: string, lecturerId: string) {
+  return prisma.facultyLecturer.upsert({ where: { facultyId_lecturerId: { facultyId, lecturerId } }, update: {}, create: { facultyId, lecturerId } });
+}
+
 /** Logs in and returns a supertest agent that keeps the session cookie. */
 export async function loginAs(user: { email: string | null; studentNumber: string | null }, password = PASSWORD) {
   const agent = request.agent(app);
