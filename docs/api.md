@@ -170,7 +170,7 @@ All of these are for the course's own lecturer only.
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| GET | `/api/courses/:courseId/questions` | query: `type`, `difficulty`, `topicId`, `search`, `archived`, `page`, `pageSize` | paged `{ id, isArchived, current }` |
+| GET | `/api/courses/:courseId/questions` | query: `type`, `difficulty`, `topicId`, `search`, `archived`, `review` (REVIEWED / DRAFT), `page`, `pageSize` | paged `{ id, isArchived, current, review }` plus `review: { reviewed, total, target: 40 }` |
 | POST | `/api/courses/:courseId/questions` | the question body (below) | `201 { question }`. Errors: `400 QUESTION_INVALID { errors }`, `409 DUPLICATE_QUESTION` |
 | GET | `/api/courses/:courseId/question-summary` | — | `{ items: [{ type, difficulty, marks, count }] }` |
 | GET / POST | `/api/courses/:courseId/topics` | POST: `{ name }` | `{ items }` / `201 { topic }` |
@@ -178,6 +178,7 @@ All of these are for the course's own lecturer only.
 | PUT | `/api/questions/:id` | the question body | `{ question, newVersionCreated }` |
 | GET | `/api/questions/:id/versions/:versionId` | — | `{ version }` |
 | POST | `/api/questions/:id/archive`, `/restore` | — | `{ question }` |
+| POST / DELETE | `/api/questions/:id/review` | — | marks the current version reviewed / not reviewed: `{ question }`. Error: `409 QUESTION_ARCHIVED`. Any edit clears the review. |
 | POST | `/api/question-images` | multipart: `image` (PNG, JPEG, GIF or WebP, at most 2 MB) | `201 { imagePath, imageUrl }` |
 | GET | `/api/question-images/:name` | any logged-in user | the image |
 
@@ -202,19 +203,23 @@ All of these are for the course's own lecturer only.
 
 **Versions:** editing a question that an exam attempt has already used creates a new version, and old results keep the original.
 
+**Review (Phase 3):** exams published from now on draw only reviewed questions (the reviewed version must be the current one). Exams published earlier keep their pools.
+
 ## Exams
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
 | GET | `/api/exams` | ADMIN, LECTURER | query: `courseId`, `status` | `{ items }` |
-| POST | `/api/exams` | LECTURER (own course) | `{ courseId, title, instructions?, shuffleQuestions?, shuffleOptions?, allowAnswerReview?, feeAmount?, feeCurrency?, secondGraderId?, rules? }` | `201 { exam }` |
+| POST | `/api/exams` | LECTURER (own course) | `{ examType: QUIZ\|MIDTERM\|FINAL, courseId, title, instructions?, shuffleQuestions?, shuffleOptions?, allowAnswerReview?, secondGraderId?, rules? }` | `201 { exam }` (with `examType`, `reviewedOnly`, `excludedQuestions`) |
 | GET | `/api/exams/:id` | ADMIN, course lecturer, second grader | — | `{ exam }`, with each rule's `available` count and the schedules |
-| PATCH | `/api/exams/:id` | course lecturer | settings | `{ exam }`. After publishing, shuffling and the fee are fixed: `409 EXAM_PUBLISHED_LOCKED` |
+| PATCH | `/api/exams/:id` | course lecturer | settings, `examType` | `{ exam }`. After publishing, the exam type and shuffling are fixed: `409 EXAM_PUBLISHED_LOCKED` |
 | PUT | `/api/exams/:id/rules` | course lecturer (DRAFT only) | `{ rules: [{ questionType, difficulty, marksPerQuestion, questionCount, topicIds? }] }` | `{ exam }`. Errors: `400 EXAM_NOT_ENOUGH_QUESTIONS { rules: [{ position, required, available }] }`, `400 RULE_DUPLICATE` |
 | GET | `/api/exams/:id/preview` | course lecturer | — | `{ sample: true, totalMarks, questions }`: one generated sample with the correct answers. Nothing is saved or locked. |
-| POST | `/api/exams/:id/publish` | course lecturer | — | `{ exam }`. Errors: `400 EXAM_HAS_NO_RULES`, `400 EXAM_NOT_ENOUGH_QUESTIONS` |
+| GET | `/api/exams/:id/question-pool` | course lecturer | — | per rule, the reviewed questions that can be drawn, with `excluded` flags |
+| PUT | `/api/exams/:id/excluded-questions` | course lecturer (DRAFT only) | `{ questionIds }` | `{ exam }`: these questions are left out of the draw. Errors: `400 EXAM_NOT_ENOUGH_QUESTIONS`, `400 QUESTION_NOT_IN_COURSE` |
+| POST | `/api/exams/:id/publish` | course lecturer | — | `{ exam }`. Errors: `400 EXAM_HAS_NO_RULES`, `400 EXAM_NOT_ENOUGH_QUESTIONS` (reviewed questions only) |
 
-**Fees and currencies:** `feeCurrency` must be one of `SUPPORTED_CURRENCIES`. A fee of 0 means the exam is free.
+**Fees:** since Phase 4 students pay a **semester fee** instead of a per-exam fee (see *Semester fees and eligibility*). The old per-exam fee fields are kept for the historical payments only.
 
 **Rules:** an exam has at most one rule per type + difficulty + mark value. This gives every student the same difficulty mix and the same total marks.
 
@@ -222,14 +227,16 @@ All of these are for the course's own lecturer only.
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
-| POST | `/api/exams/:id/schedules` | course lecturer | `{ windowStart, windowEnd, durationMinutes, roomIds?, invigilatorIds? }` | `201 { schedule }`. Errors: `400 WINDOW_INVALID`, `400 DURATION_LONGER_THAN_WINDOW`, `400 WINDOW_IN_PAST`, `409 SCHEDULE_ALREADY_REQUESTED` |
+| POST | `/api/exams/:id/schedules` | course lecturer | `{ windowStart, windowEnd, roomIds?, invigilatorIds? }` (the duration is the window length) | `201 { schedule }`. Errors: `400 WINDOW_INVALID`, `400 WINDOW_LENGTH_INVALID` (5–600 minutes), `400 WINDOW_IN_PAST`, `400 ROOM_INACTIVE`, `409 SCHEDULE_ALREADY_REQUESTED` |
 | GET | `/api/schedules` | ADMIN, LECTURER, INVIGILATOR | query: `status`, `from`, `to` | `{ items }`. An invigilator sees only the approved sessions assigned to them. |
 | GET | `/api/schedules/:id` | ADMIN, owner, assigned invigilator | — | `{ schedule }` |
-| POST | `/api/schedules/:id/approve` | ADMIN | — | `{ schedule }`. Errors: `409 SCHEDULE_CONFLICT { conflicts: [{ type: STUDENT\|ROOM\|INVIGILATOR, scheduleId, examTitle, count }] }`, `409 EXAM_NOT_PUBLISHED` |
+| POST | `/api/schedules/:id/approve` | ADMIN | `{ confirmUnknownCapacity? }` | `{ schedule }`. Errors: `409 SCHEDULE_CONFLICT { conflicts: [{ type: STUDENT\|ROOM\|INVIGILATOR, scheduleId, examTitle, count }] }`, `409 EXAM_NOT_PUBLISHED`, `409 ROOM_CAPACITY_INSUFFICIENT { capacity, students }`, `409 ROOM_CAPACITY_UNKNOWN { students, rooms }` (send `confirmUnknownCapacity: true` to approve anyway) |
 | POST | `/api/schedules/:id/reject` | ADMIN | `{ reason }` | `{ schedule }` |
 | POST | `/api/schedules/:id/cancel` | ADMIN, owner lecturer | — | `{ schedule }`. Error: `409 SCHEDULE_HAS_ATTEMPTS` |
 
 Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the enrolled students.
+
+**Room capacity (Phase 3):** the capacities of the chosen rooms are added up and compared with the course's active students. A room without a known capacity needs the registrar's confirmation; a known total that is too small blocks approval. Schedules without rooms are not checked.
 
 **Overlapping exams (4.5)** are blocked at both ends:
 - **Approval** is refused when the schedule overlaps another approved exam of any shared student, room or invigilator.
@@ -332,7 +339,7 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
-| POST | `/api/payments` | STUDENT | `{ examId, provider: EVC_PLUS\|ZAAD\|EDAHAB, phone, idempotencyKey: uuid }` (extra fields such as `amount` are rejected) | `201 { payment, reused: false }`, or `200 { payment, reused: true }` for a repeated request or an open payment. Errors: `400 EXAM_HAS_NO_FEE`, `409 PAYMENT_ALREADY_PAID` |
+| POST | `/api/payments` | STUDENT | `{ semesterFeeId, amount, provider: EVC_PLUS\|ZAAD\|EDAHAB, phone, idempotencyKey: uuid }` | `201 { payment, reused: false }`, or `200 { payment, reused: true }` for a repeated request or the open payment of that fee. Errors: `404 FEE_NOT_FOUND`, `400 AMOUNT_INVALID`, `409 FEE_ALREADY_PAID`, `400 AMOUNT_EXCEEDS_BALANCE` |
 | GET | `/api/payments` | STUDENT (own), ADMIN (all) | query: `examId`, `status`, `provider` | `{ items }` |
 | GET | `/api/payments/:id` | owner, ADMIN | — | `{ payment }` |
 | POST | `/api/payments/:id/confirm` | owner | `{ accept: true \| false }` | `{ payment }`: status `PENDING_PIN` or `CANCELLED` |
@@ -340,10 +347,11 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 | POST | `/api/payments/:id/cancel` | owner | — | `{ payment }` |
 | GET | `/api/payments/:id/receipt.pdf?lang=so\|en` | owner, ADMIN | — | DEMO receipt PDF (SUCCESS only) |
 
-**The `payment` object:** `{ id, exam, provider, providerName, phone, amount, currency, status, merchantName, merchantNumber, pinAttemptsLeft, failureReason, receiptNumber, expiresAt, secondsUntilExpiry, isSimulated: true, … }`.
+**The `payment` object:** `{ id, purpose, semesterFee, exam, provider, providerName, phone, amount, currency, status, merchantName, merchantNumber, pinAttemptsLeft, failureReason, receiptNumber, expiresAt, secondsUntilExpiry, isSimulated: true, … }`.
 
 **How it works**
-- **Amount:** always copied from the exam. The browser never sends it.
+- **Amount:** all or part of the outstanding semester fee; the server checks it against the balance. Several partial payments are allowed, one open at a time.
+- **History:** payments made for single exams before Phase 4 keep their exam, amount and receipt, and are listed as earlier exam fees.
 - **PIN:** checked on the server against `DEMO_PAYMENT_PIN`. It is never stored or logged.
 - **Outcomes:**
   - 3 wrong PINs: `FAILED`;
@@ -390,12 +398,25 @@ Approving a schedule sends the `SCHEDULE_APPROVED` SMS and notification to the e
 
 All numbers come from live database queries.
 
+## Semester fees and eligibility (Phase 4)
+
+| Method | Path | Role | Request | Response |
+|---|---|---|---|---|
+| GET | `/api/semester-fees` | ADMIN | query: `academicYearId`, `facultyId` | `{ items }` |
+| POST | `/api/semester-fees` | ADMIN | `{ academicYearId, facultyId, semesterNumber, amount, currency? }` | `201 { fee }`. Error: `409 FEE_EXISTS` |
+| PATCH | `/api/semester-fees/:id` | ADMIN | `{ amount?, currency? }` | `{ fee }` (the previous values go to Activity History) |
+| GET | `/api/fee-status` | ADMIN | query: `academicYearId` (required), `facultyId`, `semesterNumber`, `status` (PAID / PARTIAL / UNPAID / NO_FEE), `search`, `page`, `pageSize` | paged rows per registered student with fee, paid and outstanding, plus `counts` and `missingFees` |
+| POST | `/api/fee-reminders` | ADMIN | `{ academicYearId, facultyId?, semesterNumber?, studentIds? }` | `{ reminded }`: a simulated SMS and a notification to each student who still owes |
+| GET | `/api/my/fees` | STUDENT | — | `{ semesters: [{ academicYear, faculty, semesterNumber, fee, paid, outstanding, percentPaid }], payments }` |
+
+**Eligibility:** to start an exam, a student must have paid part of the semester fee of the exam's course (its academic year, faculty and semester): **Quiz 30 %, Midterm 50 %, Final 100 %**. Otherwise starting returns `402 FEE_REQUIREMENT_NOT_MET { requiredPercent, requiredAmount, paid, stillToPay, outstanding, currency }`. `GET /api/my/exams` shows the same as `eligibility` on each exam. When no fee is set for the group the student is not blocked and the registrars get a `FEE_NOT_CONFIGURED` notification (at most once a day). Courses without an academic year are not checked.
+
 ## Rooms and grading scale
 
 | Method | Path | Role | Request | Response |
 |---|---|---|---|---|
-| GET | `/api/rooms` | ADMIN, LECTURER | — | `{ items }` |
-| POST | `/api/rooms` | ADMIN | `{ name, building, networkRanges: ["10.10.4.0/24"] }` | `201 { room }`. Error: `409 ROOM_NAME_TAKEN` |
+| GET | `/api/rooms` | ADMIN, LECTURER | query: `active` | `{ items }` (with `capacity`, `isActive`) |
+| POST | `/api/rooms` | ADMIN | `{ name, building, capacity?, isActive?, networkRanges? }` | `201 { room }`. Error: `409 ROOM_NAME_TAKEN` |
 | PATCH | `/api/rooms/:id` | ADMIN | any of the fields | `{ room }` |
 | GET | `/api/grading-scale` | any | — | `{ bands: [{ letter, minPercentage }] }` |
 | PUT | `/api/grading-scale` | ADMIN | `{ bands }`: unique letters and minimums, one band at 0 | `{ bands }` |
