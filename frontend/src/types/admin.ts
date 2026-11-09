@@ -353,3 +353,33 @@ export interface AuditEntry {
   createdAt: string;
   actor: { id: string; fullName: string; email: string | null; username: string; studentNumber: string | null; role: { name: Role } } | null;
 }
+
+/** GET /api/semester-fees */
+export interface SemesterFee {
+  id: string;
+  semesterNumber: number;
+  amount: number;
+  currency: string;
+  academicYear: { id: string; name: string; isCurrent: boolean };
+  faculty: { id: string; code: string; name: string };
+}
+
+/** GET /api/fee-status */
+export interface FeeStatusPage {
+  items: {
+    registrationId: string;
+    student: { id: string; fullName: string; username: string; studentNumber: string | null };
+    faculty: { id: string; code: string; name: string };
+    academicYear: { id: string; name: string };
+    semesterNumber: number;
+    fee: { id: string; amount: number; currency: string } | null;
+    paid: number;
+    outstanding: number;
+    status: "PAID" | "PARTIAL" | "UNPAID" | "NO_FEE";
+  }[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<"PAID" | "PARTIAL" | "UNPAID" | "NO_FEE", number>;
+  missingFees: { faculty: { id: string; code: string; name: string }; semesterNumber: number }[];
+}

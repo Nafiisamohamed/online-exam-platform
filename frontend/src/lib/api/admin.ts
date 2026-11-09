@@ -27,6 +27,8 @@ export const paths = {
   courses: (q: { semester?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number } = {}) => `/courses${query(q)}`,
   academicYears: "/academic-years",
   rooms: "/rooms",
+  semesterFees: (academicYearId: string) => `/semester-fees${query({ academicYearId })}`,
+  feeStatus: (q: { academicYearId: string; facultyId?: string; semesterNumber?: number; status?: string; search?: string; page?: number; pageSize?: number }) => `/fee-status${query(q)}`,
   facultyLecturers: (facultyId: string) => `/faculties/${facultyId}/lecturers`,
   registrations: (q: { academicYearId?: string; facultyId?: string; semesterNumber?: number; search?: string; page?: number; pageSize?: number } = {}) => `/registrations${query(q)}`,
   course: (id: string) => `/courses/${id}`,
@@ -192,4 +194,17 @@ export async function rejectSchedule(id: string, reason: string) {
 export async function saveRoom(id: string | null, input: { name: string; building: string; capacity: number | null; isActive: boolean }) {
   await api(id ? `/rooms/${id}` : "/rooms", { method: id ? "PATCH" : "POST", json: input });
   invalidate("/rooms", "/audit-logs");
+}
+
+/** Creates (id null) or changes a semester fee. */
+export async function saveFee(id: string | null, input: { academicYearId?: string; facultyId?: string; semesterNumber?: number; amount: number }) {
+  await api(id ? `/semester-fees/${id}` : "/semester-fees", { method: id ? "PATCH" : "POST", json: input });
+  invalidate("/semester-fees", "/fee-status", "/audit-logs");
+}
+
+/** Simulated SMS + in-app reminders to the students of the filter who still owe money. */
+export async function sendFeeReminders(q: { academicYearId: string; facultyId?: string; semesterNumber?: number }) {
+  const res = await api<{ reminded: number }>("/fee-reminders", { method: "POST", json: q });
+  invalidate("/audit-logs");
+  return res;
 }

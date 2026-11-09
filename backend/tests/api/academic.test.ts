@@ -11,12 +11,18 @@ async function faculty(admin: Awaited<ReturnType<typeof userAgent>>[1]) {
   expect(f.status).toBe(201);
   return f.body.faculty as { id: string; code: string };
 }
-const freeYear = () => 2100 + Math.floor(Math.random() * 800);
+/** A random test year (2100-2898) where neither it nor the next year exists yet (other tests make random years too). */
+async function freeYear() {
+  for (;;) {
+    const y = 2100 + Math.floor(Math.random() * 799);
+    if ((await prisma.academicYear.count({ where: { name: { in: [`${y}/${y + 1}`, `${y + 1}/${y + 2}`, `${y + 900}/${y + 901}`] } } })) === 0) return y;
+  }
+}
 
 describe("academic years", () => {
   it("are created by the registrar as YYYY/YYYY+1 with dates, and exactly one can be current", async () => {
     const [, admin] = await userAgent("ADMIN");
-    const y = freeYear();
+    const y = await freeYear();
     const a = await admin.post("/api/academic-years").send({ name: `${y}/${y + 1}`, startDate: `${y}-09-01`, endDate: `${y + 1}-07-31` });
     expect(a.status).toBe(201);
     expect(a.body.academicYear).toMatchObject({ name: `${y}/${y + 1}`, isCurrent: false });
@@ -24,7 +30,7 @@ describe("academic years", () => {
     expect((await admin.post("/api/academic-years").send({ name: `${y}/${y + 2}`, startDate: `${y}-09-01`, endDate: `${y + 1}-07-31` })).body.error.code).toBe("ACADEMIC_YEAR_NAME_INVALID");
     expect((await admin.post("/api/academic-years").send({ name: `${y + 900}/${y + 901}`, startDate: `${y}-09-01`, endDate: `${y}-08-01` })).body.error.code).toBe("ACADEMIC_YEAR_DATES_INVALID");
 
-    const b = await testAcademicYear(y === 2899 ? 2100 : y + 1);
+    const b = await testAcademicYear(y + 1);
     expect((await admin.post(`/api/academic-years/${a.body.academicYear.id}/activate`)).status).toBe(200);
     expect((await admin.post(`/api/academic-years/${b.id}/activate`)).body.academicYear.isCurrent).toBe(true);
     const current = await prisma.academicYear.findMany({ where: { isCurrent: true } });

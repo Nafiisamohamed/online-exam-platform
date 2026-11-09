@@ -27,8 +27,7 @@ import { isUniqueViolation } from "../../db/db-errors.ts";
 import { transaction } from "../../db/prisma.ts";
 import * as attemptsRepo from "../../repositories/attempts.repository.ts";
 import { findEnrolment } from "../../repositories/courses.repository.ts";
-import { findExam } from "../../repositories/exams.repository.ts";
-import { findSuccessfulPayment } from "../../repositories/payments.repository.ts";
+import { findExam, findExamForEligibility } from "../../repositories/exams.repository.ts";
 import { findApprovedSchedule } from "../../repositories/schedules.repository.ts";
 import type { AuthUser } from "../../middleware/auth.ts";
 import { AppError, badRequest, conflict, forbidden, notFound } from "../../lib/errors.ts";
@@ -36,6 +35,7 @@ import { num, num0 } from "../../lib/format.ts";
 import { audit } from "../../services/audit.ts";
 import { generateExam, NotEnoughQuestionsError } from "../../services/exam-generator.ts";
 import { examPoolFilter, loadRuleSpecs, rulesWithPools } from "../../services/exam-pool.ts";
+import { examEligibility } from "../../services/eligibility.ts";
 import { submitAttempt, submitIfExpired, terminateLocked } from "../../services/submission.ts";
 
 /** Counted tab switches after which the student is warned (4.8). */
@@ -118,11 +118,14 @@ export async function attemptView(attemptId: string) {
 export async function listMyExams(user: AuthUser) {
   const exams = await attemptsRepo.findStudentExams(user.id);
   const t = now();
+  const eligibilities = new Map<string, Awaited<ReturnType<typeof examEligibility>>>();
+  for (const e of exams) eligibilities.set(e.id, await examEligibility(user.id, e));
   return exams.map((e) => {
     const schedule = e.schedules[0] ?? null;
     const attempt = e.attempts[0] ?? null;
     const fee = num0(e.feeAmount);
-    const paid = fee === 0 || e.payments.length > 0;
+    const eligibility = eligibilities.get(e.id)!;
+    const paid = eligibility.eligible;
     const windowState = !schedule ? "UNSCHEDULED" : t < schedule.windowStart ? "UPCOMING" : t < schedule.windowEnd ? "OPEN" : "CLOSED";
     const state = attempt ? (attempt.status === "TERMINATED" ? "TERMINATED" : attempt.status === "IN_PROGRESS" && attempt.deadline > t ? "IN_PROGRESS" : "SUBMITTED") : windowState;
     return {
@@ -134,7 +137,9 @@ export async function listMyExams(user: AuthUser) {
       totalQuestions: e.rules.reduce((s, r) => s + r.questionCount, 0),
       totalMarks: Math.round(e.rules.reduce((s, r) => s + num0(r.marksPerQuestion) * r.questionCount, 0) * 100) / 100,
       schedule,
-      fee: { amount: fee, currency: e.feeCurrency, required: fee > 0, paid, receiptNumber: e.payments[0]?.receiptNumber ?? null },
+      // The old per-exam fee is history only (required: false); eligibility is the semester-fee rule.
+      fee: { amount: fee, currency: e.feeCurrency, required: false, paid: true, receiptNumber: e.payments[0]?.receiptNumber ?? null },
+      eligibility,
       attempt,
       resultsPublished: e.resultsStatus !== "UNPUBLISHED",
       state,
@@ -168,9 +173,15 @@ export async function startAttempt(user: AuthUser, examId: string, ip: string) {
 
   // No network, IP address, room or device restriction: an eligible student may start from any
   // device and any connection. The address is only recorded on the attempt (start_ip) for the record.
-  if (num0(exam.feeAmount) > 0) {
-    const paid = await findSuccessfulPayment(user.id, examId);
-    if (!paid) throw new AppError(402, "PAYMENT_REQUIRED", "Pay the exam fee first", { amount: num(exam.feeAmount), currency: exam.feeCurrency });
+  // Phase 4: the semester fee decides (Quiz 30%, Midterm 50%, Final 100% paid). The old
+  // per-exam fee no longer blocks anyone; its payments are kept as history.
+  const withCourse = await findExamForEligibility(examId);
+  const eligibility = await examEligibility(user.id, withCourse!);
+  if (!eligibility.eligible) {
+    throw new AppError(402, "FEE_REQUIREMENT_NOT_MET", "Pay more of the semester fee before this exam", {
+      requiredPercent: eligibility.requiredPercent, requiredAmount: eligibility.requiredAmount, paid: eligibility.paid,
+      stillToPay: eligibility.stillToPay, outstanding: eligibility.outstanding, currency: eligibility.fee?.currency,
+    });
   }
 
   try {

@@ -8,6 +8,7 @@ import { api, query } from "./client";
 import { invalidate } from "./use-api";
 
 export const studentPaths = {
+  myFees: "/my/fees",
   /** Active enrolments only (the API scopes /courses to the student). */
   courses: "/courses",
   course: (id: string) => `/courses/${id}`,
@@ -62,9 +63,12 @@ export async function submitAttempt(attemptId: string) {
 
 // --- Exam fee payments (simulated mobile money) ---------------------------------------------
 
-/** Starts a payment, or returns the open one for this exam (reused: true). The amount always comes from the exam. */
-export function createPayment(examId: string, provider: PaymentProvider, phone: string, idempotencyKey: string) {
-  return api<{ payment: Payment; reused: boolean }>("/payments", { method: "POST", json: { examId, provider, phone, idempotencyKey } });
+/**
+ * Starts a simulated payment of `amount` towards a semester fee, or returns the open one for that fee
+ * (reused: true). The server checks the amount against the outstanding balance.
+ */
+export function createPayment(semesterFeeId: string, amount: number, provider: PaymentProvider, phone: string, idempotencyKey: string) {
+  return api<{ payment: Payment; reused: boolean }>("/payments", { method: "POST", json: { semesterFeeId, amount, provider, phone, idempotencyKey } });
 }
 
 /** The "Do you accept?" step on the phone: true continues to the PIN, false cancels. */
@@ -74,7 +78,7 @@ export function confirmPayment(id: string, accept: boolean) {
 
 export async function enterPin(id: string, pin: string) {
   const res = await api<{ result: "SUCCESS" | "WRONG_PIN" | "FAILED"; payment: Payment }>(`/payments/${id}/pin`, { method: "POST", json: { pin } });
-  if (res.result === "SUCCESS") invalidate("/my/exams", "/payments");
+  if (res.result === "SUCCESS") invalidate("/my/exams", "/payments", "/my/fees");
   return res;
 }
 

@@ -260,6 +260,7 @@ model Faculty {
   courses       Course[]
   lecturers     FacultyLecturer[]
   registrations StudentRegistration[]
+  semesterFees  SemesterFee[]
 
   @@map("faculties")
 }
@@ -276,6 +277,7 @@ model AcademicYear {
 
   courses       Course[]
   registrations StudentRegistration[]
+  semesterFees  SemesterFee[]
 
   @@map("academic_years")
 }
@@ -915,7 +917,9 @@ model GradeRevision {
 model Payment {
   id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   studentId      String          @map("student_id") @db.Uuid
-  examId         String          @map("exam_id") @db.Uuid
+  /// Historical exam-fee payments have examId; semester-fee payments have semesterFeeId (exactly one is set).
+  examId         String?         @map("exam_id") @db.Uuid
+  semesterFeeId  String?         @map("semester_fee_id") @db.Uuid
   provider       PaymentProvider
   phone          String
   /// Copied from the exam by the server - never taken from the browser.
@@ -937,12 +941,14 @@ model Payment {
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   completedAt    DateTime?       @map("completed_at") @db.Timestamptz(6)
 
-  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
-  exam    Exam @relation(fields: [examId], references: [id], onDelete: Restrict)
+  student     User         @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  exam        Exam?        @relation(fields: [examId], references: [id], onDelete: Restrict)
+  semesterFee SemesterFee? @relation(fields: [semesterFeeId], references: [id], onDelete: Restrict)
 
   @@index([studentId, examId])
   /// Used to expire unfinished payments.
   @@index([status, expiresAt])
+  @@index([studentId, semesterFeeId], map: "payments_student_fee_idx")
   @@map("payments")
 }
 
@@ -999,4 +1005,24 @@ model ExamExcludedQuestion {
 
   @@id([examId, questionId])
   @@map("exam_excluded_questions")
+}
+
+/// The fee of one faculty, academic year and semester (Phase 4). Students pay it in one or more
+/// simulated payments; exam eligibility depends on how much of it is paid.
+model SemesterFee {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  facultyId      String   @map("faculty_id") @db.Uuid
+  semesterNumber Int      @map("semester_number") @db.SmallInt
+  amount         Decimal  @db.Decimal(12, 2)
+  currency       String   @db.Char(3)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  faculty      Faculty      @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+
+  @@unique([academicYearId, facultyId, semesterNumber], map: "semester_fees_group_key")
+  @@map("semester_fees")
 }

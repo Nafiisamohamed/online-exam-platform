@@ -61,7 +61,7 @@ describe("exam clock follows the server, not the device", () => {
 
 describe("exam grouping uses the server's states only", () => {
   const exam = (id: string, state: MyExam["state"], start: string): MyExam => ({
-    id, title: id, examType: "QUIZ", instructions: "", course: { id: "c", code: "C", name: "C" }, totalQuestions: 1, totalMarks: 1,
+    id, title: id, examType: "QUIZ", eligibility: { eligible: true, reason: "NO_OFFERING", examType: "QUIZ", requiredPercent: 30, fee: null, paid: 0, outstanding: 0, requiredAmount: 0, stillToPay: 0 }, instructions: "", course: { id: "c", code: "C", name: "C" }, totalQuestions: 1, totalMarks: 1,
     schedule: { id: `s${id}`, windowStart: start, windowEnd: start, durationMinutes: 30 },
     fee: { amount: 0, currency: "USD", required: false, paid: true, receiptNumber: null }, attempt: null, resultsPublished: false, state, canStart: state === "OPEN",
   });

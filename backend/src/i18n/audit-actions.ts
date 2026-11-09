@@ -69,6 +69,9 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     EXAM_QUESTIONS_SELECTED: "beddelay doorashada su'aalaha imtixaan",
     QUESTION_REVIEWED: "dib u eegay su'aal",
     QUESTION_REVIEW_REMOVED: "su'aal ku celiyay qabyo",
+    SEMESTER_FEE_CREATED: "dejiyay khidmad semestar",
+    SEMESTER_FEE_UPDATED: "beddelay khidmad semestar",
+    PAYMENT_REMINDERS_SENT: "diray xusuusin lacag bixin",
   },
   en: {
     USER_CREATED: "created a user account",
@@ -133,6 +136,9 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     EXAM_QUESTIONS_SELECTED: "changed an exam's question selection",
     QUESTION_REVIEWED: "reviewed a question",
     QUESTION_REVIEW_REMOVED: "sent a question back to draft",
+    SEMESTER_FEE_CREATED: "set a semester fee",
+    SEMESTER_FEE_UPDATED: "changed a semester fee",
+    PAYMENT_REMINDERS_SENT: "sent payment reminders",
   },
 };
 
@@ -157,12 +163,12 @@ export const ENTITY_LABELS: Record<Language, Record<string, string>> = {
     user: "Akoon", course: "Maaddo", faculty: "Kulliyad", exam: "Imtixaan", exam_schedule: "Jadwalka imtixaanka",
     exam_attempt: "Isku dayga imtixaanka", answer: "Jawaab", question: "Su'aal", import_batch: "Soo dejin", payment: "Lacag bixin",
     room: "Qol", grading_scale: "Miisaanka darajooyinka", audit_log: "Taariikhda hawlaha", enrolment: "Diiwaangelin",
-    academic_year: "Sannad-dugsiyeed", student_registration: "Diiwaangelinta ardayga",
+    academic_year: "Sannad-dugsiyeed", student_registration: "Diiwaangelinta ardayga", semester_fee: "Khidmadda semestarka",
   },
   en: {
     user: "Account", course: "Course", faculty: "Faculty", exam: "Examination", exam_schedule: "Exam schedule",
     exam_attempt: "Exam attempt", answer: "Answer", question: "Question", import_batch: "Import", payment: "Payment",
     room: "Room", grading_scale: "Grading scale", audit_log: "Activity history", enrolment: "Enrolment",
-    academic_year: "Academic year", student_registration: "Student registration",
+    academic_year: "Academic year", student_registration: "Student registration", semester_fee: "Semester fee",
   },
 };

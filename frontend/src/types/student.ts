@@ -14,6 +14,7 @@ export interface MyExam {
   id: string;
   title: string;
   examType: "QUIZ" | "MIDTERM" | "FINAL";
+  eligibility: Eligibility;
   instructions: string;
   course: { id: string; code: string; name: string };
   totalQuestions: number;
@@ -148,3 +149,37 @@ export interface Payment {
   completedAt: string | null;
   isSimulated: boolean;
 }
+
+/** Phase 4: whether the semester fee allows this exam (calculated by the server). */
+export interface Eligibility {
+  eligible: boolean;
+  reason: "PAID_ENOUGH" | "NOT_ENOUGH_PAID" | "NO_OFFERING" | "NOT_REGISTERED" | "NO_FEE";
+  examType: "QUIZ" | "MIDTERM" | "FINAL";
+  requiredPercent: number;
+  fee: { id: string; amount: number; currency: string } | null;
+  paid: number;
+  outstanding: number;
+  requiredAmount: number;
+  stillToPay: number;
+}
+
+/** GET /api/my/fees */
+export interface MyFees {
+  semesters: {
+    academicYear: { id: string; name: string };
+    faculty: { id: string; code: string; name: string };
+    semesterNumber: number;
+    fee: { id: string; amount: number; currency: string } | null;
+    paid: number;
+    outstanding: number;
+    percentPaid: number;
+  }[];
+  payments: {
+    id: string; status: PaymentStatus; amount: number; currency: string; provider: PaymentProvider; receiptNumber: string | null;
+    createdAt: string; completedAt: string | null; kind: "SEMESTER_FEE" | "EXAM_FEE"; semesterFeeId: string | null;
+    exam: { title: string; course: string } | null;
+  }[];
+}
+
+/** What a payment dialog pays: part or all of one semester fee's outstanding balance. */
+export interface PayTarget { feeId: string; label: string; outstanding: number; currency: string; suggested?: number }

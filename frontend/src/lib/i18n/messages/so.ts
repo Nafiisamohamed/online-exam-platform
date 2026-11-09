@@ -52,6 +52,7 @@ export const so: Messages = {
     academicYears: "Sannad-dugsiyeedyada",
     registrations: "Diiwaangelinta ardayda",
     rooms: "Qolalka",
+    fees: "Khidmadaha",
     signIn: "Gal",
     collapse: "Yaree liiska dhinaca",
     expand: "Ballaari liiska dhinaca",

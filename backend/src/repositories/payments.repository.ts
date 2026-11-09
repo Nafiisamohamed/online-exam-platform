@@ -4,7 +4,15 @@ import { prisma } from "../db/prisma.ts";
 import type { Prisma } from "../generated/prisma/client.ts";
 import type { PaymentStatus } from "../generated/prisma/enums.ts";
 
-const paymentInclude = { exam: { select: { id: true, title: true, course: { select: { code: true, name: true } } } } };
+const paymentInclude = {
+  exam: { select: { id: true, title: true, course: { select: { code: true, name: true } } } },
+  semesterFee: { select: { id: true, semesterNumber: true, academicYear: { select: { name: true } }, faculty: { select: { code: true, name: true } } } },
+};
+
+/** The student's open payment towards a semester fee, if any. */
+export function findOpenFeePayment(studentId: string, semesterFeeId: string, db: Db = prisma) {
+  return db.payment.findFirst({ where: { studentId, semesterFeeId, status: { in: ["PENDING_CONFIRMATION", "PENDING_PIN"] } } });
+}
 
 export function findSuccessfulPayment(studentId: string, examId: string, db: Db = prisma) {
   return db.payment.findFirst({ where: { studentId, examId, status: "SUCCESS" } });

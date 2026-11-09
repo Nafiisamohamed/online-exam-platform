@@ -106,7 +106,6 @@ function NewExamForm({ courses }: { courses: Course[] }) {
               { label: t("lecturer.exams.rules"), value: rules.length },
               { label: t("admin.exams.totalQuestions"), value: totals.questions },
               { label: t("admin.exams.totalMarks"), value: formatNumber(totals.marks, locale, 2) },
-              { label: t("lecturer.exams.fee"), value: Number(settings.feeAmount) > 0 ? `${settings.feeAmount} ${settings.feeCurrency || ""}`.trim() : t("admin.exams.free") },
             ]}
           />
           {missing && <Alert tone="warning">{t("lecturer.exams.fieldsRequired")}</Alert>}

@@ -60,6 +60,11 @@ export function findExam(id: string, db: Db = prisma) {
   return db.exam.findUnique({ where: { id } });
 }
 
+/** An exam with its course's academic year and semester (for fee eligibility). */
+export function findExamForEligibility(id: string, db: Db = prisma) {
+  return db.exam.findUnique({ where: { id }, include: { course: { select: { academicYearId: true, semesterNumber: true } } } });
+}
+
 const examDetailInclude = {
   course: { select: { id: true, code: true, name: true, semester: true, lecturerId: true } },
   secondGrader: { select: { id: true, fullName: true } },

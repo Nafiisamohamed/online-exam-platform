@@ -52,6 +52,7 @@ export const en = {
     academicYears: "Academic years",
     registrations: "Student registration",
     rooms: "Rooms",
+    fees: "Fees",
     signIn: "Sign in",
     collapse: "Collapse sidebar",
     expand: "Expand sidebar",

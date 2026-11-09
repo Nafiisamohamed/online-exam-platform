@@ -5,7 +5,7 @@
  * (The schedule is written directly, because the approval endpoint only
  * accepts windows that start in the future.)
  */
-import { addQuestions, createCourse, createUser, enrol, loginAs, prisma, userAgent } from "./helpers.ts";
+import { addQuestions, createCourse, createUser, enrol, loginAs, prisma, testAcademicYear, userAgent } from "./helpers.ts";
 
 export interface OpenExamOptions {
   students?: number;
@@ -15,6 +15,8 @@ export interface OpenExamOptions {
   windowMinutes?: number;
   durationMinutes?: number;
   feeAmount?: number;
+  /** Phase 4: a semester fee for the course's year and semester; every student is registered for it. */
+  semesterFee?: number;
   networkRanges?: string[];
   rules?: { questionType: "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY"; difficulty: "EASY" | "MEDIUM" | "HARD"; marksPerQuestion: number; questionCount: number; poolSize: number }[];
   secondGrader?: boolean;
@@ -67,7 +69,14 @@ export async function openExam(o: OpenExamOptions = {}) {
   const students = await Promise.all(Array.from({ length: o.students ?? 2 }, () => createUser("STUDENT")));
   await enrol(course.id, ...students.map((s) => s.id));
   const studentAgents = await Promise.all(students.map((s) => loginAs(s)));
-  return { lecturer, lecturerAgent, course, examId, schedule, students, studentAgents, invigilators, secondGrader };
+  let semesterFeeId: string | null = null;
+  if (o.semesterFee) {
+    const year = await testAcademicYear();
+    await prisma.course.update({ where: { id: course.id }, data: { academicYearId: year.id, semesterNumber: 1 } });
+    for (const s of students) await prisma.studentRegistration.create({ data: { studentId: s.id, academicYearId: year.id, facultyId: course.facultyId, semesterNumber: 1 } });
+    semesterFeeId = (await prisma.semesterFee.create({ data: { academicYearId: year.id, facultyId: course.facultyId, semesterNumber: 1, amount: o.semesterFee, currency: "USD" } })).id;
+  }
+  return { lecturer, lecturerAgent, course, examId, schedule, students, studentAgents, invigilators, secondGrader, semesterFeeId };
 }
 
 /** Correct option id and accepted answers of every question version in an attempt. */

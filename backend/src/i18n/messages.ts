@@ -37,6 +37,10 @@ export const SMS_TEMPLATES: Record<string, Record<Language, Template>> = {
     so: (p) => `[DEMO] Natiijadaada ${p.course} waa la cusbooneysiiyay. Gal nidaamka.`,
     en: (p) => `[DEMO] Your ${p.course} result has been updated. Log in to view it.`,
   },
+  PAYMENT_REMINDER: {
+    so: (p) => `[DEMO] Xusuusin: khidmadda semestarka ${p.semester} (${p.year}) waxaa kaa harsan ${p.amount}. Ku bixi EVC Plus, Zaad ama eDahab nidaamka dhexdiisa.`,
+    en: (p) => `[DEMO] Reminder: ${p.amount} of your Semester ${p.semester} fee (${p.year}) is still outstanding. Pay with EVC Plus, Zaad or eDahab in the system.`,
+  },
 };
 
 /** In-app notification titles and bodies. */
@@ -46,8 +50,16 @@ export const NOTIFICATION_TEMPLATES: Record<string, Record<Language, { title: Te
     en: { title: () => "Exam schedule", body: (p) => `${p.exam} takes place on ${p.date}.` },
   },
   PAYMENT_SUCCESS: {
-    so: { title: () => "Lacag bixin guuleysatay (DEMO)", body: (p) => `Rasiidka: ${p.receipt}. ${p.exam} hadda waa furan yahay.` },
-    en: { title: () => "Payment successful (DEMO)", body: (p) => `Receipt: ${p.receipt}. ${p.exam} is now unlocked.` },
+    so: { title: () => "Lacag bixin guuleysatay (tijaabo)", body: (p) => p.purpose ? `${p.amount} loogu talagalay ${p.purpose}. Rasiidka: ${p.receipt}.` : `Rasiidka: ${p.receipt}. ${p.exam} hadda waa furan yahay.` },
+    en: { title: () => "Payment successful (simulated)", body: (p) => p.purpose ? `${p.amount} towards ${p.purpose}. Receipt: ${p.receipt}.` : `Receipt: ${p.receipt}. ${p.exam} is now unlocked.` },
+  },
+  PAYMENT_REMINDER: {
+    so: { title: () => "Xusuusin lacag bixin", body: (p) => `Khidmadda semestarka ${p.semester} (${p.year}) waxaa kaa harsan ${p.amount}.` },
+    en: { title: () => "Payment reminder", body: (p) => `${p.amount} of your Semester ${p.semester} fee (${p.year}) is still outstanding.` },
+  },
+  FEE_NOT_CONFIGURED: {
+    so: { title: () => "Khidmad semestar lama dejin", body: (p) => `Arday ayaa isku dayay imtixaan semestarka ${p.semester} laakiin khidmadda kulliyaddiisa iyo sannadkaas lama dejin. Ardayga lama joojin. Ku dar khidmadda bogga Lacagaha.` },
+    en: { title: () => "Semester fee not set", body: (p) => `A student opened a Semester ${p.semester} exam, but no fee is set for their faculty and year. The student was not blocked. Add the fee on the Fees page.` },
   },
   RESULTS_PUBLISHED: {
     so: { title: () => "Natiijada waa la daabacay", body: (p) => `Natiijada ${p.exam} waa diyaar.` },
@@ -67,7 +79,10 @@ export const NOTIFICATION_TEMPLATES: Record<string, Record<Language, { title: Te
 export const LABELS: Record<Language, Record<string, string>> = {
   so: {
     receiptTitle: "Rasiidka Lacag Bixinta",
-    demoWatermark: "DEMO / TIJAABO: lacag dhab ah lama dirin",
+    demoWatermark: "Lacag bixin tijaabo ah – lacag dhab ah lama wareejin.",
+    semesterFee: "Khidmadda semestarka",
+    semester: "Semestar",
+    paidFor: "Loo bixiyay",
     receiptNumber: "Lambarka rasiidka",
     date: "Taariikhda",
     student: "Ardayga",
@@ -99,7 +114,10 @@ export const LABELS: Record<Language, Record<string, string>> = {
   },
   en: {
     receiptTitle: "Payment Receipt",
-    demoWatermark: "DEMO / SIMULATED: no real money was transferred",
+    demoWatermark: "Simulated payment – no money was transferred.",
+    semesterFee: "Semester fee",
+    semester: "Semester",
+    paidFor: "Paid for",
     receiptNumber: "Receipt number",
     date: "Date",
     student: "Student",

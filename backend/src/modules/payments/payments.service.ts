@@ -1,6 +1,8 @@
 /**
- * Simulated exam-fee payments (section 7, D1). No real money and no real
- * provider: the mobile-money adapter (adapters/mobile-money.ts) is simulated.
+ * Simulated semester-fee payments (section 7, D1; Phase 4). No real money and no real provider:
+ * the mobile-money adapter (adapters/mobile-money.ts) is simulated. A student pays all or part
+ * of the outstanding balance of one of their semester fees; historical exam-fee payments stay
+ * readable (with their receipts) but no new exam-fee payment can be started.
  *
  * Flow (enforced here and by the payments database triggers):
  *   create  -> PENDING_CONFIRMATION   amount, currency and recipient copied from the exam/settings,
@@ -23,8 +25,7 @@ import { env } from "../../config/env.ts";
 import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
 import { transaction } from "../../db/prisma.ts";
-import { findEnrolment } from "../../repositories/courses.repository.ts";
-import { findExam } from "../../repositories/exams.repository.ts";
+import { checkFeePayment } from "../fees/fees.service.ts";
 import * as paymentsRepo from "../../repositories/payments.repository.ts";
 import type { PaymentProvider, PaymentStatus } from "../../generated/prisma/enums.ts";
 import { formatDateTime, LABELS, PROVIDER_NAMES } from "../../i18n/messages.ts";
@@ -42,12 +43,20 @@ const OPEN = ["PENDING_CONFIRMATION", "PENDING_PIN"] as const;
 type PaymentRow = NonNullable<Awaited<ReturnType<typeof find>>>;
 const find = (id: string) => paymentsRepo.findPayment(id);
 
+/** What the payment was for, as one line (receipts, messages). */
+export function purposeOf(p: { exam: { title: string; course: { code: string } } | null; semesterFee: { semesterNumber: number; academicYear: { name: string }; faculty: { code: string } } | null }, lang: "so" | "en") {
+  if (p.semesterFee) return `${LABELS[lang].semesterFee} ${p.semesterFee.academicYear.name} · ${p.semesterFee.faculty.code} · ${LABELS[lang].semester} ${p.semesterFee.semesterNumber}`;
+  return p.exam ? `${p.exam.course.code} - ${p.exam.title}` : "";
+}
+
 /** Public shape of a payment. Never contains a PIN. */
 export function serializePayment(p: PaymentRow) {
   const open = (OPEN as readonly string[]).includes(p.status);
   return {
     id: p.id,
     exam: p.exam,
+    semesterFee: p.semesterFee ? { id: p.semesterFee.id, academicYear: p.semesterFee.academicYear.name, faculty: p.semesterFee.faculty, semesterNumber: p.semesterFee.semesterNumber } : null,
+    purpose: purposeOf(p, "en"),
     provider: p.provider,
     providerName: PROVIDER_NAMES[p.provider],
     phone: p.phone,
@@ -87,46 +96,41 @@ async function ownPayment(user: AuthUser, id: string) {
 }
 
 /**
- * Starts a payment for an exam fee (or returns the same payment for a resent request).
+ * Starts a simulated payment of `amount` towards one of the student's semester fees (all or part
+ * of the outstanding balance), or returns the same payment for a resent request. An open payment
+ * for the same fee is returned instead of starting a second one.
  * @returns { payment, reused }
- * @throws 400 EXAM_HAS_NO_FEE, 403 NOT_ENROLLED, 409 PAYMENT_ALREADY_PAID, 409 IDEMPOTENCY_KEY_REUSED
+ * @throws 404 FEE_NOT_FOUND, 400 AMOUNT_INVALID, 409 FEE_ALREADY_PAID, 409 AMOUNT_EXCEEDS_BALANCE, 409 IDEMPOTENCY_KEY_REUSED
  */
-export async function createPayment(user: AuthUser, input: { examId: string; provider: PaymentProvider; phone: string; idempotencyKey: string }, req: Request) {
+export async function createPayment(user: AuthUser, input: { semesterFeeId: string; amount: number; provider: PaymentProvider; phone: string; idempotencyKey: string }, req: Request) {
   const byKey = await paymentsRepo.findPaymentByKey(input.idempotencyKey);
   if (byKey) {
-    if (byKey.studentId !== user.id || byKey.examId !== input.examId) throw conflict("IDEMPOTENCY_KEY_REUSED", "Use a new request key for a new payment");
+    if (byKey.studentId !== user.id || byKey.semesterFeeId !== input.semesterFeeId) throw conflict("IDEMPOTENCY_KEY_REUSED", "Use a new request key for a new payment");
     return { payment: serializePayment(await ownPayment(user, byKey.id)), reused: true };
   }
-  const exam = await findExam(input.examId);
-  if (!exam || exam.status !== "PUBLISHED") throw notFound("EXAM_NOT_FOUND");
-  const enrolment = await findEnrolment(user.id, exam.courseId);
-  if (enrolment?.status !== "ACTIVE") throw notFound("EXAM_NOT_FOUND");
-  if (num0(exam.feeAmount) <= 0) throw badRequest("EXAM_HAS_NO_FEE", "This exam is free");
-  if (await paymentsRepo.findSuccessfulPayment(user.id, exam.id)) {
-    throw conflict("PAYMENT_ALREADY_PAID", "This exam fee is already paid");
-  }
-  const open = await paymentsRepo.findOpenPayment(user.id, exam.id);
+  const open = await paymentsRepo.findOpenFeePayment(user.id, input.semesterFeeId);
   if (open && !(await expireIfDue(open))) return { payment: serializePayment(await ownPayment(user, open.id)), reused: true };
+  const { fee, currency } = await checkFeePayment(user.id, input.semesterFeeId, input.amount);
 
   try {
     const id = await transaction(async (tx) => {
       const p = await paymentsRepo.insertPayment(
         {
-          studentId: user.id, examId: exam.id, provider: input.provider, phone: input.phone,
-          amount: exam.feeAmount, currency: exam.feeCurrency,
+          studentId: user.id, semesterFeeId: fee.id, provider: input.provider, phone: input.phone,
+          amount: input.amount, currency,
           merchantName: env.PAYMENT_MERCHANT_NAME, merchantNumber: env.PAYMENT_MERCHANT_NUMBER,
           idempotencyKey: input.idempotencyKey, mockReference: `MOCK-REQ-${randomCode(8)}`,
         },
         tx,
       );
-      await audit(tx, { actorId: user.id, action: "PAYMENT_STARTED", entityType: "payment", entityId: p.id, details: { examId: exam.id, provider: input.provider, simulated: true }, req });
+      await audit(tx, { actorId: user.id, action: "PAYMENT_STARTED", entityType: "payment", entityId: p.id, details: { semesterFeeId: fee.id, amount: input.amount, provider: input.provider, simulated: true }, req });
       return p.id;
     });
     return { payment: serializePayment((await find(id))!), reused: false };
   } catch (error) {
     // A parallel request created the open payment first: return that one.
     if (isUniqueViolation(error)) {
-      const again = await paymentsRepo.findOpenPayment(user.id, exam.id);
+      const again = await paymentsRepo.findOpenFeePayment(user.id, input.semesterFeeId);
       if (again) return { payment: serializePayment((await find(again.id))!), reused: true };
     }
     throw error;
@@ -172,7 +176,7 @@ export async function submitPin(user: AuthUser, id: string, pin: string, req: Re
       await queueSms(tx, { ...student, phone: p.phone }, "PAYMENT_SUCCESS", {
         amount: `${num0(p.amount).toFixed(2)} ${p.currency}`, merchant: p.merchantName, merchantNumber: p.merchantNumber, receipt: receiptNumber,
       }, { type: "payment", id });
-      await notify(tx, user.id, "PAYMENT_SUCCESS", { receipt: receiptNumber, exam: p.exam.title });
+      await notify(tx, user.id, "PAYMENT_SUCCESS", { receipt: receiptNumber, amount: `${num0(p.amount).toFixed(2)} ${p.currency}`, purpose: purposeOf(p, student.preferredLanguage) });
       await audit(tx, { actorId: user.id, action: "PAYMENT_SUCCEEDED", entityType: "payment", entityId: id, details: { receiptNumber, simulated: true }, req });
       return "SUCCESS" as const;
     }
@@ -228,7 +232,7 @@ export async function expireDuePayments(): Promise<number> {
   return n;
 }
 
-/** Receipt PDF of a successful payment, in the user's language, watermarked DEMO. */
+/** Receipt PDF of a successful payment, in the chosen language, clearly marked as simulated. */
 export async function receiptPdf(user: AuthUser, id: string, lang: "so" | "en") {
   const p = user.role === "ADMIN" ? await find(id) : await ownPayment(user, id);
   if (!p || p.status !== "SUCCESS") throw notFound("RECEIPT_NOT_FOUND");
@@ -242,7 +246,7 @@ export async function receiptPdf(user: AuthUser, id: string, lang: "so" | "en") 
       [L.date, formatDateTime(p.completedAt!, env.APP_TIMEZONE)],
       [L.student, student.fullName],
       [L.studentNumber, student.studentNumber ?? ""],
-      [L.exam, `${p.exam.course.code} - ${p.exam.title}`],
+      [p.semesterFee ? L.paidFor : L.exam, purposeOf(p, lang)],
       [L.provider, `${PROVIDER_NAMES[p.provider]} (DEMO)`],
       [L.phone, p.phone],
       [L.amount, `${num0(p.amount).toFixed(2)} ${p.currency}`],

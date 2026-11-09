@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Exam fee payment with the backend's simulated mobile money (docs/api.md
- * "Payments"): choose the service and phone (POST /api/payments; the amount
- * always comes from the exam, never from the browser), confirm on the "phone"
+ * Semester fee payment with the backend's simulated mobile money (docs/api.md
+ * "Payments"): choose the amount (all or part of the outstanding balance; the server
+ * checks it), the service and phone (POST /api/payments), confirm on the "phone"
  * (POST …/confirm), enter the PIN (POST …/pin, checked only on the server).
  * Three wrong PINs fail the payment; 5 minutes without finishing expire it.
  */
@@ -20,13 +20,16 @@ import { cancelPayment, confirmPayment, createPayment, enterPin, studentPaths } 
 import { useI18n } from "@/lib/i18n/i18n";
 import { newUuid } from "@/lib/student/exam-clock";
 import { useSession } from "@/lib/session/session";
-import { PAYMENT_PROVIDERS, type MyExam, type Payment, type PaymentProvider } from "@/types/student";
+import { PAYMENT_PROVIDERS, type Payment, type PaymentProvider, type PayTarget } from "@/types/student";
 
-export function PayDialog({ exam, onClose }: { exam: MyExam; onClose: () => void }) {
+export function PayDialog({ target, onClose }: { target: PayTarget; onClose: () => void }) {
   const { t, locale } = useI18n();
   const { profile } = useSession();
   const [provider, setProvider] = useState<PaymentProvider>("EVC_PLUS");
   const [phone, setPhone] = useState(profile.phone ?? "");
+  const [amount, setAmount] = useState(String(target.suggested ?? target.outstanding));
+  const value = Number(amount);
+  const amountOk = value > 0 && value <= target.outstanding + 0.005 && /^\d+(\.\d{1,2})?$/.test(amount.trim());
   const [pin, setPin] = useState("");
   const [payment, setPayment] = useState<Payment | null>(null);
   const [wrongPin, setWrongPin] = useState<number | null>(null);
@@ -52,8 +55,8 @@ export function PayDialog({ exam, onClose }: { exam: MyExam; onClose: () => void
   const start = (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (phoneProblem) return;
-    void step(async () => setPayment((await createPayment(exam.id, provider, normalizeSomaliPhone(phone) ?? phone.trim(), key)).payment));
+    if (phoneProblem || !amountOk) return;
+    void step(async () => setPayment((await createPayment(target.feeId, value, provider, normalizeSomaliPhone(phone) ?? phone.trim(), key)).payment));
   };
   const answer = (accept: boolean) => payment && void step(async () => setPayment(await confirmPayment(payment.id, accept)));
   const sendPin = (e: FormEvent) => {
@@ -74,14 +77,17 @@ export function PayDialog({ exam, onClose }: { exam: MyExam; onClose: () => void
 
   const status = payment?.status;
   return (
-    <Modal open onOpenChange={(o) => !o && close()} title={t("student.payments.payTitle")} description={`${exam.course.code} · ${exam.title}`} closeLabel={t("student.payments.close")} size="sm">
+    <Modal open onOpenChange={(o) => !o && close()} title={t("student.payments.payTitle")} description={target.label} closeLabel={t("student.payments.close")} size="sm">
       <div className="space-y-4">
         <Alert tone="info">{t("student.payments.simulated")}</Alert>
-        <p className="text-sm text-muted">{t("student.payments.amount")}: <span className="font-semibold text-foreground">{exam.fee.amount} {exam.fee.currency}</span></p>
+        <p className="text-sm text-muted">{t("student.fees.outstanding")}: <span className="font-semibold text-foreground">{target.outstanding.toFixed(2)} {target.currency}</span></p>
         <FormError error={error} />
 
         {!payment && (
           <form onSubmit={start} className="space-y-4" noValidate>
+            <Field label={t("student.fees.amountToPay", { currency: target.currency })} hint={t("student.fees.partialHint")} error={touched && !amountOk ? t("student.fees.amountInvalid", { max: target.outstanding.toFixed(2) }) : undefined} required>
+              {({ id, describedBy, invalid }) => <Input id={id} aria-describedby={describedBy} aria-invalid={invalid} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className="sm:w-40" />}
+            </Field>
             <Field label={t("student.payments.provider")}>
               {({ id }) => (
                 <Select id={id} value={provider} onChange={(e) => setProvider(e.target.value as PaymentProvider)}>
