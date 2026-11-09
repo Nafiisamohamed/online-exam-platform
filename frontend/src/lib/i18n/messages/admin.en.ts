@@ -287,7 +287,6 @@ export const adminEn = {
   sms: {
     title: "SMS Management",
     subtitle: "Send messages to students, lecturers and invigilators, keep Somali and English templates and follow every message.",
-    simulated: "Simulated SMS: there is no connection to Hormuud or Somtel, so no real text message is sent. Statuses show what a gateway would report.",
     tabSend: "Send a message",
     tabTemplates: "Templates",
     outbox: "Outbox",
