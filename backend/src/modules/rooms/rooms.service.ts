@@ -1,6 +1,7 @@
 /**
- * Examination rooms and their campus network ranges (section 4.5).
- * Room names are unique; network ranges are validated CIDR ranges (also checked by the database).
+ * Examination rooms (section 4.5): name, building, capacity (may be unknown) and an active flag.
+ * Room names are unique; inactive rooms cannot be chosen for new schedules. The old network
+ * ranges are kept as they are but no longer restrict anything.
  */
 import type { Request } from "express";
 import { isUniqueViolation } from "../../db/db-errors.ts";
@@ -10,8 +11,8 @@ import { conflict, notFound } from "../../lib/errors.ts";
 import { audit } from "../../services/audit.ts";
 
 /** All rooms, by name. */
-export function listRooms() {
-  return roomsRepo.listRooms();
+export function listRooms(q: { active?: boolean } = {}) {
+  return roomsRepo.listRooms(q);
 }
 
 function nameTaken(error: unknown): never {
@@ -20,10 +21,10 @@ function nameTaken(error: unknown): never {
 }
 
 /** @throws 409 ROOM_NAME_TAKEN */
-export async function createRoom(data: { name: string; building: string; networkRanges: string[] }, actorId: string, req: Request) {
+export async function createRoom(data: { name: string; building: string; networkRanges?: string[]; capacity?: number | null; isActive?: boolean }, actorId: string, req: Request) {
   try {
     return await transaction(async (tx) => {
-      const r = await roomsRepo.insertRoom(data, tx);
+      const r = await roomsRepo.insertRoom({ networkRanges: [], ...data }, tx);
       await audit(tx, { actorId, action: "ROOM_CREATED", entityType: "room", entityId: r.id, details: { name: r.name }, req });
       return r;
     });
@@ -33,7 +34,7 @@ export async function createRoom(data: { name: string; building: string; network
 }
 
 /** @throws 404 ROOM_NOT_FOUND, 409 ROOM_NAME_TAKEN */
-export async function updateRoom(id: string, data: { name?: string; building?: string; networkRanges?: string[] }, actorId: string, req: Request) {
+export async function updateRoom(id: string, data: { name?: string; building?: string; networkRanges?: string[]; capacity?: number | null; isActive?: boolean }, actorId: string, req: Request) {
   if (!(await roomsRepo.findRoom(id))) throw notFound("ROOM_NOT_FOUND");
   try {
     return await transaction(async (tx) => {

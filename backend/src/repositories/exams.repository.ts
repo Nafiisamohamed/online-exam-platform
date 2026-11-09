@@ -25,8 +25,26 @@ export function findEligibleVersions(
       },
     },
     orderBy: { createdAt: "asc" },
-    select: { currentVersion: { select: { id: true, type: true, options: { select: { id: true }, orderBy: { position: "asc" } } } } },
+    select: {
+      id: true, currentVersionId: true, reviewedVersionId: true,
+      currentVersion: { select: { id: true, type: true, text: true, topic: { select: { name: true } }, options: { select: { id: true }, orderBy: { position: "asc" } } } },
+    },
   });
+}
+
+/** Question ids the lecturer unticked for this exam. */
+export async function findExcludedQuestionIds(examId: string, db: Db = prisma) {
+  return (await db.examExcludedQuestion.findMany({ where: { examId }, select: { questionId: true } })).map((r) => r.questionId);
+}
+
+/** Replaces the unticked questions of an exam. */
+export async function replaceExcludedQuestions(examId: string, questionIds: string[], db: Db) {
+  await db.examExcludedQuestion.deleteMany({ where: { examId } });
+  if (questionIds.length) await db.examExcludedQuestion.createMany({ data: questionIds.map((questionId) => ({ examId, questionId })) });
+}
+
+export function countCourseQuestions(courseId: string, ids: string[], db: Db = prisma) {
+  return db.question.count({ where: { courseId, id: { in: ids } } });
 }
 
 export function findRulesWithTopics(examId: string, db: Db = prisma) {
@@ -49,7 +67,7 @@ const examDetailInclude = {
   schedules: {
     orderBy: { createdAt: "desc" as const },
     include: {
-      rooms: { include: { room: { select: { id: true, name: true, building: true } } } },
+      rooms: { include: { room: { select: { id: true, name: true, building: true, capacity: true, isActive: true } } } },
       invigilators: { include: { invigilator: { select: { id: true, fullName: true } } } },
     },
   },

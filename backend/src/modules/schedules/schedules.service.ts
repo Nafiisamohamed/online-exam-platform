@@ -1,10 +1,12 @@
 /**
  * Examination scheduling (section 4.5): the lecturer requests, the admin approves.
  *
- * A schedule has a window (e.g. 09:00-11:00), a duration (e.g. 60 minutes),
- * allowed rooms (their network ranges limit where students can start) and
- * assigned invigilators. Students may start at any time inside the window and
- * must finish by the window's end.
+ * A schedule has a window (e.g. 09:00-11:00), rooms (optional) and assigned invigilators. Since
+ * Phase 3 the duration is the window length (end - start), worked out by the server. Students may
+ * start at any time inside the window and must finish by the window's end. Only active rooms can
+ * be chosen. At approval, the combined capacity of the rooms must cover the course's active
+ * students: unknown capacity needs the registrar's confirmation; known but too small is refused.
+ * No rooms means no capacity check.
  *
  * Approval blocks conflicts with other APPROVED schedules whose windows overlap:
  * - STUDENT: any student actively enrolled in both exams' courses (two exams
@@ -35,7 +37,6 @@ import { notifyMany, queueSms } from "../../services/messaging.ts";
 export interface ScheduleInput {
   windowStart: Date;
   windowEnd: Date;
-  durationMinutes: number;
   roomIds: string[];
   invigilatorIds: string[];
 }
@@ -62,14 +63,17 @@ function serialize(s: ScheduleRow) {
   };
 }
 
+/** The exam duration in whole minutes: the window length. */
+export const durationOf = (w: { windowStart: Date; windowEnd: Date }) => Math.floor((w.windowEnd.getTime() - w.windowStart.getTime()) / 60_000);
+
 async function checkInput(input: ScheduleInput) {
   if (input.windowEnd <= input.windowStart) throw badRequest("WINDOW_INVALID", "The window must end after it starts");
-  if (input.windowStart.getTime() + input.durationMinutes * 60_000 > input.windowEnd.getTime()) {
-    throw badRequest("DURATION_LONGER_THAN_WINDOW", "The duration must fit inside the window");
-  }
+  const minutes = durationOf(input);
+  if (minutes < 5 || minutes > 600) throw badRequest("WINDOW_LENGTH_INVALID", "The exam must last between 5 minutes and 10 hours", { minutes });
   if (input.windowStart <= now()) throw badRequest("WINDOW_IN_PAST", "The window must start in the future");
   if (input.roomIds.length) {
     if ((await schedulesRepo.countRooms(input.roomIds)) !== input.roomIds.length) throw badRequest("ROOM_NOT_FOUND", "A room was not found");
+    if ((await schedulesRepo.countActiveRooms(input.roomIds)) !== input.roomIds.length) throw badRequest("ROOM_INACTIVE", "An inactive room cannot be chosen");
   }
   if (input.invigilatorIds.length) {
     if ((await countActiveWithRole(input.invigilatorIds, "INVIGILATOR")) !== input.invigilatorIds.length) throw badRequest("INVIGILATOR_INVALID", "Choose active invigilators");
@@ -89,7 +93,7 @@ export async function requestSchedule(user: AuthUser, examId: string, input: Sch
   const id = await transaction(async (tx) => {
     const s = await schedulesRepo.insertSchedule(
       {
-        examId, requestedById: user.id, windowStart: input.windowStart, windowEnd: input.windowEnd, durationMinutes: input.durationMinutes,
+        examId, requestedById: user.id, windowStart: input.windowStart, windowEnd: input.windowEnd, durationMinutes: durationOf(input),
         roomIds: [...new Set(input.roomIds)], invigilatorIds: [...new Set(input.invigilatorIds)],
       },
       tx,
@@ -153,7 +157,7 @@ export function windowText(start: Date, end: Date) {
  * Admin approves a REQUESTED schedule.
  * @throws 409 SCHEDULE_NOT_REQUESTED, 409 EXAM_NOT_PUBLISHED, 400 WINDOW_IN_PAST, 409 SCHEDULE_CONFLICT { conflicts }
  */
-export async function approveSchedule(user: AuthUser, id: string, req: Request) {
+export async function approveSchedule(user: AuthUser, id: string, req: Request, opts: { confirmUnknownCapacity?: boolean } = {}) {
   const s = await load(id);
   if (!s) throw notFound("SCHEDULE_NOT_FOUND");
   try {
@@ -165,6 +169,7 @@ export async function approveSchedule(user: AuthUser, id: string, req: Request) 
       if (current.windowStart <= now()) throw badRequest("WINDOW_IN_PAST", "The window has already started");
       const conflicts = await findConflicts(id, tx);
       if (conflicts.length) throw conflict("SCHEDULE_CONFLICT", "The schedule clashes with another approved exam", { conflicts });
+      const capacity = await checkCapacity(id, current.exam.courseId, !!opts.confirmUnknownCapacity, tx);
       await schedulesRepo.updateSchedule(id, { status: "APPROVED", decidedById: user.id, decidedAt: now() }, tx);
 
       const students = await findActiveStudentsOfCourse(current.exam.courseId, tx);
@@ -173,13 +178,35 @@ export async function approveSchedule(user: AuthUser, id: string, req: Request) 
         await queueSms(tx, st, "SCHEDULE_APPROVED", { course: current.exam.course.code, date, window }, { type: "exam_schedule", id });
       }
       await notifyMany(tx, students.map((st) => st.id), "SCHEDULE_APPROVED", { course: current.exam.course.code, exam: current.exam.title, date });
-      await audit(tx, { actorId: user.id, action: "SCHEDULE_APPROVED", entityType: "exam_schedule", entityId: id, details: { examId: current.examId, students: students.length }, req });
+      await audit(tx, { actorId: user.id, action: "SCHEDULE_APPROVED", entityType: "exam_schedule", entityId: id, details: { examId: current.examId, students: students.length, capacity }, req });
     });
   } catch (error) {
     if (isUniqueViolation(error, "exam_schedules_one_approved_key")) throw conflict("SCHEDULE_ALREADY_APPROVED", "This exam already has an approved schedule");
     throw error;
   }
   return serialize((await load(id))!);
+}
+
+/**
+ * Room capacity rule at approval. No rooms: no check. A room that is now inactive: refused.
+ * Any room with unknown capacity: refused unless the registrar confirms. All known: their sum
+ * must cover the course's active students.
+ * @throws 409 ROOM_INACTIVE, 409 ROOM_CAPACITY_UNKNOWN { rooms, students }, 409 ROOM_CAPACITY_INSUFFICIENT { capacity, students }
+ */
+async function checkCapacity(scheduleId: string, courseId: string, confirmUnknown: boolean, db: Db) {
+  const rooms = await schedulesRepo.findScheduleRooms(scheduleId, db);
+  if (rooms.length === 0) return { checked: false };
+  const inactive = rooms.filter((r) => !r.isActive);
+  if (inactive.length) throw conflict("ROOM_INACTIVE", "A chosen room is no longer active", { rooms: inactive.map((r) => r.name) });
+  const students = await schedulesRepo.countActiveStudentsOfCourse(courseId, db);
+  const unknown = rooms.filter((r) => r.capacity === null);
+  if (unknown.length) {
+    if (!confirmUnknown) throw conflict("ROOM_CAPACITY_UNKNOWN", "The capacity of a chosen room is unknown; confirm to approve anyway", { rooms: unknown.map((r) => r.name), students });
+    return { checked: false, unknownConfirmed: unknown.map((r) => r.name), students };
+  }
+  const total = rooms.reduce((s, r) => s + (r.capacity ?? 0), 0);
+  if (total < students) throw conflict("ROOM_CAPACITY_INSUFFICIENT", "The rooms do not have enough seats for the enrolled students", { capacity: total, students });
+  return { checked: true, capacity: total, students };
 }
 
 /** Admin rejects a REQUESTED schedule with a reason. */

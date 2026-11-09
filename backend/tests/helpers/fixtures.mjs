@@ -72,8 +72,8 @@ export async function createQuestion(db, { courseId, topicId, lecturerId, type =
 
 export async function createExam(db, { courseId, lecturerId, fee = 0 }) {
   return (await db.one(
-    `INSERT INTO exams (course_id, created_by, title, instructions, fee_amount, fee_currency, updated_at)
-     VALUES ($1, $2, 'Exam', 'Read carefully', $3, 'USD', now()) RETURNING id`,
+    `INSERT INTO exams (course_id, created_by, title, exam_type, instructions, fee_amount, fee_currency, updated_at)
+     VALUES ($1, $2, 'Exam', 'QUIZ', 'Read carefully', $3, 'USD', now()) RETURNING id`,
     [courseId, lecturerId, fee],
   )).id;
 }

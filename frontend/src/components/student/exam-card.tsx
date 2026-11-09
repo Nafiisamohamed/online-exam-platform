@@ -2,6 +2,7 @@
 
 /** One examination in the student's lists (from GET /api/my/exams), with its state, window and a countdown. */
 import { CalendarClock, Clock, CreditCard } from "lucide-react";
+import { ExamTypeBadge } from "@/components/exam-type-badge";
 import Link from "next/link";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export function ExamCard({ exam, serverNow }: { exam: MyExam; serverNow: number 
       <Link href={`/student/exams/${exam.id}`} className="block space-y-3 p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-foreground">{exam.title}</p>
+            <p className="flex flex-wrap items-center gap-2 font-semibold text-foreground">{exam.title}<ExamTypeBadge type={exam.examType} /></p>
             <p className="text-xs text-muted">{exam.course.code} · {exam.course.name}</p>
           </div>
           <Badge tone={stateTone[exam.state]} dot>{t(`student.common.examState.${exam.state}`)}</Badge>

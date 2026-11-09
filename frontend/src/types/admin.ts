@@ -209,10 +209,15 @@ export interface ExamScheduleSummary {
   durationMinutes: number;
 }
 
+/** Quiz, Midterm or Final (Phase 3). */
+export type ExamType = "QUIZ" | "MIDTERM" | "FINAL";
+export const EXAM_TYPES: readonly ExamType[] = ["QUIZ", "MIDTERM", "FINAL"];
+
 /** GET /api/exams */
 export interface ExamListItem {
   id: string;
   title: string;
+  examType: ExamType;
   course: { id: string; code: string; name: string; semester: string };
   status: ExamStatus;
   resultsStatus: ResultsStatus;
@@ -241,6 +246,11 @@ export interface ExamDetail {
   id: string;
   course: { id: string; code: string; name: string; semester: string };
   title: string;
+  examType: ExamType;
+  /** Draws only reviewed questions (exams published since Phase 3). */
+  reviewedOnly: boolean;
+  /** Questions the lecturer unticked. */
+  excludedQuestions: number;
   instructions: string;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
@@ -258,7 +268,7 @@ export interface ExamDetail {
   schedules: (ExamScheduleSummary & {
     rejectionReason: string | null;
     decidedAt: string | null;
-    rooms: { id: string; name: string; building: string }[];
+    rooms: { id: string; name: string; building: string; capacity: number | null; isActive: boolean }[];
     invigilators: { id: string; fullName: string }[];
   })[];
 }
@@ -276,7 +286,7 @@ export interface Schedule {
   decidedBy: { id: string; fullName: string } | null;
   decidedAt: string | null;
   createdAt: string;
-  rooms: { id: string; name: string; building: string }[];
+  rooms: { id: string; name: string; building: string; capacity: number | null; isActive: boolean }[];
   invigilators: { id: string; fullName: string }[];
 }
 

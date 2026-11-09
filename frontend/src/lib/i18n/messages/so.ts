@@ -21,6 +21,11 @@ export const so: Messages = {
     STUDENT: "Arday",
     INVIGILATOR: "Ilaaliye imtixaan",
   },
+  examTypes: {
+    QUIZ: "Kuis",
+    MIDTERM: "Imtixaanka bartamaha",
+    FINAL: "Imtixaanka kama dambaysta",
+  },
   nav: {
     sections: { main: "Guud", academics: "Waxbarasho", examinations: "Imtixaannada", system: "Nidaamka" },
     dashboard: "Guddiga",
@@ -46,6 +51,7 @@ export const so: Messages = {
     activity: "Taariikhda hawlaha",
     academicYears: "Sannad-dugsiyeedyada",
     registrations: "Diiwaangelinta ardayda",
+    rooms: "Qolalka",
     signIn: "Gal",
     collapse: "Yaree liiska dhinaca",
     expand: "Ballaari liiska dhinaca",

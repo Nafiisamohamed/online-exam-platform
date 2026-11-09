@@ -83,7 +83,7 @@ function RequestCard({ s, onApprove, onReject }: { s: Schedule; onApprove: (s: S
           <dl className="mt-3 grid gap-x-8 gap-y-2 text-sm text-text sm:grid-cols-2">
             <Detail icon={CalendarClock} label={t("admin.schedules.window")}>{formatTimeRange(s.windowStart, s.windowEnd, locale)}</Detail>
             <Detail icon={Clock} label={t("admin.schedules.duration")}>{t("admin.schedules.minutes", { count: s.durationMinutes })}</Detail>
-            <Detail icon={DoorOpen} label={t("admin.schedules.rooms")}>{s.rooms.length ? s.rooms.map((r) => r.name).join(", ") : t("admin.schedules.anyRoom")}</Detail>
+            <Detail icon={DoorOpen} label={t("admin.schedules.rooms")}>{s.rooms.length ? s.rooms.map((r) => `${r.name} (${r.capacity ? t("admin.rooms.seats", { count: r.capacity }) : t("admin.rooms.capacityUnknown")})`).join(", ") : t("admin.schedules.anyRoom")}</Detail>
             <Detail icon={Eye} label={t("admin.schedules.invigilators")}>{s.invigilators.length ? s.invigilators.map((i) => i.fullName).join(", ") : t("admin.schedules.noInvigilators")}</Detail>
             <Detail icon={UserRound} label={t("admin.schedules.requestedBy")} wide>
               {t("admin.schedules.requestedByOn", { name: s.requestedBy?.fullName ?? "—", date: formatDateTime(s.createdAt, locale) })}
@@ -136,6 +136,9 @@ export function ScheduleRequests() {
     }
   };
 
+  // A chosen room has unknown capacity: the registrar may approve anyway after confirming.
+  const unknownCapacity = error instanceof ApiError && error.code === "ROOM_CAPACITY_UNKNOWN";
+
   return (
     <>
       <PageHeader
@@ -181,14 +184,14 @@ export function ScheduleRequests() {
           approving ? (
             <span className="block space-y-3">
               <span className="block">{t("admin.schedules.approveBody", { exam: approving.exam.title, course: approving.exam.course.code })}</span>
-              {error ? <DecisionError error={error} /> : null}
+              {unknownCapacity ? <Alert tone="warning">{t("admin.rooms.unknownConfirm")}</Alert> : error ? <DecisionError error={error} /> : null}
             </span>
           ) : null
         }
-        confirmLabel={t("admin.schedules.approve")}
+        confirmLabel={unknownCapacity ? t("admin.rooms.approveAnyway") : t("admin.schedules.approve")}
         cancelLabel={t("common.cancel")}
         loading={busy}
-        onConfirm={() => { if (approving) void decide(() => approveSchedule(approving.id), t("admin.schedules.approvedToast")); }}
+        onConfirm={() => { if (approving) void decide(() => approveSchedule(approving.id, { confirmUnknownCapacity: unknownCapacity }), t("admin.schedules.approvedToast")); }}
       />
 
       <Modal

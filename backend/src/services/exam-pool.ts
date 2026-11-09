@@ -5,7 +5,9 @@
  *
  * A question is eligible for a rule when it belongs to the exam's course, is
  * not archived, and its CURRENT version has the rule's type, difficulty and
- * mark value, and (if the rule lists topics) one of those topics. Rules never
+ * mark value, and (if the rule lists topics) one of those topics. With a PoolFilter, only
+ * reviewed questions count (reviewedOnly: exams published since Phase 3) and the questions the
+ * lecturer unticked for the exam are left out. Rules never
  * share questions, because no two rules of an exam have the same
  * type + difficulty + marks (database unique constraint).
  */
@@ -24,13 +26,40 @@ export interface RuleSpec {
   topicIds: string[];
 }
 
+/** Which questions may be drawn for an exam. */
+export interface PoolFilter {
+  /** Only questions whose current version is reviewed. */
+  reviewedOnly?: boolean;
+  /** Questions the lecturer unticked for this exam. */
+  excludedQuestionIds?: string[];
+}
+
 /** Eligible current versions for one rule, oldest question first. */
-export async function poolFor(courseId: string, rule: Omit<RuleSpec, "id" | "position" | "questionCount">, db?: Db) {
+export async function poolFor(courseId: string, rule: Omit<RuleSpec, "id" | "position" | "questionCount">, db?: Db, filter: PoolFilter = {}) {
+  const excluded = new Set(filter.excludedQuestionIds ?? []);
+  const rows = (await examsRepo.findEligibleVersions(courseId, rule, db))
+    .filter((r) => !filter.reviewedOnly || (r.reviewedVersionId !== null && r.reviewedVersionId === r.currentVersionId))
+    .filter((r) => !excluded.has(r.id));
+  return rows.map((r) => ({ questionId: r.id, versionId: r.currentVersion!.id, type: r.currentVersion!.type, optionIds: r.currentVersion!.options.map((o) => o.id) }));
+}
+
+/** Every reviewed question that matches a rule, with its text, for the lecturer's tick list. */
+export async function reviewedCandidates(courseId: string, rule: Omit<RuleSpec, "id" | "position" | "questionCount">, db?: Db) {
   const rows = await examsRepo.findEligibleVersions(courseId, rule, db);
-  return rows.map((r) => r.currentVersion!).map((v) => ({ versionId: v.id, type: v.type, optionIds: v.options.map((o) => o.id) }));
+  return rows
+    .filter((r) => r.reviewedVersionId !== null && r.reviewedVersionId === r.currentVersionId)
+    .map((r) => ({ questionId: r.id, text: r.currentVersion!.text, topic: r.currentVersion!.topic.name }));
 }
 
 /** The exam's rules as plain values. */
+/**
+ * The pool filter of an exam: drafts are checked as they will be published (reviewed questions
+ * only); published exams use the rule they were published with. Unticked questions never count.
+ */
+export async function examPoolFilter(exam: { id: string; status: string; reviewedOnly: boolean }, db?: Db): Promise<PoolFilter> {
+  return { reviewedOnly: exam.status === "DRAFT" ? true : exam.reviewedOnly, excludedQuestionIds: await examsRepo.findExcludedQuestionIds(exam.id, db) };
+}
+
 export async function loadRuleSpecs(examId: string, db?: Db): Promise<RuleSpec[]> {
   const rules = await examsRepo.findRulesWithTopics(examId, db);
   return rules.map((r) => ({
@@ -48,7 +77,7 @@ export async function loadRuleSpecs(examId: string, db?: Db): Promise<RuleSpec[]
  * Rules with pools. With `examIdForUsage`, each question's usage counts how
  * many attempts of that exam already received it (for least-used-first draws).
  */
-export async function rulesWithPools(courseId: string, rules: RuleSpec[], examIdForUsage?: string, db?: Db): Promise<RuleWithPool[]> {
+export async function rulesWithPools(courseId: string, rules: RuleSpec[], examIdForUsage?: string, db?: Db, filter: PoolFilter = {}): Promise<RuleWithPool[]> {
   const usage = new Map<string, number>();
   if (examIdForUsage) {
     const counts = await examsRepo.countVersionUsage(examIdForUsage, db);
@@ -56,7 +85,7 @@ export async function rulesWithPools(courseId: string, rules: RuleSpec[], examId
   }
   const out: RuleWithPool[] = [];
   for (const r of rules) {
-    const pool = await poolFor(courseId, r, db);
+    const pool = await poolFor(courseId, r, db, filter);
     out.push({ ...r, pool: pool.map((q) => ({ ...q, usage: usage.get(q.versionId) ?? 0 })) });
   }
   return out;

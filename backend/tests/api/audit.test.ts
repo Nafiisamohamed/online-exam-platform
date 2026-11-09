@@ -14,7 +14,7 @@ describe("core challenge: extra evidence", () => {
     await addQuestions(lec, course.id, 6, { type: "MCQ", difficulty: "MEDIUM", marks: 2, topic: "Indexes" });
     const topics = await lec.get(`/api/courses/${course.id}/topics`);
     const joins = topics.body.items.find((t: any) => t.name === "Joins").id;
-    const exam = await lec.post("/api/exams").send({ courseId: course.id, title: "Topic exam", rules: [{ questionType: "MCQ", difficulty: "MEDIUM", marksPerQuestion: 2, questionCount: 3, topicIds: [joins] }] });
+    const exam = await lec.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Topic exam", rules: [{ questionType: "MCQ", difficulty: "MEDIUM", marksPerQuestion: 2, questionCount: 3, topicIds: [joins] }] });
     expect(exam.body.exam.rules[0]).toMatchObject({ available: 6, topics: [{ id: joins, name: "Joins" }] });
     await lec.post(`/api/exams/${exam.body.exam.id}/publish`);
     const admin = await createUser("ADMIN");
@@ -102,7 +102,7 @@ describe("permissions and data exposure", () => {
     const answer = await prisma.answer.findFirstOrThrow({ where: { attemptId: attempt.id } });
     const forbidden = [
       inv.post("/api/users").send({ role: "ADMIN", fullName: "X", phone: "+252615000000", email: "x@test.local" }),
-      inv.post("/api/exams").send({ courseId: fx.course.id, title: "X" }),
+      inv.post("/api/exams").send({ examType: "QUIZ", courseId: fx.course.id, title: "X" }),
       inv.post(`/api/exams/${fx.examId}/publish`),
       inv.put(`/api/grading/answers/${answer.id}/marks`).send({ marks: 1 }),
       inv.post(`/api/exams/${fx.examId}/results/publish`).send({}),

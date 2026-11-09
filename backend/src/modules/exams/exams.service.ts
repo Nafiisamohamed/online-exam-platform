@@ -28,7 +28,7 @@ import { num, num0 } from "../../lib/format.ts";
 import { manageableExam } from "../../services/access.ts";
 import { audit } from "../../services/audit.ts";
 import { generateExam, shortages } from "../../services/exam-generator.ts";
-import { loadRuleSpecs, type RuleSpec, rulesWithPools } from "../../services/exam-pool.ts";
+import { examPoolFilter, loadRuleSpecs, type PoolFilter, reviewedCandidates, type RuleSpec, rulesWithPools } from "../../services/exam-pool.ts";
 
 export interface RuleInput {
   questionType: RuleSpec["questionType"];
@@ -38,7 +38,10 @@ export interface RuleInput {
   topicIds?: string[];
 }
 
+export type ExamType = "QUIZ" | "MIDTERM" | "FINAL";
+
 export interface ExamSettings {
+  examType?: ExamType;
   title?: string;
   instructions?: string;
   shuffleQuestions?: boolean;
@@ -54,13 +57,17 @@ const loadExam = (id: string) => examsRepo.findExamDetail(id);
 
 /** Staff view of an exam, including how many eligible questions each rule has. */
 async function serializeExam(e: ExamRow) {
-  const pools = await rulesWithPools(e.courseId, await loadRuleSpecs(e.id));
+  const filter = await examPoolFilter(e);
+  const pools = await rulesWithPools(e.courseId, await loadRuleSpecs(e.id), undefined, undefined, filter);
   const available = new Map(pools.map((p) => [p.id, p.pool.length]));
   const totalMarks = e.rules.reduce((s, r) => s + num0(r.marksPerQuestion) * r.questionCount, 0);
   return {
     id: e.id,
     course: { id: e.course.id, code: e.course.code, name: e.course.name, semester: e.course.semester },
     title: e.title,
+    examType: e.examType,
+    reviewedOnly: e.reviewedOnly,
+    excludedQuestions: filter.excludedQuestionIds?.length ?? 0,
     instructions: e.instructions,
     shuffleQuestions: e.shuffleQuestions,
     shuffleOptions: e.shuffleOptions,
@@ -110,8 +117,12 @@ async function checkSettings(s: ExamSettings, courseLecturerId: string) {
   }
 }
 
-/** Validates rules: unique combinations, topics from the course, enough questions. */
-async function checkRules(courseId: string, rules: RuleInput[]) {
+/**
+ * Validates rules: unique combinations, topics from the course, enough questions. Rules are
+ * saved on draft exams, which publish with reviewed questions only, so only reviewed (and not
+ * unticked) questions count.
+ */
+async function checkRules(courseId: string, rules: RuleInput[], excludedQuestionIds: string[] = []) {
   const keys = rules.map((r) => `${r.questionType}|${r.difficulty}|${r.marksPerQuestion}`);
   if (new Set(keys).size !== keys.length) throw badRequest("RULE_DUPLICATE", "Use one rule per type, difficulty and mark value");
   const topicIds = [...new Set(rules.flatMap((r) => r.topicIds ?? []))];
@@ -120,14 +131,14 @@ async function checkRules(courseId: string, rules: RuleInput[]) {
     if (found !== topicIds.length) throw badRequest("TOPIC_NOT_IN_COURSE", "Every topic must belong to the course");
   }
   const specs: RuleSpec[] = rules.map((r, i) => ({ id: `new-${i}`, position: i + 1, topicIds: r.topicIds ?? [], ...r }));
-  const short = shortages(await rulesWithPools(courseId, specs));
+  const short = shortages(await rulesWithPools(courseId, specs, undefined, undefined, { reviewedOnly: true, excludedQuestionIds }));
   if (short.length) {
-    throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
+    throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "There are not enough reviewed questions for every rule", { rules: short });
   }
 }
 
 /** Creates a DRAFT exam for one of the lecturer's courses (rules optional). */
-export async function createExam(user: AuthUser, courseId: string, s: ExamSettings & { title: string; rules?: RuleInput[] }, req: Request) {
+export async function createExam(user: AuthUser, courseId: string, s: ExamSettings & { title: string; examType: ExamType; rules?: RuleInput[] }, req: Request) {
   const course = await findCourse(courseId);
   if (!course || course.lecturerId !== user.id) throw notFound("COURSE_NOT_FOUND");
   await checkSettings(s, course.lecturerId);
@@ -135,7 +146,7 @@ export async function createExam(user: AuthUser, courseId: string, s: ExamSettin
   const id = await transaction(async (tx) => {
     const exam = await examsRepo.insertExam(
       {
-        courseId, createdById: user.id, title: s.title, instructions: s.instructions ?? "",
+        courseId, createdById: user.id, title: s.title, examType: s.examType, instructions: s.instructions ?? "",
         shuffleQuestions: s.shuffleQuestions ?? true, shuffleOptions: s.shuffleOptions ?? true,
         allowAnswerReview: s.allowAnswerReview ?? false, feeAmount: s.feeAmount ?? 0,
         feeCurrency: s.feeCurrency ?? env.DEFAULT_CURRENCY, secondGraderId: s.secondGraderId ?? null,
@@ -161,7 +172,7 @@ export async function listExams(user: AuthUser, q: { courseId?: string; status?:
     user.role === "ADMIN" ? {} : { OR: [{ course: { lecturerId: user.id } }, { secondGraderId: user.id }] };
   const rows = await examsRepo.listExams({ ...scope, ...(q.courseId ? { courseId: q.courseId } : {}), ...(q.status ? { status: q.status } : {}) });
   return rows.map((e) => ({
-    id: e.id, title: e.title, course: e.course, status: e.status, resultsStatus: e.resultsStatus,
+    id: e.id, title: e.title, examType: e.examType, course: e.course, status: e.status, resultsStatus: e.resultsStatus,
     feeAmount: num(e.feeAmount), feeCurrency: e.feeCurrency, schedules: e.schedules, attempts: e._count.attempts,
     isSecondGrader: e.secondGraderId === user.id,
   }));
@@ -175,7 +186,7 @@ export async function listExams(user: AuthUser, q: { courseId?: string; status?:
 export async function updateExam(user: AuthUser, id: string, s: ExamSettings, req: Request) {
   const exam = await manageableExam(user, id, { ownerOnly: true });
   if (exam.status === "PUBLISHED") {
-    const locked = (["shuffleQuestions", "shuffleOptions", "feeAmount", "feeCurrency"] as const).filter((k) => s[k] !== undefined);
+    const locked = (["examType", "shuffleQuestions", "shuffleOptions", "feeAmount", "feeCurrency"] as const).filter((k) => s[k] !== undefined);
     if (locked.length) throw conflict("EXAM_PUBLISHED_LOCKED", "These settings cannot change after publishing", { fields: locked });
   }
   await checkSettings(s, exam.course.lecturerId);
@@ -190,7 +201,7 @@ export async function updateExam(user: AuthUser, id: string, s: ExamSettings, re
 export async function setRules(user: AuthUser, id: string, rules: RuleInput[], req: Request) {
   const exam = await manageableExam(user, id, { ownerOnly: true });
   if (exam.status !== "DRAFT") throw conflict("EXAM_PUBLISHED_LOCKED", "Rules cannot change after publishing");
-  await checkRules(exam.courseId, rules);
+  await checkRules(exam.courseId, rules, await examsRepo.findExcludedQuestionIds(id));
   await transaction(async (tx) => {
     await examsRepo.replaceRules(id, rules, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_RULES_UPDATED", entityType: "exam", entityId: id, details: { rules: rules.length }, req });
@@ -204,10 +215,11 @@ export async function publishExam(user: AuthUser, id: string, req: Request) {
   if (exam.status === "PUBLISHED") throw conflict("EXAM_ALREADY_PUBLISHED", "The exam is already published");
   const specs = await loadRuleSpecs(id);
   if (specs.length === 0) throw badRequest("EXAM_HAS_NO_RULES", "Add at least one question rule first");
-  const short = shortages(await rulesWithPools(exam.courseId, specs));
-  if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
+  // From now on this exam draws only reviewed questions (and never the unticked ones).
+  const short = shortages(await rulesWithPools(exam.courseId, specs, undefined, undefined, await examPoolFilter(exam)));
+  if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "There are not enough reviewed questions for every rule", { rules: short });
   await transaction(async (tx) => {
-    await examsRepo.updateExam(id, { status: "PUBLISHED" }, tx);
+    await examsRepo.updateExam(id, { status: "PUBLISHED", reviewedOnly: true }, tx);
     await audit(tx, { actorId: user.id, action: "EXAM_PUBLISHED", entityType: "exam", entityId: id, req });
   });
   return serializeExam((await loadExam(id))!);
@@ -221,7 +233,7 @@ export async function previewExam(user: AuthUser, id: string) {
   const exam = await manageableExam(user, id, { ownerOnly: true });
   const specs = await loadRuleSpecs(id);
   if (specs.length === 0) throw badRequest("EXAM_HAS_NO_RULES", "Add at least one question rule first");
-  const pools = await rulesWithPools(exam.courseId, specs);
+  const pools = await rulesWithPools(exam.courseId, specs, undefined, undefined, await examPoolFilter(exam));
   const short = shortages(pools);
   if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "The question bank does not have enough questions for every rule", { rules: short });
   const items = generateExam(pools, { shuffleQuestions: exam.shuffleQuestions, shuffleOptions: exam.shuffleOptions });
@@ -244,4 +256,45 @@ export async function previewExam(user: AuthUser, id: string) {
     };
   });
   return { sample: true, totalMarks: Math.round(questions.reduce((s, q) => s + q.marks, 0) * 100) / 100, questions };
+}
+
+/**
+ * The tick list for the lecturer: for each rule, every reviewed question that matches it, and
+ * whether it is unticked for this exam. Students then get random sets drawn from the ticked
+ * questions, the same number of each type, difficulty and mark value per rule.
+ */
+export async function questionPool(user: AuthUser, id: string) {
+  const exam = await manageableExam(user, id, { ownerOnly: true });
+  const excluded = new Set(await examsRepo.findExcludedQuestionIds(id));
+  const specs = await loadRuleSpecs(id);
+  const rules = [];
+  for (const r of specs) {
+    const candidates = await reviewedCandidates(exam.courseId, r);
+    rules.push({
+      id: r.id, position: r.position, questionType: r.questionType, difficulty: r.difficulty, marksPerQuestion: r.marksPerQuestion,
+      questionCount: r.questionCount,
+      questions: candidates.map((q) => ({ ...q, included: !excluded.has(q.questionId) })),
+    });
+  }
+  return { status: exam.status, reviewedOnly: exam.status === "DRAFT" ? true : exam.reviewedOnly, rules };
+}
+
+/**
+ * Saves which questions are unticked for a DRAFT exam. Every rule must still have enough
+ * ticked reviewed questions. @throws 409 EXAM_PUBLISHED_LOCKED, 400 QUESTION_NOT_IN_COURSE,
+ * 400 EXAM_NOT_ENOUGH_QUESTIONS { rules }
+ */
+export async function setExcludedQuestions(user: AuthUser, id: string, questionIds: string[], req: Request) {
+  const exam = await manageableExam(user, id, { ownerOnly: true });
+  if (exam.status !== "DRAFT") throw conflict("EXAM_PUBLISHED_LOCKED", "The question selection cannot change after publishing");
+  const ids = [...new Set(questionIds)];
+  if (ids.length && (await examsRepo.countCourseQuestions(exam.courseId, ids)) !== ids.length) throw badRequest("QUESTION_NOT_IN_COURSE", "Every question must belong to the exam's course");
+  const filter: PoolFilter = { reviewedOnly: true, excludedQuestionIds: ids };
+  const short = shortages(await rulesWithPools(exam.courseId, await loadRuleSpecs(id), undefined, undefined, filter));
+  if (short.length) throw new AppError(400, "EXAM_NOT_ENOUGH_QUESTIONS", "Too many questions unticked: a rule no longer has enough", { rules: short });
+  await transaction(async (tx) => {
+    await examsRepo.replaceExcludedQuestions(id, ids, tx);
+    await audit(tx, { actorId: user.id, action: "EXAM_QUESTIONS_SELECTED", entityType: "exam", entityId: id, details: { unticked: ids.length }, req });
+  });
+  return serializeExam((await loadExam(id))!);
 }

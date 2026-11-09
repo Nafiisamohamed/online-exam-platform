@@ -104,7 +104,7 @@ export async function enrol(courseId: string, ...studentIds: string[]) {
   await prisma.enrolment.createMany({ data: studentIds.map((studentId) => ({ studentId, courseId })) });
 }
 
-type Q = { type: "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY"; difficulty?: "EASY" | "MEDIUM" | "HARD"; marks?: number; topic?: string; text?: string };
+type Q = { type: "MCQ" | "TRUE_FALSE" | "SHORT_ANSWER" | "ESSAY"; difficulty?: "EASY" | "MEDIUM" | "HARD"; marks?: number; topic?: string; text?: string; reviewed?: boolean };
 
 /** Request body for a valid question of the given type. */
 export function questionBody(q: Q) {
@@ -122,6 +122,11 @@ export async function addQuestions(agent: ReturnType<typeof request.agent>, cour
   for (let i = 0; i < count; i++) {
     const res = await agent.post(`/api/courses/${courseId}/questions`).send(questionBody(q));
     if (res.status !== 201) throw new Error(`question create failed: ${JSON.stringify(res.body)}`);
+    // Exams published since Phase 3 draw reviewed questions only: test questions are reviewed (pass reviewed: false to keep a draft).
+    if (q.reviewed !== false) {
+      const row = await prisma.question.findUniqueOrThrow({ where: { id: res.body.question.id } });
+      await prisma.question.update({ where: { id: row.id }, data: { reviewedVersionId: row.currentVersionId, reviewedById: row.createdById, reviewedAt: new Date() } });
+    }
     out.push(res.body.question);
   }
   return out;

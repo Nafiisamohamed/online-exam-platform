@@ -33,7 +33,7 @@ export function findQuestionWithCourse(id: string, db: Db = prisma) {
 export function findQuestionDetail(id: string, db: Db = prisma) {
   return db.question.findUniqueOrThrow({
     where: { id },
-    include: { currentVersion: { include: versionInclude }, versions: { select: { id: true, versionNumber: true, isLocked: true, createdAt: true }, orderBy: { versionNumber: "asc" } } },
+    include: { currentVersion: { include: versionInclude }, reviewedBy: { select: { id: true, fullName: true } }, versions: { select: { id: true, versionNumber: true, isLocked: true, createdAt: true }, orderBy: { versionNumber: "asc" } } },
   });
 }
 
@@ -41,9 +41,17 @@ export function findVersionOfQuestion(questionId: string, versionId: string, db:
   return db.questionVersion.findFirst({ where: { id: versionId, questionId }, include: versionInclude });
 }
 
+/** Reviewed and all active questions of a course (reviewed = the current version was reviewed). */
+export function countReviewed(courseId: string, db: Db = prisma) {
+  return Promise.all([
+    db.question.count({ where: { courseId, isArchived: false, reviewedVersionId: { not: null } } }),
+    db.question.count({ where: { courseId, isArchived: false } }),
+  ]);
+}
+
 export function listQuestions(where: Prisma.QuestionWhereInput, skip: number, take: number, db: Db = prisma) {
   return Promise.all([
-    db.question.findMany({ where, include: { currentVersion: { include: versionInclude } }, orderBy: { createdAt: "asc" }, skip, take }),
+    db.question.findMany({ where, include: { currentVersion: { include: versionInclude }, reviewedBy: { select: { id: true, fullName: true } } }, orderBy: { createdAt: "asc" }, skip, take }),
     db.question.count({ where }),
   ]);
 }
@@ -141,7 +149,7 @@ export async function replaceVersionContent(versionId: string, c: VersionContent
   await insertChildren(versionId, c, db);
 }
 
-export function updateQuestion(id: string, data: { currentVersionId?: string; normalizedText?: string; isArchived?: boolean }, db: Db = prisma) {
+export function updateQuestion(id: string, data: { currentVersionId?: string; normalizedText?: string; isArchived?: boolean; reviewedVersionId?: string | null; reviewedById?: string | null; reviewedAt?: Date | null }, db: Db = prisma) {
   return db.question.update({ where: { id }, data });
 }
 

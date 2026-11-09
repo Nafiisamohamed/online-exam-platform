@@ -16,7 +16,7 @@ const hours = (h: number) => new Date(NOW + h * 3_600_000).toISOString();
 
 function exam(partial: Partial<ExamListItem> = {}): ExamListItem {
   return {
-    id: "e1", title: "Midterm", course: { id: "c1", code: "CS201", name: "Databases", semester: "2026-Fall" },
+    id: "e1", title: "Midterm", examType: "MIDTERM", course: { id: "c1", code: "CS201", name: "Databases", semester: "2026-Fall" },
     status: "PUBLISHED", resultsStatus: "UNPUBLISHED", feeAmount: 0, feeCurrency: "USD", schedules: [], attempts: 0, isSecondGrader: false,
     ...partial,
   };

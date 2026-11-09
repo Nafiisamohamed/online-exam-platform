@@ -13,6 +13,7 @@ export type MyExamState = "UNSCHEDULED" | "UPCOMING" | "OPEN" | "CLOSED" | "IN_P
 export interface MyExam {
   id: string;
   title: string;
+  examType: "QUIZ" | "MIDTERM" | "FINAL";
   instructions: string;
   course: { id: string; code: string; name: string };
   totalQuestions: number;

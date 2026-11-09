@@ -21,6 +21,7 @@ describe("exam builder", () => {
   it("refuses rules the question bank cannot fill, and reports each shortage", async () => {
     const { agent, course } = await examSetup();
     const res = await agent.post("/api/exams").send({
+      examType: "MIDTERM",
       courseId: course.id,
       title: "Midterm",
       rules: [
@@ -40,7 +41,7 @@ describe("exam builder", () => {
 
   it("builds, previews (without locking) and publishes an exam; rules are then fixed", async () => {
     const { agent, course } = await examSetup();
-    const created = await agent.post("/api/exams").send({ courseId: course.id, title: "Quiz", instructions: "Answer all", feeAmount: 0 });
+    const created = await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Quiz", instructions: "Answer all", feeAmount: 0 });
     expect(created.status).toBe(201);
     const id = created.body.exam.id;
     expect((await agent.post(`/api/exams/${id}/publish`)).body.error.code).toBe("EXAM_HAS_NO_RULES");
@@ -80,20 +81,20 @@ describe("exam builder", () => {
 
   it("checks the fee currency and the second grader", async () => {
     const { agent, course, lecturer } = await examSetup();
-    expect((await agent.post("/api/exams").send({ courseId: course.id, title: "X", feeAmount: 5, feeCurrency: "EUR" })).body.error.code).toBe("CURRENCY_NOT_SUPPORTED");
-    expect((await agent.post("/api/exams").send({ courseId: course.id, title: "X", secondGraderId: lecturer.id })).body.error.code).toBe("SECOND_GRADER_IS_LECTURER");
+    expect((await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "X", feeAmount: 5, feeCurrency: "EUR" })).body.error.code).toBe("CURRENCY_NOT_SUPPORTED");
+    expect((await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "X", secondGraderId: lecturer.id })).body.error.code).toBe("SECOND_GRADER_IS_LECTURER");
     const second = await createUser("LECTURER");
-    const ok = await agent.post("/api/exams").send({ courseId: course.id, title: "Paid", feeAmount: 5, feeCurrency: "USD", secondGraderId: second.id });
+    const ok = await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Paid", feeAmount: 5, feeCurrency: "USD", secondGraderId: second.id });
     expect(ok.status).toBe(201);
     expect(ok.body.exam).toMatchObject({ feeAmount: 5, feeCurrency: "USD", secondGrader: { id: second.id } });
   });
 
   it("hides other lecturers' exams", async () => {
     const { agent, course } = await examSetup();
-    const created = await agent.post("/api/exams").send({ courseId: course.id, title: "Private" });
+    const created = await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Private" });
     const [, other] = await userAgent("LECTURER");
     expect((await other.get(`/api/exams/${created.body.exam.id}`)).status).toBe(404);
-    expect((await other.post("/api/exams").send({ courseId: course.id, title: "Steal" })).status).toBe(404);
+    expect((await other.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Steal" })).status).toBe(404);
     const [, admin] = await userAgent("ADMIN");
     expect((await admin.get(`/api/exams/${created.body.exam.id}`)).status).toBe(200);
     expect((await admin.put(`/api/exams/${created.body.exam.id}/rules`).send({ rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 1, questionCount: 1 }] })).status).toBe(403);
@@ -102,7 +103,7 @@ describe("exam builder", () => {
 
 /** A published exam with one rule, for scheduling tests. */
 async function publishedExam(agent: Awaited<ReturnType<typeof examSetup>>["agent"], courseId: string, title = "Exam") {
-  const e = await agent.post("/api/exams").send({ courseId, title, rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 1, questionCount: 2 }] });
+  const e = await agent.post("/api/exams").send({ examType: "QUIZ", courseId, title, rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 1, questionCount: 2 }] });
   await agent.post(`/api/exams/${e.body.exam.id}/publish`);
   return e.body.exam.id as string;
 }
@@ -114,17 +115,19 @@ describe("scheduling", () => {
     const students = [await createUser("STUDENT"), await createUser("STUDENT", { preferredLanguage: "en" })];
     await enrol(course.id, ...students.map((s) => s.id));
     const invigilator = await createUser("INVIGILATOR");
-    const room = await prisma.room.create({ data: { name: `Room ${uid()}`, building: "Main", networkRanges: ["127.0.0.1/32"] } });
+    const room = await prisma.room.create({ data: { name: `Room ${uid()}`, building: "Main", networkRanges: [], capacity: 40 } });
     const examId = await publishedExam(agent, course.id);
 
-    const tooLong = await agent.post(`/api/exams/${examId}/schedules`).send({ windowStart: inDays(3, 6), windowEnd: inDays(3, 7), durationMinutes: 90 });
-    expect(tooLong.body.error.code).toBe("DURATION_LONGER_THAN_WINDOW");
+    // The duration is the window length; a window under 5 minutes is refused.
+    const tooShort = await agent.post(`/api/exams/${examId}/schedules`).send({ windowStart: inDays(3, 6), windowEnd: new Date(new Date(inDays(3, 6)).getTime() + 3 * 60_000).toISOString() });
+    expect(tooShort.body.error.code).toBe("WINDOW_LENGTH_INVALID");
     const past = await agent.post(`/api/exams/${examId}/schedules`).send({ windowStart: inDays(-1, 6), windowEnd: inDays(-1, 8), durationMinutes: 60 });
     expect(past.body.error.code).toBe("WINDOW_IN_PAST");
 
     const req = await agent.post(`/api/exams/${examId}/schedules`).send({ windowStart: inDays(3, 6), windowEnd: inDays(3, 8), durationMinutes: 60, roomIds: [room.id], invigilatorIds: [invigilator.id] });
     expect(req.status).toBe(201);
     expect(req.body.schedule.status).toBe("REQUESTED");
+    expect(req.body.schedule.durationMinutes).toBe(120); // 06:00-08:00, whatever was sent
     expect((await agent.post(`/api/exams/${examId}/schedules`).send({ windowStart: inDays(4, 6), windowEnd: inDays(4, 8), durationMinutes: 60 })).body.error.code).toBe("SCHEDULE_ALREADY_REQUESTED");
     expect((await agent.post(`/api/schedules/${req.body.schedule.id}/approve`)).status).toBe(403);
 
@@ -169,7 +172,7 @@ describe("scheduling", () => {
     // Room clash between exams without shared students.
     const c = await examSetup();
     const d = await examSetup();
-    const room = await prisma.room.create({ data: { name: `Hall ${uid()}`, building: "Main", networkRanges: ["10.0.0.0/24"] } });
+    const room = await prisma.room.create({ data: { name: `Hall ${uid()}`, building: "Main", networkRanges: [], capacity: 500 } });
     const examC = await publishedExam(c.agent, c.course.id, "Exam C");
     const examD = await publishedExam(d.agent, d.course.id, "Exam D");
     const sC = await c.agent.post(`/api/exams/${examC}/schedules`).send({ windowStart: inDays(6, 6), windowEnd: inDays(6, 8), durationMinutes: 60, roomIds: [room.id] });
@@ -182,7 +185,7 @@ describe("scheduling", () => {
   it("requires the exam to be published before approval", async () => {
     const { agent, course } = await examSetup();
     const [, admin] = await userAgent("ADMIN");
-    const draft = await agent.post("/api/exams").send({ courseId: course.id, title: "Draft", rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 1, questionCount: 1 }] });
+    const draft = await agent.post("/api/exams").send({ examType: "QUIZ", courseId: course.id, title: "Draft", rules: [{ questionType: "MCQ", difficulty: "EASY", marksPerQuestion: 1, questionCount: 1 }] });
     const s = await agent.post(`/api/exams/${draft.body.exam.id}/schedules`).send({ windowStart: inDays(7, 6), windowEnd: inDays(7, 8), durationMinutes: 60 });
     expect((await admin.post(`/api/schedules/${s.body.schedule.id}/approve`)).body.error.code).toBe("EXAM_NOT_PUBLISHED");
     expect((await agent.post(`/api/schedules/${s.body.schedule.id}/cancel`)).body.schedule.status).toBe("CANCELLED");

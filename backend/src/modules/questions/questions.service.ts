@@ -13,6 +13,7 @@
  * - Questions are archived, never deleted.
  */
 import type { Request } from "express";
+import { now } from "../../db/clock.ts";
 import { isUniqueViolation } from "../../db/db-errors.ts";
 import type { Tx } from "../../db/prisma.ts";
 import { transaction } from "../../db/prisma.ts";
@@ -120,6 +121,15 @@ export async function createQuestion(user: AuthUser, courseId: string, input: Qu
   }
 }
 
+/** Number of reviewed questions each course should have (shown as progress, not enforced). */
+export const REVIEWED_TARGET = 40;
+
+/** REVIEWED when the current version is the reviewed one; otherwise DRAFT. */
+function reviewOf(q: { reviewedVersionId: string | null; currentVersionId: string | null; reviewedAt: Date | null; reviewedBy?: { id: string; fullName: string } | null }) {
+  const reviewed = q.reviewedVersionId !== null && q.reviewedVersionId === q.currentVersionId;
+  return { status: reviewed ? "REVIEWED" as const : "DRAFT" as const, reviewedAt: reviewed ? q.reviewedAt : null, reviewedBy: reviewed ? q.reviewedBy ?? null : null };
+}
+
 /** Question with its current version and the list of all versions. */
 export async function getQuestion(user: AuthUser, id: string) {
   await ownQuestion(user, id);
@@ -128,6 +138,7 @@ export async function getQuestion(user: AuthUser, id: string) {
     id: q.id,
     courseId: q.courseId,
     isArchived: q.isArchived,
+    review: reviewOf(q),
     createdAt: q.createdAt,
     updatedAt: q.updatedAt,
     current: q.currentVersion ? serializeVersion(q.currentVersion) : null,
@@ -145,7 +156,8 @@ export async function getVersion(user: AuthUser, questionId: string, versionId: 
 
 /**
  * Edits a question. A locked current version is kept as it is and a new
- * version is created; an unlocked one is changed in place.
+ * version is created; an unlocked one is changed in place. Either way the content changed, so
+ * the question goes back to DRAFT and has to be reviewed again.
  * @returns the question and newVersionCreated
  */
 export async function updateQuestion(user: AuthUser, id: string, input: QuestionInput, req: Request) {
@@ -161,10 +173,10 @@ export async function updateQuestion(user: AuthUser, id: string, input: Question
       const created = !current || current.isLocked;
       if (created) {
         const v = await questionsRepo.insertVersion(id, await questionsRepo.nextVersionNumber(id, tx), content, tx);
-        await questionsRepo.updateQuestion(id, { currentVersionId: v.id, normalizedText }, tx);
+        await questionsRepo.updateQuestion(id, { currentVersionId: v.id, normalizedText, reviewedVersionId: null, reviewedById: null, reviewedAt: null }, tx);
       } else {
         await questionsRepo.replaceVersionContent(current.id, content, tx);
-        await questionsRepo.updateQuestion(id, { normalizedText }, tx);
+        await questionsRepo.updateQuestion(id, { normalizedText, reviewedVersionId: null, reviewedById: null, reviewedAt: null }, tx);
       }
       await audit(tx, { actorId: user.id, action: "QUESTION_UPDATED", entityType: "question", entityId: id, details: { newVersion: created }, req });
       return created;
@@ -173,6 +185,23 @@ export async function updateQuestion(user: AuthUser, id: string, input: Question
   } catch (error) {
     duplicateError(error);
   }
+}
+
+/**
+ * Marks the question's current version as reviewed (by the course lecturer), or sends it back
+ * to draft. Only reviewed questions can be drawn in exams published since Phase 3.
+ * @throws 409 QUESTION_ARCHIVED
+ */
+export async function setReviewed(user: AuthUser, id: string, reviewed: boolean, req: Request) {
+  const q = await ownQuestion(user, id);
+  if (reviewed && q.isArchived) throw conflict("QUESTION_ARCHIVED", "Restore the question before reviewing it");
+  await transaction(async (tx) => {
+    await questionsRepo.updateQuestion(id, reviewed
+      ? { reviewedVersionId: q.currentVersionId, reviewedById: user.id, reviewedAt: now() }
+      : { reviewedVersionId: null, reviewedById: null, reviewedAt: null }, tx);
+    await audit(tx, { actorId: user.id, action: reviewed ? "QUESTION_REVIEWED" : "QUESTION_REVIEW_REMOVED", entityType: "question", entityId: id, req });
+  });
+  return getQuestion(user, id);
 }
 
 /** Archives (hides from new exams) or restores a question. Restoring can hit 409 DUPLICATE_QUESTION. */
@@ -193,13 +222,15 @@ export async function setArchived(user: AuthUser, id: string, archived: boolean,
 export async function listQuestions(
   user: AuthUser,
   courseId: string,
-  f: { type?: QuestionType; difficulty?: Difficulty; topicId?: string; search?: string; archived?: boolean; page: number; pageSize: number },
+  f: { type?: QuestionType; difficulty?: Difficulty; topicId?: string; search?: string; archived?: boolean; review?: "REVIEWED" | "DRAFT"; page: number; pageSize: number },
 ) {
   await ownCourse(user, courseId);
   const where = {
     courseId,
     isArchived: f.archived ?? false,
     ...(f.search ? { normalizedText: { contains: normalizeText(f.search) } } : {}),
+    // Editing always clears the review, so a set reviewed version is the current one.
+    ...(f.review ? { reviewedVersionId: f.review === "REVIEWED" ? { not: null } : null } : {}),
     currentVersion: {
       ...(f.type ? { type: f.type } : {}),
       ...(f.difficulty ? { difficulty: f.difficulty } : {}),
@@ -207,8 +238,9 @@ export async function listQuestions(
     },
   };
   const [rows, total] = await questionsRepo.listQuestions(where, (f.page - 1) * f.pageSize, f.pageSize);
-  const items = rows.map((q) => ({ id: q.id, isArchived: q.isArchived, current: q.currentVersion ? serializeVersion(q.currentVersion) : null }));
-  return paged(items, total, f.page, f.pageSize);
+  const items = rows.map((q) => ({ id: q.id, isArchived: q.isArchived, review: reviewOf(q), current: q.currentVersion ? serializeVersion(q.currentVersion) : null }));
+  const [reviewed, active] = await questionsRepo.countReviewed(courseId);
+  return { ...paged(items, total, f.page, f.pageSize), review: { reviewed, total: active, target: REVIEWED_TARGET } };
 }
 
 /** Counts of active questions per type / difficulty / marks, to help build exam rules. */

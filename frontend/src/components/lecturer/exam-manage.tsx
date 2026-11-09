@@ -30,7 +30,9 @@ import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/i18n";
 import type { BankSummaryRow, LecturerExam, Topic } from "@/types/lecturer";
+import { ExamTypeBadge } from "@/components/exam-type-badge";
 import { useMyCourses } from "./course-picker";
+import { QuestionSelection } from "./question-selection";
 import { PreviewDialog, ScheduleDialog, SettingsDialog } from "./exam-dialogs";
 import { RulesEditor, rulesComplete, toRuleInputs, type RuleDraft } from "./rules-editor";
 
@@ -121,6 +123,7 @@ function ManageView({ exam }: { exam: LecturerExam }) {
   const crumbs = <Breadcrumbs items={[{ label: t("nav.dashboard"), href: "/dashboard" }, { label: t("nav.exams"), href: "/lecturer/exams" }, { label: exam.title }]} />;
   const badges = (
     <span className="flex flex-wrap items-center gap-2">
+      <ExamTypeBadge type={exam.examType} />
       <Badge tone={exam.status === "PUBLISHED" ? "navy" : "neutral"}>{t(`lecturer.exams.status.${exam.status}`)}</Badge>
       <ExamStateBadge state={state} />
       <ResultsBadge status={exam.resultsStatus} />
@@ -209,6 +212,7 @@ function ManageView({ exam }: { exam: LecturerExam }) {
       </div>
 
       <div className="mt-6"><RulesCard key={`${exam.status}-${exam.updatedAt}`} exam={exam} /></div>
+      {exam.rules.length > 0 && <div className="mt-6"><QuestionSelection key={`${exam.status}-${exam.updatedAt}`} examId={exam.id} /></div>}
 
       {exam.status === "PUBLISHED" && (
         <div className="mt-6 flex flex-wrap gap-2">
