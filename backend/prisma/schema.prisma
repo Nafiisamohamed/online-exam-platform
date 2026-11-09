@@ -193,6 +193,8 @@ model User {
 
   auditLogs              AuditLog[]
   coursesTaught          Course[]              @relation("CourseLecturer")
+  facultyAssignments     FacultyLecturer[]     @relation("FacultyLecturer")
+  registrations          StudentRegistration[] @relation("StudentRegistration")
   enrolments             Enrolment[]
   questionsCreated       Question[]            @relation("QuestionCreator")
   importBatches          ImportBatch[]
@@ -247,24 +249,80 @@ model Faculty {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  courses Course[]
+  courses       Course[]
+  lecturers     FacultyLecturer[]
+  registrations StudentRegistration[]
 
   @@map("faculties")
 }
 
-/// A course offering in one semester (Q3: unique by code + semester).
-model Course {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+/// A university year such as "2026/2027". At most one is current (partial unique index in SQL).
+model AcademicYear {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+  isCurrent Boolean  @default(false) @map("is_current")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  courses       Course[]
+  registrations StudentRegistration[]
+
+  @@map("academic_years")
+}
+
+/// Lecturers assigned to a faculty. A course's lecturer must be assigned to the course's faculty.
+model FacultyLecturer {
   facultyId  String   @map("faculty_id") @db.Uuid
-  code       String
-  name       String
-  semester   String
   lecturerId String   @map("lecturer_id") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz(6)
 
   faculty  Faculty @relation(fields: [facultyId], references: [id], onDelete: Restrict)
-  lecturer User    @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: Restrict)
+  lecturer User    @relation("FacultyLecturer", fields: [lecturerId], references: [id], onDelete: Restrict)
+
+  @@id([facultyId, lecturerId])
+  @@index([lecturerId])
+  @@map("faculty_lecturers")
+}
+
+/// Where a student studies in one academic year: faculty and semester (1-8). One row per student and year.
+model StudentRegistration {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId      String   @map("student_id") @db.Uuid
+  academicYearId String   @map("academic_year_id") @db.Uuid
+  facultyId      String   @map("faculty_id") @db.Uuid
+  semesterNumber Int      @map("semester_number") @db.SmallInt
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student      User         @relation("StudentRegistration", fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  faculty      Faculty      @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, academicYearId])
+  @@index([academicYearId, facultyId, semesterNumber])
+  @@map("student_registrations")
+}
+
+/// A course offering in one semester (Q3: unique by code + semester).
+model Course {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  facultyId      String   @map("faculty_id") @db.Uuid
+  code           String
+  name           String
+  /// Label of the offering: "2026/2027 S1" for courses with an academic year; older courses keep e.g. "2026-Fall".
+  semester       String
+  lecturerId     String   @map("lecturer_id") @db.Uuid
+  /// Academic year and semester (1-8); both set or both empty (empty only for courses created before Phase 2).
+  academicYearId String?  @map("academic_year_id") @db.Uuid
+  semesterNumber Int?     @map("semester_number") @db.SmallInt
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  faculty      Faculty       @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  lecturer     User          @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
 
   enrolments    Enrolment[]
   topics        Topic[]
@@ -275,6 +333,7 @@ model Course {
   @@unique([code, semester])
   @@index([facultyId])
   @@index([lecturerId])
+  @@index([academicYearId, semesterNumber])
   @@map("courses")
 }
 

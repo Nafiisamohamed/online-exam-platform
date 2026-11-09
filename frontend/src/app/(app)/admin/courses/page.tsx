@@ -12,6 +12,7 @@ import { CourseModal } from "@/components/admin/course-forms";
 import { CourseTable } from "@/components/admin/course-table";
 import { QueryError } from "@/components/admin/query-state";
 import { PageHeader } from "@/components/layout/app-shell";
+import { Alert } from "@/components/ui/alert";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,28 +20,32 @@ import { Field, SearchInput, Select } from "@/components/ui/form";
 import { paths } from "@/lib/api/admin";
 import { useApi } from "@/lib/api/use-api";
 import { useI18n } from "@/lib/i18n/i18n";
-import type { Course, Faculty } from "@/types/admin";
+import { SEMESTERS, type AcademicYear, type Course, type Faculty } from "@/types/admin";
 
 export default function CoursesPage() {
   const { t } = useI18n();
   const courses = useApi<{ items: Course[] }>(paths.courses());
   const faculties = useApi<{ items: Faculty[] }>(paths.faculties);
+  const years = useApi<{ items: AcademicYear[] }>(paths.academicYears);
   const [search, setSearch] = useState("");
-  const [semester, setSemester] = useState("");
+  // "" = all, "none" = courses still without an academic year, otherwise a year id.
+  const [yearId, setYearId] = useState("");
+  const [semesterNumber, setSemesterNumber] = useState("");
   const [facultyId, setFacultyId] = useState("");
   const [modal, setModal] = useState<{ course?: Course } | null>(null);
 
   const all = useMemo(() => courses.data?.items ?? [], [courses.data]);
-  const semesters = useMemo(() => [...new Set(all.map((c) => c.semester))].sort().reverse(), [all]);
+  const missing = all.filter((c) => !c.academicYearId).length;
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return all.filter(
       (c) =>
-        (!semester || c.semester === semester) &&
+        (!yearId || (yearId === "none" ? !c.academicYearId : c.academicYearId === yearId)) &&
+        (!semesterNumber || c.semesterNumber === Number(semesterNumber)) &&
         (!facultyId || c.facultyId === facultyId) &&
         (!q || c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.lecturer.fullName.toLowerCase().includes(q)),
     );
-  }, [all, search, semester, facultyId]);
+  }, [all, search, yearId, semesterNumber, facultyId]);
 
   return (
     <>
@@ -54,11 +59,20 @@ export default function CoursesPage() {
         <Field label={t("common.search")}>
           {({ id }) => <SearchInput id={id} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.courses.search")} />}
         </Field>
-        <Field label={t("admin.courses.semester")}>
+        <Field label={t("admin.academic.year")}>
           {({ id }) => (
-            <Select id={id} value={semester} onChange={(e) => setSemester(e.target.value)}>
+            <Select id={id} value={yearId} onChange={(e) => setYearId(e.target.value)}>
+              <option value="">{t("admin.academic.allYears")}</option>
+              {years.data?.items.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+              {missing > 0 && <option value="none">{t("admin.academic.needsYearOption", { count: missing })}</option>}
+            </Select>
+          )}
+        </Field>
+        <Field label={t("admin.academic.semester")}>
+          {({ id }) => (
+            <Select id={id} value={semesterNumber} onChange={(e) => setSemesterNumber(e.target.value)}>
               <option value="">{t("admin.courses.allSemesters")}</option>
-              {semesters.map((s) => <option key={s} value={s}>{s}</option>)}
+              {SEMESTERS.map((n) => <option key={n} value={n}>{t("admin.academic.semesterN", { n })}</option>)}
             </Select>
           )}
         </Field>
@@ -71,6 +85,9 @@ export default function CoursesPage() {
           )}
         </Field>
       </FilterBar>
+      {missing > 0 && (
+        <Alert tone="warning" className="mb-4">{t("admin.academic.needsYearNotice", { count: missing })}</Alert>
+      )}
       <Card className="overflow-hidden">
         {courses.error && !courses.data ? (
           <QueryError state={courses} />

@@ -16,9 +16,10 @@ import { EmptyState } from "@/components/ui/states";
 import { paths } from "@/lib/api/admin";
 import { useApi } from "@/lib/api/use-api";
 import { useI18n } from "@/lib/i18n/i18n";
-import type { Course, Faculty } from "@/types/admin";
+import type { Course, Faculty, FacultyLecturer } from "@/types/admin";
 import { CourseTable } from "./course-table";
 import { FacultyModal } from "./faculty-forms";
+import { FacultyLecturers } from "./faculty-lecturers";
 import { QueryState } from "./query-state";
 
 export function FacultyDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +27,7 @@ export function FacultyDetail({ params }: { params: Promise<{ id: string }> }) {
   const { t } = useI18n();
   const faculties = useApi<{ items: Faculty[] }>(paths.faculties);
   const courses = useApi<{ items: Course[] }>(paths.courses({ facultyId: id }));
+  const assigned = useApi<{ items: FacultyLecturer[] }>(paths.facultyLecturers(id));
   const [editing, setEditing] = useState(false);
 
   return (
@@ -35,7 +37,6 @@ export function FacultyDetail({ params }: { params: Promise<{ id: string }> }) {
         if (!faculty) return <Card><EmptyState title={t("errors.FACULTY_NOT_FOUND")} /></Card>;
         const list = courses.data?.items ?? [];
         const enrolments = list.reduce((s, c) => s + c.activeStudents, 0);
-        const lecturers = new Set(list.map((c) => c.lecturerId)).size;
         return (
           <>
             <PageHeader
@@ -47,8 +48,9 @@ export function FacultyDetail({ params }: { params: Promise<{ id: string }> }) {
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <StatCard emphasis label={t("admin.faculties.courses")} value={faculty._count.courses} icon={BookOpenCheck} />
               <StatCard label={t("admin.faculties.activeStudents")} value={courses.data ? enrolments : "—"} icon={GraduationCap} />
-              <StatCard label={t("admin.faculties.lecturers")} value={courses.data ? lecturers : "—"} icon={UserRound} />
+              <StatCard label={t("admin.faculties.lecturers")} value={assigned.data ? assigned.data.items.length : "—"} icon={UserRound} />
             </section>
+            <FacultyLecturers facultyId={id} />
             <Card className="overflow-hidden">
               <CardHeader title={t("admin.faculties.coursesIn")} className="pb-4" />
               <QueryState state={courses} skeleton="h-40 w-full" className="p-5">

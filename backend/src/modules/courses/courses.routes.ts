@@ -5,7 +5,7 @@
  * POST  /api/faculties                                  ADMIN
  * PATCH /api/faculties/:id                              ADMIN
  * GET   /api/courses                                    any role (scoped to the user)
- * POST  /api/courses                                    ADMIN
+ * POST  /api/courses                                    ADMIN  { facultyId, code, name, academicYearId, semesterNumber, lecturerId }
  * GET   /api/courses/:id                                ADMIN, course lecturer, enrolled student
  * PATCH /api/courses/:id                                ADMIN
  * GET   /api/courses/:id/enrolments                     ADMIN, course lecturer
@@ -16,13 +16,15 @@ import { Router } from "express";
 import { z } from "zod";
 import { authenticate, currentUser, requireRole } from "../../middleware/auth.ts";
 import { idParams, trimmed, validate, zid } from "../../middleware/validate.ts";
+import { semesterLabel } from "../../lib/semester-label.ts";
 import * as courses from "./courses.service.ts";
 
 export const facultiesRouter = Router();
 export const coursesRouter = Router();
 
 const code = z.string().trim().regex(/^[A-Za-z0-9-]{2,20}$/, "use 2-20 letters, digits or dashes");
-const semester = z.string().trim().regex(/^\d{4}-[A-Za-z]{3,10}$/, 'use the form "2026-Fall"');
+const semester = semesterLabel;
+const semesterNumber = z.coerce.number().int().min(1).max(8);
 
 facultiesRouter.use(authenticate());
 
@@ -40,15 +42,15 @@ facultiesRouter.patch("/:id", requireRole("ADMIN"), validate({ params: idParams,
 
 coursesRouter.use(authenticate());
 
-/** Query: semester?, facultyId?. Response: { items: Course[] } scoped to the user. */
-coursesRouter.get("/", validate({ query: z.object({ semester: semester.optional(), facultyId: zid.optional() }) }), async (req, res) => {
+/** Query: semester?, facultyId?, academicYearId?, semesterNumber?. Response: { items: Course[] } scoped to the user. */
+coursesRouter.get("/", validate({ query: z.object({ semester: semester.optional(), facultyId: zid.optional(), academicYearId: zid.optional(), semesterNumber: semesterNumber.optional() }) }), async (req, res) => {
   res.json({ items: await courses.listCourses(currentUser(req), req.valid.query) });
 });
 
 coursesRouter.post(
   "/",
   requireRole("ADMIN"),
-  validate({ body: z.object({ facultyId: zid, code, name: trimmed(200), semester, lecturerId: zid }) }),
+  validate({ body: z.object({ facultyId: zid, code, name: trimmed(200), academicYearId: zid, semesterNumber, lecturerId: zid }) }),
   async (req, res) => {
     res.status(201).json({ course: await courses.createCourse(req.valid.body, currentUser(req).id, req) });
   },
@@ -63,7 +65,9 @@ coursesRouter.patch(
   requireRole("ADMIN"),
   validate({
     params: idParams,
-    body: z.object({ name: trimmed(200).optional(), lecturerId: zid.optional(), facultyId: zid.optional() }).refine((v) => Object.keys(v).length > 0, "send at least one field"),
+    body: z.object({ name: trimmed(200).optional(), lecturerId: zid.optional(), facultyId: zid.optional(), academicYearId: zid.optional(), semesterNumber: semesterNumber.optional() })
+      .refine((v) => Object.keys(v).length > 0, "send at least one field")
+      .refine((v) => (v.academicYearId === undefined) === (v.semesterNumber === undefined), "send academicYearId and semesterNumber together"),
   }),
   async (req, res) => {
     res.json({ course: await courses.updateCourse(req.valid.params.id, req.valid.body, currentUser(req).id, req) });

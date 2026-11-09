@@ -34,11 +34,12 @@ export function updateFaculty(id: string, data: { name?: string }, db: Db = pris
 const courseInclude = {
   faculty: { select: { id: true, code: true, name: true } },
   lecturer: { select: { id: true, fullName: true, email: true } },
+  academicYear: { select: { id: true, name: true, isCurrent: true } },
   _count: { select: { enrolments: { where: { status: "ACTIVE" as const } } } },
 };
 
 export function listCourses(where: Prisma.CourseWhereInput, db: Db = prisma) {
-  return db.course.findMany({ where, include: courseInclude, orderBy: [{ semester: "desc" }, { code: "asc" }] });
+  return db.course.findMany({ where, include: courseInclude, orderBy: [{ semester: "desc" }, { semesterNumber: "asc" }, { code: "asc" }] });
 }
 
 export function findCourseDetail(id: string, db: Db = prisma) {

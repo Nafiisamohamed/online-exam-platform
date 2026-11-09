@@ -20,7 +20,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
 | Area | Brief | Status |
 |---|---|---|
 | Four roles with server-side permission checks on every request | 2, 6.2 | ✅ Done (API) |
-| Faculties, courses, enrolment, CSV student import, dropping without losing results | 4.1 | ✅ Done (API) |
+| Faculties, courses, enrolment, CSV student import, dropping without losing results; academic years, Semesters 1–8, lecturers assigned to faculties, student registration per year and semester, enrolling a semester group | 4.1 | ✅ Done |
 | Question bank (MCQ, True/False, short answer, essay), images, versions for used questions | 4.2 | ✅ Done (API) |
 | CSV question import with preview, error reasons and duplicate skipping | 4.3 | ✅ Done (API) |
 | Exam builder with difficulty rules, enough-questions check and a sample preview | 4.4 | ✅ Done (API) |
@@ -60,7 +60,7 @@ Paper exams take long to mark, students can copy from their neighbours, and lect
         │  restricted role exam_app (no owner rights), TLS for Supabase
         ▼
  PostgreSQL 17: campus server (primary) or Supabase (hosted copy)
-   36 tables, CHECK constraints, triggers and row-level security as a second line of defence
+   39 tables, CHECK constraints, triggers and row-level security as a second line of defence
 ```
 
 **Layers**
@@ -188,7 +188,7 @@ erDiagram
   users ||--o{ audit_logs : "performed"
 ```
 
-The full list of 36 tables is in [docs/database.md](docs/database.md#tables-36).
+The full list of 39 tables is in [docs/database.md](docs/database.md#tables-39).
 
 ## Run the API
 

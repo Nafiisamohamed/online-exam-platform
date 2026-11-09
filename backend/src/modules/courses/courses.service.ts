@@ -2,7 +2,9 @@
  * Faculties, courses and enrolment (section 4.1, Admin / Registrar).
  *
  * Rules:
- * - a course is unique by code + semester (Q3) and has one lecturer;
+ * - a course is unique by code + semester label (Q3) and has one lecturer, who must be assigned
+ *   to the course's faculty; since Phase 2 a new course also has an academic year and a
+ *   semester (1-8), and its label is "2026/2027 S1";
  * - students can only take exams for courses they are ACTIVE in;
  * - dropping a student sets the enrolment to DROPPED and keeps every past
  *   attempt and result (rows are never deleted); enrolling again reactivates it;
@@ -21,6 +23,8 @@ import * as coursesRepo from "../../repositories/courses.repository.ts";
 import { findStudent, findUserWithRole } from "../../repositories/users.repository.ts";
 import { audit } from "../../services/audit.ts";
 import { manageableCourse, viewableCourse } from "../../services/access.ts";
+import { findAcademicYear, findFacultyLecturer } from "../../repositories/academic.repository.ts";
+import { offeringLabel } from "../../lib/semester-label.ts";
 
 // --- Faculties ------------------------------------------------------------------
 
@@ -59,8 +63,11 @@ type CourseRow = Awaited<ReturnType<typeof coursesRepo.findCourseDetail>>;
 const toCourse = ({ _count, ...c }: CourseRow) => ({ ...c, activeStudents: _count.enrolments });
 
 /** Courses the user may see: admin all; lecturer own; student ACTIVE enrolments; invigilator none. */
-export async function listCourses(user: AuthUser, q: { semester?: string; facultyId?: string }) {
-  const filter = { ...(q.semester ? { semester: q.semester } : {}), ...(q.facultyId ? { facultyId: q.facultyId } : {}) };
+export async function listCourses(user: AuthUser, q: { semester?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number }) {
+  const filter = {
+    ...(q.semester ? { semester: q.semester } : {}), ...(q.facultyId ? { facultyId: q.facultyId } : {}),
+    ...(q.academicYearId ? { academicYearId: q.academicYearId } : {}), ...(q.semesterNumber ? { semesterNumber: q.semesterNumber } : {}),
+  };
   const scope =
     user.role === "ADMIN" ? {} :
     user.role === "LECTURER" ? { lecturerId: user.id } :
@@ -78,15 +85,37 @@ export async function getCourse(user: AuthUser, id: string) {
 async function assertLecturer(lecturerId: string) {
   const l = await findUserWithRole(lecturerId);
   if (!l || l.role.name !== "LECTURER" || !l.isActive) throw badRequest("LECTURER_INVALID", "Choose an active lecturer");
+  return l;
 }
 
-/** @throws 400 LECTURER_INVALID / FACULTY_NOT_FOUND, 409 COURSE_EXISTS */
-export async function createCourse(data: { facultyId: string; code: string; name: string; semester: string; lecturerId: string }, actorId: string, req: Request) {
+/** A course's lecturer must be assigned to the course's faculty. @throws 400 LECTURER_NOT_IN_FACULTY */
+async function assertLecturerInFaculty(lecturerId: string, facultyId: string) {
+  if (!(await findFacultyLecturer(facultyId, lecturerId))) throw badRequest("LECTURER_NOT_IN_FACULTY", "Assign the lecturer to this faculty first");
+}
+
+/** @throws 400 ACADEMIC_YEAR_NOT_FOUND */
+async function yearOf(academicYearId: string) {
+  const y = await findAcademicYear(academicYearId);
+  if (!y) throw badRequest("ACADEMIC_YEAR_NOT_FOUND", "Academic year not found");
+  return y;
+}
+
+/**
+ * Creates a course in a faculty, academic year and semester (1-8).
+ * @throws 400 LECTURER_INVALID / FACULTY_NOT_FOUND / ACADEMIC_YEAR_NOT_FOUND / LECTURER_NOT_IN_FACULTY, 409 COURSE_EXISTS
+ */
+export async function createCourse(
+  data: { facultyId: string; code: string; name: string; academicYearId: string; semesterNumber: number; lecturerId: string },
+  actorId: string,
+  req: Request,
+) {
   await assertLecturer(data.lecturerId);
   if (!(await coursesRepo.findFaculty(data.facultyId))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
+  const year = await yearOf(data.academicYearId);
+  await assertLecturerInFaculty(data.lecturerId, data.facultyId);
   try {
     return await transaction(async (tx) => {
-      const c = await coursesRepo.insertCourse({ ...data, code: data.code.toUpperCase() }, tx);
+      const c = await coursesRepo.insertCourse({ ...data, code: data.code.toUpperCase(), semester: offeringLabel(year.name, data.semesterNumber) }, tx);
       await audit(tx, { actorId, action: "COURSE_CREATED", entityType: "course", entityId: c.id, details: { code: c.code, semester: c.semester }, req });
       return c;
     });
@@ -96,15 +125,36 @@ export async function createCourse(data: { facultyId: string; code: string; name
   }
 }
 
-/** Changes a course's name, lecturer or faculty. @throws 404 COURSE_NOT_FOUND, 400 LECTURER_INVALID */
-export async function updateCourse(id: string, data: { name?: string; lecturerId?: string; facultyId?: string }, actorId: string, req: Request) {
-  if (!(await coursesRepo.findCourse(id))) throw notFound("COURSE_NOT_FOUND");
+/**
+ * Changes a course's name, lecturer, faculty, or academic year and semester (both together).
+ * The lecturer must be assigned to the (new) faculty. A lecturer change is recorded with the
+ * previous and new lecturer, so the assignment history is in the audit log.
+ * @throws 404 COURSE_NOT_FOUND, 400 LECTURER_INVALID / LECTURER_NOT_IN_FACULTY / ACADEMIC_YEAR_NOT_FOUND, 409 COURSE_EXISTS
+ */
+export async function updateCourse(
+  id: string,
+  data: { name?: string; lecturerId?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number },
+  actorId: string,
+  req: Request,
+) {
+  const before = await coursesRepo.findCourse(id);
+  if (!before) throw notFound("COURSE_NOT_FOUND");
   if (data.lecturerId) await assertLecturer(data.lecturerId);
-  return transaction(async (tx) => {
-    const c = await coursesRepo.updateCourse(id, data, tx);
-    await audit(tx, { actorId, action: "COURSE_UPDATED", entityType: "course", entityId: id, details: { fields: Object.keys(data) }, req });
-    return c;
-  });
+  if (data.facultyId && !(await coursesRepo.findFaculty(data.facultyId))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
+  if (data.lecturerId || data.facultyId) await assertLecturerInFaculty(data.lecturerId ?? before.lecturerId, data.facultyId ?? before.facultyId);
+  const label = data.academicYearId ? offeringLabel((await yearOf(data.academicYearId)).name, data.semesterNumber!) : undefined;
+  try {
+    return await transaction(async (tx) => {
+      const c = await coursesRepo.updateCourse(id, { ...data, ...(label ? { semester: label } : {}) }, tx);
+      const lecturerChange = data.lecturerId && data.lecturerId !== before.lecturerId ? { lecturer: { from: before.lecturerId, to: data.lecturerId } } : {};
+      const offeringChange = label && label !== before.semester ? { offering: { from: before.semester, to: label } } : {};
+      await audit(tx, { actorId, action: "COURSE_UPDATED", entityType: "course", entityId: id, details: { fields: Object.keys(data), ...lecturerChange, ...offeringChange }, req });
+      return c;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw conflict("COURSE_EXISTS", "This course code already exists in this semester");
+    throw error;
+  }
 }
 
 // --- Enrolments -----------------------------------------------------------------

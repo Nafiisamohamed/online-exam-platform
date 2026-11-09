@@ -7,7 +7,7 @@
  * - ProfileSettings: language and theme preferences, and the security section.
  * They take a Profile and work the same for every role.
  */
-import { BadgeCheck, Building2, Camera, KeyRound, Languages, Mail, MonitorSmartphone, Phone, ShieldCheck, UserRound, Trash2, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Building2, CalendarDays, Camera, GraduationCap, KeyRound, Languages, Mail, MonitorSmartphone, Phone, ShieldCheck, UserRound, Trash2, type LucideIcon } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/overlays";
 import { useToast } from "@/components/ui/toast";
 import { ChangePasswordForm } from "@/components/auth/password-forms";
 import { useSession } from "@/lib/session/session";
+import { useApi } from "@/lib/api/use-api";
 import { useI18n } from "@/lib/i18n/i18n";
 import { useTheme } from "@/lib/theme";
 import type { Profile } from "@/types/account";
@@ -102,6 +103,24 @@ function DetailRow({ icon: Icon, label, value }: { icon: LucideIcon; label: stri
   );
 }
 
+interface MyAcademic { current: { semesterNumber: number; academicYear: { name: string; isCurrent: boolean }; faculty: { code: string; name: string } } | null }
+
+/** The student's own faculty, academic year and semester (GET /api/my/academic). */
+function StudentAcademicRows() {
+  const { t } = useI18n();
+  const academic = useApi<MyAcademic>("/my/academic");
+  const c = academic.data?.current;
+  if (!academic.data) return null;
+  if (!c) return <DetailRow icon={GraduationCap} label={t("profile.academicPlacement")} value={<span className="text-muted">{t("profile.notRegistered")}</span>} />;
+  return (
+    <>
+      <DetailRow icon={Building2} label={t("profile.faculty")} value={`${c.faculty.code} · ${c.faculty.name}`} />
+      <DetailRow icon={CalendarDays} label={t("profile.academicYear")} value={c.academicYear.name} />
+      <DetailRow icon={GraduationCap} label={t("profile.semester")} value={t("admin.academic.semesterN", { n: c.semesterNumber })} />
+    </>
+  );
+}
+
 export function ProfileDetails({ profile }: { profile: Profile }) {
   const { t } = useI18n();
   return (
@@ -115,6 +134,7 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
           <DetailRow icon={Phone} label={t("profile.phone")} value={profile.phone} />
           <DetailRow icon={ShieldCheck} label={t("profile.role")} value={t(`roles.${profile.role}`)} />
           {profile.faculty && <DetailRow icon={Building2} label={t("profile.faculty")} value={profile.faculty} />}
+          {profile.role === "STUDENT" && <StudentAcademicRows />}
           <DetailRow icon={BadgeCheck} label={t("profile.accountStatus")} value={<Badge tone="success" dot>{t("profile.active")}</Badge>} />
         </dl>
       </CardContent>

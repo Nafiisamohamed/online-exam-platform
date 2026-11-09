@@ -58,6 +58,14 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     PAYMENT_WRONG_PIN: "geliyay PIN khaldan",
     LOGOUT: "wuu ka baxay",
     AUDIT_EXPORTED: "soo dejiyay taariikhda hawlaha",
+    ACADEMIC_YEAR_CREATED: "ku daray sannad-dugsiyeed",
+    ACADEMIC_YEAR_UPDATED: "beddelay sannad-dugsiyeed",
+    ACADEMIC_YEAR_ACTIVATED: "ka dhigay sannad-dugsiyeed kan hadda",
+    FACULTY_LECTURER_ASSIGNED: "macallin ku daray kulliyad",
+    FACULTY_LECTURER_REMOVED: "macallin ka saaray kulliyad",
+    REGISTRATION_CREATED: "arday u diiwaangeliyay sannad-dugsiyeed",
+    REGISTRATION_UPDATED: "saxay diiwaangelinta arday",
+    GROUP_ENROLLED: "koox semestar ku diiwaangeliyay maaddooyinkeeda",
   },
   en: {
     USER_CREATED: "created a user account",
@@ -111,6 +119,14 @@ export const AUDIT_ACTION_LABELS: Record<Language, Record<string, string>> = {
     PAYMENT_WRONG_PIN: "entered a wrong payment PIN",
     LOGOUT: "signed out",
     AUDIT_EXPORTED: "exported the activity history",
+    ACADEMIC_YEAR_CREATED: "added an academic year",
+    ACADEMIC_YEAR_UPDATED: "changed an academic year",
+    ACADEMIC_YEAR_ACTIVATED: "made an academic year current",
+    FACULTY_LECTURER_ASSIGNED: "assigned a lecturer to a faculty",
+    FACULTY_LECTURER_REMOVED: "removed a lecturer from a faculty",
+    REGISTRATION_CREATED: "registered a student for an academic year",
+    REGISTRATION_UPDATED: "corrected a student registration",
+    GROUP_ENROLLED: "enrolled a semester group in its courses",
   },
 };
 
@@ -135,10 +151,12 @@ export const ENTITY_LABELS: Record<Language, Record<string, string>> = {
     user: "Akoon", course: "Maaddo", faculty: "Kulliyad", exam: "Imtixaan", exam_schedule: "Jadwalka imtixaanka",
     exam_attempt: "Isku dayga imtixaanka", answer: "Jawaab", question: "Su'aal", import_batch: "Soo dejin", payment: "Lacag bixin",
     room: "Qol", grading_scale: "Miisaanka darajooyinka", audit_log: "Taariikhda hawlaha", enrolment: "Diiwaangelin",
+    academic_year: "Sannad-dugsiyeed", student_registration: "Diiwaangelinta ardayga",
   },
   en: {
     user: "Account", course: "Course", faculty: "Faculty", exam: "Examination", exam_schedule: "Exam schedule",
     exam_attempt: "Exam attempt", answer: "Answer", question: "Question", import_batch: "Import", payment: "Payment",
     room: "Room", grading_scale: "Grading scale", audit_log: "Activity history", enrolment: "Enrolment",
+    academic_year: "Academic year", student_registration: "Student registration",
   },
 };

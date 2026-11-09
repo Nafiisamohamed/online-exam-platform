@@ -132,6 +132,13 @@ export const lecturerEn = {
   },
 
   courses: {
+    facultiesHint: "Choose one of your faculties to see the courses you teach there.",
+    noFaculties: "You are not assigned to a faculty yet.",
+    noFacultiesHint: "The registrar assigns lecturers to faculties.",
+    myFaculties: "My faculties",
+    allFaculties: "All my faculties",
+    courseCount: "{count} course(s)",
+    noCoursesInFaculty: "You teach no courses in this faculty.",
     title: "My courses",
     subtitle: "The courses you teach, with their students and examinations.",
     studentsTitle: "Enrolled students",
