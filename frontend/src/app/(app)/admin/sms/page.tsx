@@ -9,7 +9,7 @@
  * - Templates: Somali + English texts per category, switched off instead of deleted.
  * - Outbox: every simulated SMS with its status (queued, simulated sent, simulated delivered,
  *   failed) and a retry for failed ones.
- * There is no real SMS gateway: nothing leaves the system, and the page says so.
+ * There is no real SMS gateway: nothing leaves the system, and statuses come from the simulator.
  */
 import { PencilLine, Plus, RotateCcw, Send, Users } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -197,10 +197,10 @@ function SendTab() {
         <CardContent className="space-y-4">
           <Field label={t("admin.sms.template")}>
             {({ id }) => (
-              <Select id={id} value={templateId} onChange={(e) => pickTemplate(e.target.value)} className="sm:w-96">
+              <div className="sm:w-96"><Select id={id} value={templateId} onChange={(e) => pickTemplate(e.target.value)}>
                 <option value="">{t("admin.sms.ownText")}</option>
                 {templates.data?.items.map((x) => <option key={x.id} value={x.id}>{x.name} · {t(`admin.sms.category.${x.category}`)}</option>)}
-              </Select>
+              </Select></div>
             )}
           </Field>
           <TextPair so={so} en={en} onSo={setSo} onEn={setEn} />
@@ -360,7 +360,6 @@ export default function SmsManagementPage() {
         title={t("admin.sms.title")}
         description={t("admin.sms.subtitle")}
       />
-      <Alert tone="info" className="mb-4">{t("admin.sms.simulated")}</Alert>
       <Tabs defaultValue="send">
         <TabsList className="mb-4">
           <TabsTrigger value="send">{t("admin.sms.tabSend")}</TabsTrigger>

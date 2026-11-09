@@ -291,7 +291,6 @@ export const adminSo: Widen<typeof adminEn> = {
   sms: {
     title: "Maareynta SMS",
     subtitle: "U dir fariimo ardayda, macallimiinta iyo ilaaliyayaasha, hay qaabab Soomaali iyo Ingiriis ah, una dabagal fariin kasta.",
-    simulated: "SMS tijaabo ah: xiriir lalama laha Hormuud ama Somtel, sidaas darteed fariin dhab ah lama diro. Xaaladuhu waxay muujinayaan waxa irridda SMS ay sheegi lahayd.",
     tabSend: "Dir fariin",
     tabTemplates: "Qaabab",
     outbox: "Fariimaha la diray",
