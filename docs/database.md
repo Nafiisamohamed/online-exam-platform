@@ -81,7 +81,7 @@ Trigger errors use SQLSTATE `P0001`, and the error message is a stable code (for
 | users | `users_student_number_is_username_chk` | A student number, when present, equals the username | Phase 1 |
 | academic_years | `academic_years_name_chk`, `academic_years_dates_chk`, partial unique index `academic_years_one_current` | Name "YYYY/YYYY+1"; end after start; at most one current year | Phase 2 |
 | courses | `courses_semester_number_chk`, `courses_year_and_semester_chk` | Semester 1–8; academic year and semester both set or both empty (empty only for courses created before Phase 2) | Phase 2 |
-| student_registrations | `student_registrations_semester_number_chk`, unique (student, academic year) | One registration per student and academic year, semester 1–8 | Phase 2 |
+| student_registrations | `student_registrations_semester_number_chk`, unique (student, academic year, semester) | Semester 1–8; a student can have several semesters in one academic year, each only once | Phase 2 |
 | account_number_sequences | `year` 2000–2999, `last_value` ≥ 0 | One counter per (role, year); the server increments it with `INSERT … ON CONFLICT DO UPDATE … RETURNING` inside the account's transaction | Phase 1 |
 | enrolments | `enrolments_dropped_at_chk` | `dropped_at` is set exactly when the status is DROPPED | 4.1 |
 | question_versions | `*_version_number_chk`, `*_marks_chk`, `*_text_chk` | Version ≥ 1, marks > 0, text not blank | 4.2 |

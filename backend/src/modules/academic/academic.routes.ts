@@ -10,6 +10,7 @@
  * DELETE /api/faculties/:id/lecturers/:lecturerId     ADMIN  (refused while they teach a course there)
  * GET    /api/registrations                           ADMIN  ?academicYearId, facultyId, semesterNumber, search, page, pageSize
  * POST   /api/registrations                           ADMIN  { studentId | studentNumber, academicYearId, facultyId, semesterNumber }
+ * PATCH  /api/registrations/:id                       ADMIN  { facultyId?, semesterNumber? } correct a registration
  * POST   /api/registrations/enrol-group               ADMIN  { academicYearId, facultyId, semesterNumber }
  * GET    /api/my/academic                             STUDENT: own faculty, academic year and semester
  * GET    /api/my/faculties                            LECTURER: own faculties with their course counts
@@ -93,8 +94,16 @@ academicRouter.post(
       .refine((v) => v.studentId || v.studentNumber, "send studentId or studentNumber"),
   }),
   async (req, res) => {
-    const { registration, created } = await academic.registerStudent(req.valid.body, currentUser(req).id, req);
-    res.status(created ? 201 : 200).json({ registration, created });
+    res.status(201).json({ registration: await academic.registerStudent(req.valid.body, currentUser(req).id, req) });
+  },
+);
+
+academicRouter.patch(
+  "/registrations/:id",
+  authenticate(), requireRole("ADMIN"),
+  validate({ params: idParams, body: z.object({ facultyId: zid.optional(), semesterNumber: semesterNumber.optional() }).refine((v) => Object.keys(v).length > 0, "send at least one field") }),
+  async (req, res) => {
+    res.json({ registration: await academic.updateRegistration(req.valid.params.id, req.valid.body, currentUser(req).id, req) });
   },
 );
 

@@ -5,7 +5,8 @@
 --                          completes them on the Courses screen. The old "semester" text stays.
 --   faculty_lecturers      lecturers assigned to a faculty; filled from the faculty/lecturer pairs
 --                          the existing courses already have (no new information).
---   student_registrations  one row per student and academic year: faculty and semester (1-8).
+--   student_registrations  a student's faculty and semester (1-8) in an academic year: one row per
+--                          student, academic year and semester (Semester 1 and 2 of one year are two rows).
 -- Nothing is deleted or rewritten. Everything runs in ONE transaction: if any step fails,
 -- nothing is changed.
 BEGIN;
@@ -68,8 +69,9 @@ CREATE TABLE "student_registrations" (
   CONSTRAINT "student_registrations_academic_year_id_fkey" FOREIGN KEY ("academic_year_id") REFERENCES "academic_years" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "student_registrations_faculty_id_fkey" FOREIGN KEY ("faculty_id") REFERENCES "faculties" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "student_registrations_student_id_academic_year_id_key" ON "student_registrations" ("student_id", "academic_year_id");
-CREATE INDEX "student_registrations_academic_year_id_faculty_id_semester_number_idx" ON "student_registrations" ("academic_year_id", "faculty_id", "semester_number");
+-- One registration per student, academic year and semester.
+CREATE UNIQUE INDEX "student_registrations_student_year_semester_key" ON "student_registrations" ("student_id", "academic_year_id", "semester_number");
+CREATE INDEX "student_registrations_group_idx" ON "student_registrations" ("academic_year_id", "faculty_id", "semester_number");
 
 -- 5. Same access rules as every other table: exam_app may read, add and update (never delete),
 --    except that a lecturer can be removed from a faculty (faculty_lecturers allows DELETE);

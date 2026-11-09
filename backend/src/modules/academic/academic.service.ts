@@ -7,8 +7,9 @@
  * - an academic year is named "YYYY/YYYY+1"; at most one is current;
  * - a course's lecturer must be assigned to the course's faculty (checked in courses.service);
  *   a lecturer cannot be removed from a faculty while teaching a course there;
- * - a student has one registration per academic year; registering again in the same year
- *   corrects it (the change is in the audit log);
+ * - a student has at most one registration per academic year AND semester (so Semester 1 and
+ *   Semester 2 of one year are two registrations); a mistake is corrected with PATCH, which is
+ *   audited with the previous values;
  * - group enrolment uses the same rules as single enrolment, including the exam clash check;
  *   a student whose enrolment would create an exam clash is skipped and reported.
  */
@@ -137,25 +138,55 @@ async function checkGroup(g: Group) {
   if (!(await coursesRepo.findFaculty(g.facultyId))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
 }
 
+const REGISTRATION_EXISTS = () => conflict("REGISTRATION_EXISTS", "The student is already registered for this semester of this academic year");
+
 /**
- * Registers a student in a faculty and semester for an academic year, or corrects the
- * registration of that year. @throws 400 STUDENT_NOT_FOUND / ACADEMIC_YEAR_NOT_FOUND / FACULTY_NOT_FOUND
+ * Registers a student in a faculty and semester for an academic year. A student may have
+ * several semesters in one year, but each semester only once.
+ * @throws 400 STUDENT_NOT_FOUND / ACADEMIC_YEAR_NOT_FOUND / FACULTY_NOT_FOUND, 409 REGISTRATION_EXISTS
  */
 export async function registerStudent(input: Group & { studentId?: string; studentNumber?: string }, actorId: string, req: Request) {
   const student = await findStudent({ id: input.studentId, studentNumber: input.studentNumber?.toUpperCase() });
   if (!student) throw badRequest("STUDENT_NOT_FOUND", "No student with this id or number");
   await checkGroup(input);
-  const group = { academicYearId: input.academicYearId, facultyId: input.facultyId, semesterNumber: input.semesterNumber };
-  return transaction(async (tx) => {
-    const before = await academicRepo.findRegistration(student.id, input.academicYearId, tx);
-    const r = await academicRepo.upsertRegistration({ studentId: student.id, ...group }, tx);
-    await audit(tx, {
-      actorId, action: before ? "REGISTRATION_UPDATED" : "REGISTRATION_CREATED", entityType: "student_registration", entityId: r.id,
-      details: { student: student.studentNumber, year: r.academicYear.name, faculty: r.faculty.code, semester: r.semesterNumber, ...(before ? { previous: { facultyId: before.facultyId, semester: before.semesterNumber } } : {}) },
-      req,
+  try {
+    return await transaction(async (tx) => {
+      const r = await academicRepo.insertRegistration({ studentId: student.id, academicYearId: input.academicYearId, facultyId: input.facultyId, semesterNumber: input.semesterNumber }, tx);
+      await audit(tx, {
+        actorId, action: "REGISTRATION_CREATED", entityType: "student_registration", entityId: r.id,
+        details: { student: student.studentNumber, year: r.academicYear.name, faculty: r.faculty.code, semester: r.semesterNumber }, req,
+      });
+      return r;
     });
-    return { registration: r, created: !before };
-  });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw REGISTRATION_EXISTS();
+    throw error;
+  }
+}
+
+/**
+ * Corrects a registration's faculty or semester (the academic year and student stay). The
+ * previous values are kept in the audit log.
+ * @throws 404 REGISTRATION_NOT_FOUND, 400 FACULTY_NOT_FOUND, 409 REGISTRATION_EXISTS
+ */
+export async function updateRegistration(id: string, data: { facultyId?: string; semesterNumber?: number }, actorId: string, req: Request) {
+  const before = await academicRepo.findRegistrationById(id);
+  if (!before) throw notFound("REGISTRATION_NOT_FOUND");
+  if (data.facultyId && !(await coursesRepo.findFaculty(data.facultyId))) throw badRequest("FACULTY_NOT_FOUND", "Faculty not found");
+  try {
+    return await transaction(async (tx) => {
+      const r = await academicRepo.updateRegistration(id, data, tx);
+      await audit(tx, {
+        actorId, action: "REGISTRATION_UPDATED", entityType: "student_registration", entityId: id,
+        details: { student: before.student.studentNumber, year: before.academicYear.name, previous: { faculty: before.faculty.code, semester: before.semesterNumber }, now: { faculty: r.faculty.code, semester: r.semesterNumber } },
+        req,
+      });
+      return r;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw REGISTRATION_EXISTS();
+    throw error;
+  }
 }
 
 /**
@@ -193,7 +224,10 @@ export async function enrolGroup(g: Group, actorId: string, req: Request) {
   });
 }
 
-/** The student's own academic placement: registrations (newest year first) with the current one marked. */
+/**
+ * The student's own academic placement: all registrations (newest year, highest semester first)
+ * and the current one: the highest semester in the current academic year, else the latest.
+ */
 export async function myAcademic(user: AuthUser) {
   const regs = await academicRepo.listStudentRegistrations(user.id);
   const current = regs.find((r) => r.academicYear.isCurrent) ?? regs[0] ?? null;

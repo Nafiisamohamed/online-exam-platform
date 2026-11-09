@@ -88,22 +88,21 @@ export function listRegistrations(where: Prisma.StudentRegistrationWhereInput, s
   ]);
 }
 
-export function findRegistration(studentId: string, academicYearId: string, db: Db = prisma) {
-  return db.studentRegistration.findUnique({ where: { studentId_academicYearId: { studentId, academicYearId } } });
+export function findRegistrationById(id: string, db: Db = prisma) {
+  return db.studentRegistration.findUnique({ where: { id }, include: registrationInclude });
 }
 
-export function upsertRegistration(data: { studentId: string; academicYearId: string; facultyId: string; semesterNumber: number }, db: Db = prisma) {
-  return db.studentRegistration.upsert({
-    where: { studentId_academicYearId: { studentId: data.studentId, academicYearId: data.academicYearId } },
-    create: data,
-    update: { facultyId: data.facultyId, semesterNumber: data.semesterNumber },
-    include: registrationInclude,
-  });
+export function insertRegistration(data: { studentId: string; academicYearId: string; facultyId: string; semesterNumber: number }, db: Db = prisma) {
+  return db.studentRegistration.create({ data, include: registrationInclude });
 }
 
-/** A student's registrations, newest academic year first. */
+export function updateRegistration(id: string, data: { facultyId?: string; semesterNumber?: number }, db: Db = prisma) {
+  return db.studentRegistration.update({ where: { id }, data, include: registrationInclude });
+}
+
+/** A student's registrations, newest academic year and highest semester first. */
 export function listStudentRegistrations(studentId: string, db: Db = prisma) {
-  return db.studentRegistration.findMany({ where: { studentId }, include: registrationInclude, orderBy: { academicYear: { name: "desc" } } });
+  return db.studentRegistration.findMany({ where: { studentId }, include: registrationInclude, orderBy: [{ academicYear: { name: "desc" } }, { semesterNumber: "desc" }] });
 }
 
 /** Active students registered in one group (year, faculty, semester). */

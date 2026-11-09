@@ -286,7 +286,8 @@ model FacultyLecturer {
   @@map("faculty_lecturers")
 }
 
-/// Where a student studies in one academic year: faculty and semester (1-8). One row per student and year.
+/// A student's faculty and semester (1-8) in an academic year. One row per student, academic year and
+/// semester, so Semester 1 and Semester 2 of the same year are two registrations.
 model StudentRegistration {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   studentId      String   @map("student_id") @db.Uuid
@@ -300,8 +301,8 @@ model StudentRegistration {
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
   faculty      Faculty      @relation(fields: [facultyId], references: [id], onDelete: Restrict)
 
-  @@unique([studentId, academicYearId])
-  @@index([academicYearId, facultyId, semesterNumber])
+  @@unique([studentId, academicYearId, semesterNumber], map: "student_registrations_student_year_semester_key")
+  @@index([academicYearId, facultyId, semesterNumber], map: "student_registrations_group_idx")
   @@map("student_registrations")
 }
 

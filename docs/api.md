@@ -132,7 +132,8 @@ Every error has the same shape:
 | POST | `/api/faculties/:id/lecturers` | ADMIN | `{ lecturerId }` | `201`. Errors: `400 LECTURER_INVALID`, `409 LECTURER_ALREADY_ASSIGNED` |
 | DELETE | `/api/faculties/:id/lecturers/:lecturerId` | ADMIN | — | `204`. Error: `409 LECTURER_TEACHES_IN_FACULTY { courses }` |
 | GET | `/api/registrations` | ADMIN | query: `academicYearId`, `facultyId`, `semesterNumber`, `search`, `page`, `pageSize` | paged `{ id, semesterNumber, student, academicYear, faculty }` |
-| POST | `/api/registrations` | ADMIN | `{ studentId \| studentNumber, academicYearId, facultyId, semesterNumber }` | `201 { registration, created: true }`, or `200 { registration, created: false }` when the student's registration for that year is corrected |
+| POST | `/api/registrations` | ADMIN | `{ studentId \| studentNumber, academicYearId, facultyId, semesterNumber }` | `201 { registration }`. A student may have several semesters in one academic year, each once. Error: `409 REGISTRATION_EXISTS` |
+| PATCH | `/api/registrations/:id` | ADMIN | `{ facultyId?, semesterNumber? }` | `{ registration }`: corrects a registration (audited with the previous values). Errors: `404 REGISTRATION_NOT_FOUND`, `409 REGISTRATION_EXISTS` |
 | POST | `/api/registrations/enrol-group` | ADMIN | `{ academicYearId, facultyId, semesterNumber }` | `{ students, courses, enrolled, reactivated, alreadyEnrolled, skipped: [{ student, conflicts }] }`. Uses the same rules as single enrolment, including the exam clash check. Error: `400 GROUP_HAS_NO_COURSES` |
 | GET | `/api/my/academic` | STUDENT | — | `{ current, registrations }`: own faculty, academic year and semester |
 | GET | `/api/my/faculties` | LECTURER | — | `{ items: [{ id, code, name, myCourses }] }`: own faculties |

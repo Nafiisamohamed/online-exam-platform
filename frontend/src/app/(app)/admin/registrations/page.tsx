@@ -6,7 +6,7 @@
  * semester) in the courses offered to it (POST /api/registrations/enrol-group). Course
  * enrolment rules, including the exam clash check, are applied by the server.
  */
-import { UserPlus, UsersRound } from "lucide-react";
+import { PencilLine, UserPlus, UsersRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { FilterBar, FormError } from "@/components/admin/admin-ui";
 import { QueryError } from "@/components/admin/query-state";
@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/overlays";
 import { Pagination } from "@/components/ui/pagination";
 import { useToast } from "@/components/ui/toast";
 import { useDebounced } from "@/hooks/use-debounced";
-import { enrolGroup, paths, registerStudent } from "@/lib/api/admin";
+import { enrolGroup, paths, registerStudent, updateRegistration } from "@/lib/api/admin";
 import { useApi } from "@/lib/api/use-api";
 import { useI18n } from "@/lib/i18n/i18n";
 import { SEMESTERS, type AcademicYear, type Faculty, type GroupEnrolResult, type Paged, type Registration } from "@/types/admin";
@@ -44,7 +44,7 @@ function RegisterModal({ years, faculties, initial, onClose }: { years: Academic
     setError(null);
     try {
       const r = await registerStudent({ studentNumber: studentNumber.trim(), academicYearId, facultyId, semesterNumber: Number(semesterNumber) });
-      toast(r.created ? t("admin.academic.registered", { name: r.registration.student.fullName }) : t("admin.academic.registrationCorrected", { name: r.registration.student.fullName }));
+      toast(t("admin.academic.registered", { name: r.student.fullName }));
       onClose();
     } catch (err) {
       setError(err);
@@ -103,6 +103,71 @@ function RegisterModal({ years, faculties, initial, onClose }: { years: Academic
   );
 }
 
+/** Correct the faculty or semester of one registration (PATCH /api/registrations/:id). */
+function CorrectModal({ registration, faculties, onClose }: { registration: Registration; faculties: Faculty[]; onClose: () => void }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const [facultyId, setFacultyId] = useState(registration.faculty.id);
+  const [semesterNumber, setSemesterNumber] = useState(String(registration.semesterNumber));
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const changed = facultyId !== registration.faculty.id || Number(semesterNumber) !== registration.semesterNumber;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await updateRegistration(registration.id, {
+        ...(facultyId !== registration.faculty.id ? { facultyId } : {}),
+        ...(Number(semesterNumber) !== registration.semesterNumber ? { semesterNumber: Number(semesterNumber) } : {}),
+      });
+      toast(t("admin.academic.registrationCorrected", { name: registration.student.fullName }));
+      onClose();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("admin.academic.correctTitle", { name: registration.student.fullName })}
+      description={t("admin.academic.correctHint", { year: registration.academicYear.name })}
+      closeLabel={t("common.cancel")}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" form="correct-form" loading={busy} disabled={!changed}>{t("common.save")}</Button>
+        </>
+      }
+    >
+      <form id="correct-form" onSubmit={submit} className="space-y-4" noValidate>
+        <FormError error={error} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t("admin.courses.faculty")} required>
+            {({ id }) => (
+              <Select id={id} value={facultyId} onChange={(e) => setFacultyId(e.target.value)}>
+                {faculties.map((f) => <option key={f.id} value={f.id}>{f.code} · {f.name}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label={t("admin.academic.semester")} required>
+            {({ id }) => (
+              <Select id={id} value={semesterNumber} onChange={(e) => setSemesterNumber(e.target.value)}>
+                {SEMESTERS.map((n) => <option key={n} value={n}>{t("admin.academic.semesterN", { n })}</option>)}
+              </Select>
+            )}
+          </Field>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export default function RegistrationsPage() {
   const { t } = useI18n();
   const years = useApi<{ items: AcademicYear[] }>(paths.academicYears);
@@ -115,6 +180,7 @@ export default function RegistrationsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [registering, setRegistering] = useState(false);
+  const [correcting, setCorrecting] = useState<Registration | null>(null);
   const [groupResult, setGroupResult] = useState<GroupEnrolResult | null>(null);
   const [groupError, setGroupError] = useState<unknown>(null);
   const [groupBusy, setGroupBusy] = useState(false);
@@ -150,6 +216,12 @@ export default function RegistrationsPage() {
     { key: "faculty", header: t("admin.courses.faculty"), cell: (r) => <span title={r.faculty.name}>{r.faculty.code}</span> },
     { key: "semester", header: t("admin.academic.semester"), cell: (r) => t("admin.academic.semesterN", { n: r.semesterNumber }) },
     { key: "year", header: t("admin.academic.year"), cell: (r) => r.academicYear.name, className: "hidden sm:table-cell" },
+    {
+      key: "actions",
+      header: <span className="sr-only">{t("table.actions")}</span>,
+      align: "right",
+      cell: (r) => <Button variant="ghost" size="sm" leftIcon={<PencilLine className="h-3.5 w-3.5" />} onClick={() => setCorrecting(r)}>{t("admin.academic.correct")}</Button>,
+    },
   ];
 
   const noYears = years.data && years.data.items.length === 0;
@@ -221,6 +293,7 @@ export default function RegistrationsPage() {
           </div>
         )}
       </Card>
+      {correcting && faculties.data && <CorrectModal registration={correcting} faculties={faculties.data.items} onClose={() => setCorrecting(null)} />}
       {registering && years.data && faculties.data && (
         <RegisterModal years={years.data.items} faculties={faculties.data.items} initial={{ academicYearId, facultyId, semesterNumber }} onClose={() => setRegistering(false)} />
       )}

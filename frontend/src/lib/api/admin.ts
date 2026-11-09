@@ -97,9 +97,16 @@ export async function unassignLecturer(facultyId: string, lecturerId: string) {
 }
 
 export async function registerStudent(input: { studentNumber: string; academicYearId: string; facultyId: string; semesterNumber: number }) {
-  const res = await api<{ registration: Registration; created: boolean }>("/registrations", { method: "POST", json: input });
+  const res = await api<{ registration: Registration }>("/registrations", { method: "POST", json: input });
   invalidate("/registrations", "/academic-years", "/audit-logs");
-  return res;
+  return res.registration;
+}
+
+/** Corrects a registration's faculty or semester (the student and academic year stay). */
+export async function updateRegistration(id: string, patch: { facultyId?: string; semesterNumber?: number }) {
+  const res = await api<{ registration: Registration }>(`/registrations/${id}`, { method: "PATCH", json: patch });
+  invalidate("/registrations", "/audit-logs");
+  return res.registration;
 }
 
 export async function enrolGroup(group: { academicYearId: string; facultyId: string; semesterNumber: number }) {

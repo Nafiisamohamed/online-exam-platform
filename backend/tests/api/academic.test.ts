@@ -125,14 +125,28 @@ describe("student registrations and group enrolment", () => {
     const r1 = await admin.post("/api/registrations").send({ ...group, studentNumber: s1.username.toLowerCase() });
     expect(r1.status).toBe(201);
     expect(r1.body.registration).toMatchObject({ semesterNumber: 2, faculty: { id: f.id }, academicYear: { id: year.id }, student: { id: s1.id } });
-    // Registering again in the same year corrects it (one registration per student and year).
+    // The same student, year and semester only once (also enforced by the database).
+    const twice = await admin.post("/api/registrations").send({ ...group, studentId: s1.id });
+    expect(twice.status).toBe(409);
+    expect(twice.body.error.code).toBe("REGISTRATION_EXISTS");
+    await expect(prisma.studentRegistration.create({ data: { studentId: s1.id, ...group } })).rejects.toThrow();
+    // A different semester of the same year is a second registration.
+    const s1sem3 = await admin.post("/api/registrations").send({ ...group, semesterNumber: 3, studentId: s1.id });
+    expect(s1sem3.status).toBe(201);
+    expect(await prisma.studentRegistration.count({ where: { studentId: s1.id, academicYearId: year.id } })).toBe(2);
+
+    // A mistake is corrected with PATCH (audited with the previous values).
     const wrong = await admin.post("/api/registrations").send({ ...group, semesterNumber: 5, studentId: s2.id });
     expect(wrong.status).toBe(201);
-    const fixed = await admin.post("/api/registrations").send({ ...group, studentId: s2.id });
+    const fixed = await admin.patch(`/api/registrations/${wrong.body.registration.id}`).send({ semesterNumber: 2 });
     expect(fixed.status).toBe(200);
-    expect(fixed.body).toMatchObject({ created: false, registration: { semesterNumber: 2 } });
+    expect(fixed.body.registration).toMatchObject({ id: wrong.body.registration.id, semesterNumber: 2 });
     expect(await prisma.studentRegistration.count({ where: { studentId: s2.id } })).toBe(1);
-    expect(await prisma.auditLog.count({ where: { actionCode: "REGISTRATION_UPDATED", entityId: fixed.body.registration.id } })).toBe(1);
+    const audit = await prisma.auditLog.findFirst({ where: { actionCode: "REGISTRATION_UPDATED", entityId: wrong.body.registration.id } });
+    expect(audit?.details).toMatchObject({ previous: { semester: 5 }, now: { semester: 2 } });
+    // Correcting into a semester the student already has is refused.
+    expect((await admin.patch(`/api/registrations/${s1sem3.body.registration.id}`).send({ semesterNumber: 2 })).body.error.code).toBe("REGISTRATION_EXISTS");
+    expect((await admin.patch(`/api/registrations/00000000-0000-4000-8000-000000000000`).send({ semesterNumber: 2 })).status).toBe(404);
     await admin.post("/api/registrations").send({ ...group, semesterNumber: 4, studentId: outside.id });
     expect((await admin.post("/api/registrations").send({ ...group, studentNumber: "S-2099-0000000001" })).body.error.code).toBe("STUDENT_NOT_FOUND");
     expect((await admin.post("/api/registrations").send({ ...group, studentId: s1.id, semesterNumber: 9 })).status).toBe(400);
@@ -158,16 +172,21 @@ describe("student registrations and group enrolment", () => {
     const year = await testAcademicYear();
     const student = await createUser("STUDENT");
     await admin.post("/api/registrations").send({ academicYearId: year.id, facultyId: f.id, semesterNumber: 6, studentId: student.id });
+    const sem7 = await admin.post("/api/registrations").send({ academicYearId: year.id, facultyId: f.id, semesterNumber: 7, studentId: student.id });
     const me = await loginAs(student);
     const mine = await me.get("/api/my/academic");
     expect(mine.status).toBe(200);
-    expect(mine.body.current).toMatchObject({ semesterNumber: 6, faculty: { id: f.id }, academicYear: { id: year.id } });
+    // Two semesters in one year: both listed, the higher one shown as current.
+    expect(mine.body.registrations.map((r: any) => r.semesterNumber)).toEqual([7, 6]);
+    expect(mine.body.current).toMatchObject({ semesterNumber: 7, faculty: { id: f.id }, academicYear: { id: year.id } });
     expect(mine.body.registrations.every((r: any) => r.student.id === student.id)).toBe(true);
     expect((await me.get("/api/registrations")).status).toBe(403);
     expect((await me.post("/api/registrations/enrol-group").send({ academicYearId: year.id, facultyId: f.id, semesterNumber: 6 })).status).toBe(403);
     const [, lecturer] = await userAgent("LECTURER");
     expect((await lecturer.post("/api/registrations").send({ academicYearId: year.id, facultyId: f.id, semesterNumber: 1, studentId: student.id })).status).toBe(403);
     expect((await lecturer.get("/api/my/academic")).status).toBe(403);
+    expect((await lecturer.patch(`/api/registrations/${sem7.body.registration.id}`).send({ semesterNumber: 8 })).status).toBe(403);
+    expect((await me.patch(`/api/registrations/${sem7.body.registration.id}`).send({ semesterNumber: 8 })).status).toBe(403);
     expect((await me.get("/api/my/faculties")).status).toBe(403);
   });
 });
