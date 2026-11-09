@@ -12,7 +12,6 @@ import { CourseModal } from "@/components/admin/course-forms";
 import { CourseTable } from "@/components/admin/course-table";
 import { QueryError } from "@/components/admin/query-state";
 import { PageHeader } from "@/components/layout/app-shell";
-import { Alert } from "@/components/ui/alert";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,19 +27,18 @@ export default function CoursesPage() {
   const faculties = useApi<{ items: Faculty[] }>(paths.faculties);
   const years = useApi<{ items: AcademicYear[] }>(paths.academicYears);
   const [search, setSearch] = useState("");
-  // "" = all, "none" = courses still without an academic year, otherwise a year id.
+  // "" = all, otherwise a year id.
   const [yearId, setYearId] = useState("");
   const [semesterNumber, setSemesterNumber] = useState("");
   const [facultyId, setFacultyId] = useState("");
   const [modal, setModal] = useState<{ course?: Course } | null>(null);
 
   const all = useMemo(() => courses.data?.items ?? [], [courses.data]);
-  const missing = all.filter((c) => !c.academicYearId).length;
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return all.filter(
       (c) =>
-        (!yearId || (yearId === "none" ? !c.academicYearId : c.academicYearId === yearId)) &&
+        (!yearId || c.academicYearId === yearId) &&
         (!semesterNumber || c.semesterNumber === Number(semesterNumber)) &&
         (!facultyId || c.facultyId === facultyId) &&
         (!q || c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || c.lecturer.fullName.toLowerCase().includes(q)),
@@ -64,7 +62,6 @@ export default function CoursesPage() {
             <Select id={id} value={yearId} onChange={(e) => setYearId(e.target.value)}>
               <option value="">{t("admin.academic.allYears")}</option>
               {years.data?.items.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
-              {missing > 0 && <option value="none">{t("admin.academic.needsYearOption", { count: missing })}</option>}
             </Select>
           )}
         </Field>
@@ -85,9 +82,6 @@ export default function CoursesPage() {
           )}
         </Field>
       </FilterBar>
-      {missing > 0 && (
-        <Alert tone="warning" className="mb-4">{t("admin.academic.needsYearNotice", { count: missing })}</Alert>
-      )}
       <Card className="overflow-hidden">
         {courses.error && !courses.data ? (
           <QueryError state={courses} />
