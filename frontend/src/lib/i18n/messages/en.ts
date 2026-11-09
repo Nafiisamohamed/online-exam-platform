@@ -38,6 +38,7 @@ export const en = {
     grading: "Grading",
     results: "Results",
     allResults: "All results",
+    sms: "SMS Management",
     analytics: "Analytics",
     payments: "Payments",
     myExams: "My exams",

@@ -3,10 +3,15 @@ import type { Db } from "../db/prisma.ts";
 import { prisma } from "../db/prisma.ts";
 import type { Prisma } from "../generated/prisma/client.ts";
 
-const recipient = { select: { id: true, fullName: true, studentNumber: true } };
+const recipient = { select: { id: true, fullName: true, studentNumber: true, username: true, role: { select: { name: true } } } };
 
 export function insertSms(data: Prisma.SmsOutboxUncheckedCreateInput, db: Db = prisma) {
   return db.smsOutbox.create({ data });
+}
+
+/** Many outbox messages in one statement (group messages). */
+export function insertSmsMany(data: Prisma.SmsOutboxCreateManyInput[], db: Db = prisma) {
+  return db.smsOutbox.createMany({ data });
 }
 
 export function findSmsByStatus(status: "QUEUED" | "SENT", take: number, sentBefore?: Date, db: Db = prisma) {
@@ -18,7 +23,7 @@ export function findSmsByStatus(status: "QUEUED" | "SENT", take: number, sentBef
 }
 
 /** Changes a message only if it still has the expected status. @returns rows changed (0 or 1). */
-export async function updateSmsIfStatus(id: string, status: "QUEUED" | "SENT", data: Prisma.SmsOutboxUpdateManyMutationInput, db: Db = prisma) {
+export async function updateSmsIfStatus(id: string, status: "QUEUED" | "SENT" | "FAILED", data: Prisma.SmsOutboxUpdateManyMutationInput, db: Db = prisma) {
   return (await db.smsOutbox.updateMany({ where: { id, status }, data })).count;
 }
 

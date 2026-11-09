@@ -141,6 +141,17 @@ enum PaymentStatus {
   EXPIRED
 }
 
+/// Phase 6: what a registrar SMS template is for.
+enum SmsTemplateCategory {
+  UPCOMING_EXAM
+  SCHEDULE_APPROVED
+  PAYMENT_REMINDER
+  PAYMENT_CONFIRMATION
+  RESULTS_PUBLISHED
+  RESULTS_REVISED
+  GENERAL
+}
+
 enum SmsStatus {
   QUEUED
   SENT
@@ -223,6 +234,8 @@ model User {
   notifications          Notification[]
 
   @@index([roleId])
+  smsTemplatesCreated SmsTemplate[] @relation("SmsTemplateCreator")
+  smsTemplatesUpdated SmsTemplate[] @relation("SmsTemplateEditor")
   @@map("users")
 }
 
@@ -1025,4 +1038,23 @@ model SemesterFee {
 
   @@unique([academicYearId, facultyId, semesterNumber], map: "semester_fees_group_key")
   @@map("semester_fees")
+}
+
+/// Phase 6: an SMS template written by the registrar in Somali and English. Switched off, never deleted.
+model SmsTemplate {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String              @unique(map: "sms_templates_name_key")
+  category    SmsTemplateCategory @default(GENERAL)
+  bodySo      String              @map("body_so")
+  bodyEn      String              @map("body_en")
+  isActive    Boolean             @default(true) @map("is_active")
+  createdById String              @map("created_by") @db.Uuid
+  updatedById String              @map("updated_by") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  createdBy User @relation("SmsTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User @relation("SmsTemplateEditor", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@map("sms_templates")
 }

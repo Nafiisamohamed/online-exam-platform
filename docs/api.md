@@ -403,3 +403,16 @@ All numbers come from live database queries.
 **Rooms** are allocated to schedules for planning and are checked for clashes. They never restrict access: students can take examinations from any device and any connection (university or home Wi-Fi, mobile data). A room may list network ranges (`networkRanges`, optional) for information only. The client address is recorded on the attempt (`startIp`) and in the audit log, but never checked.
 
 **Grading scale:** changes apply to grades calculated afterwards. Published results keep their letters.
+
+## SMS Management (Phase 6, registrar only)
+
+All SMS are **simulated**: there is no connection to a real SMS gateway (Hormuud / Somtel), nothing leaves the system, and every body starts with `[DEMO]`.
+
+| Method | Path | Who | Body / query | Response |
+|---|---|---|---|---|
+| GET | `/api/sms-templates` | ADMIN | `?active=true|false` | `{ items }` |
+| POST | `/api/sms-templates` | ADMIN | `{ name, category, bodySo, bodyEn }` (category: UPCOMING_EXAM, SCHEDULE_APPROVED, PAYMENT_REMINDER, PAYMENT_CONFIRMATION, RESULTS_PUBLISHED, RESULTS_REVISED, GENERAL) | 201 `{ template }`; 409 SMS_TEMPLATE_EXISTS |
+| PATCH | `/api/sms-templates/:id` | ADMIN | any of the above + `isActive` (templates are switched off, never deleted) | `{ template }` |
+| POST | `/api/sms/recipients` | ADMIN | `{ roles: [STUDENT|LECTURER|INVIGILATOR], facultyId?, academicYearId?, semesterNumber?, courseId?, userIds? }` | `{ total, tooMany, max, withoutPhone, byRole, sample }` (nothing is sent) |
+| POST | `/api/sms/send` | ADMIN | the same + `templateId?`, `bodySo`, `bodyEn`, `sendSms`, `sendNotification`. `{name}` and `{username}` are filled in per person | 201 `{ recipients, sms, notifications, withoutPhone, simulated: true }`; at most 2000 people |
+| POST | `/api/sms-outbox/:id/retry` | ADMIN | — | `{ id, status: "QUEUED" }`; 409 SMS_NOT_FAILED |

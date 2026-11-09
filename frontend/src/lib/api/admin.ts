@@ -3,7 +3,7 @@
  * docs/api.md exactly; screens use these functions (writes) and the GET paths
  * below with useApi() (reads), so no component builds URLs or bodies itself.
  */
-import type { AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty, Schedule, AcademicYear, Registration, GroupEnrolResult } from "@/types/admin";
+import type { AdminUser, Course, Enrolment, ImportConfirmResult, ImportPreview, NewCourseInput, NewUserInput, UserPatch, Faculty, Schedule, AcademicYear, Registration, GroupEnrolResult, SmsTemplate, RecipientChoice, RecipientPreview } from "@/types/admin";
 import type { Role } from "@/types/account";
 import { api, query } from "./client";
 
@@ -29,6 +29,8 @@ export const paths = {
   rooms: "/rooms",
   semesterFees: (academicYearId: string) => `/semester-fees${query({ academicYearId })}`,
   resultsSearch: (q: { search?: string; facultyId?: string; academicYearId?: string; semesterNumber?: number; courseId?: string; examType?: string; examId?: string; publication?: string; page?: number; pageSize?: number }) => `/results-search${query(q)}`,
+  smsTemplates: (active?: boolean) => `/sms-templates${query({ active: active === undefined ? undefined : String(active) })}`,
+  smsOutbox: (q: { status?: string; templateKey?: string; page?: number; pageSize?: number } = {}) => `/sms-outbox${query(q)}`,
   feeStatus: (q: { academicYearId: string; facultyId?: string; semesterNumber?: number; status?: string; search?: string; page?: number; pageSize?: number }) => `/fee-status${query(q)}`,
   facultyLecturers: (facultyId: string) => `/faculties/${facultyId}/lecturers`,
   registrations: (q: { academicYearId?: string; facultyId?: string; semesterNumber?: number; search?: string; page?: number; pageSize?: number } = {}) => `/registrations${query(q)}`,
@@ -208,4 +210,31 @@ export async function sendFeeReminders(q: { academicYearId: string; facultyId?: 
   const res = await api<{ reminded: number }>("/fee-reminders", { method: "POST", json: q });
   invalidate("/audit-logs");
   return res;
+}
+
+/** Phase 6: creates or changes an SMS template. */
+export async function saveSmsTemplate(id: string | null, body: Partial<{ name: string; category: string; bodySo: string; bodyEn: string; isActive: boolean }>) {
+  const res = id
+    ? await api<{ template: SmsTemplate }>(`/sms-templates/${id}`, { method: "PATCH", json: body })
+    : await api<{ template: SmsTemplate }>("/sms-templates", { method: "POST", json: body });
+  invalidate("/sms-templates", "/audit-logs");
+  return res.template;
+}
+
+/** Who a group message would reach (nothing is sent). */
+export function previewRecipients(choice: RecipientChoice) {
+  return api<RecipientPreview>("/sms/recipients", { method: "POST", json: choice });
+}
+
+/** Sends a group message: simulated SMS and/or in-app notifications. */
+export async function sendGroupMessage(input: RecipientChoice & { templateId?: string; bodySo: string; bodyEn: string; sendSms: boolean; sendNotification: boolean }) {
+  const res = await api<{ recipients: number; sms: number; notifications: number; withoutPhone: number }>("/sms/send", { method: "POST", json: input });
+  invalidate("/sms-outbox", "/audit-logs", "/notifications");
+  return res;
+}
+
+/** Queues a failed SMS again. */
+export async function retrySms(id: string) {
+  await api(`/sms-outbox/${id}/retry`, { method: "POST" });
+  invalidate("/sms-outbox", "/audit-logs");
 }

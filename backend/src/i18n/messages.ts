@@ -37,6 +37,11 @@ export const SMS_TEMPLATES: Record<string, Record<Language, Template>> = {
     so: (p) => `[DEMO] Natiijadaada ${p.course} waa la cusbooneysiiyay. Gal nidaamka.`,
     en: (p) => `[DEMO] Your ${p.course} result has been updated. Log in to view it.`,
   },
+  /** Phase 6: a group message from the registrar (text already written in the recipient's language). */
+  CUSTOM_MESSAGE: {
+    so: (p) => `[DEMO] ${p.text}`,
+    en: (p) => `[DEMO] ${p.text}`,
+  },
   PAYMENT_REMINDER: {
     so: (p) => `[DEMO] Xusuusin: khidmadda semestarka ${p.semester} (${p.year}) waxaa kaa harsan ${p.amount}. Ku bixi EVC Plus, Zaad ama eDahab nidaamka dhexdiisa.`,
     en: (p) => `[DEMO] Reminder: ${p.amount} of your Semester ${p.semester} fee (${p.year}) is still outstanding. Pay with EVC Plus, Zaad or eDahab in the system.`,
@@ -56,6 +61,11 @@ export const NOTIFICATION_TEMPLATES: Record<string, Record<Language, { title: Te
   PAYMENT_REMINDER: {
     so: { title: () => "Xusuusin lacag bixin", body: (p) => `Khidmadda semestarka ${p.semester} (${p.year}) waxaa kaa harsan ${p.amount}.` },
     en: { title: () => "Payment reminder", body: (p) => `${p.amount} of your Semester ${p.semester} fee (${p.year}) is still outstanding.` },
+  },
+  /** Phase 6: a group message from the registrar; both languages are stored so it follows a language switch. */
+  CUSTOM_MESSAGE: {
+    so: { title: () => "Fariin ka timid diiwaangelinta", body: (p) => String(p.textSo) },
+    en: { title: () => "Message from the registrar", body: (p) => String(p.textEn) },
   },
   FEE_NOT_CONFIGURED: {
     so: { title: () => "Khidmad semestar lama dejin", body: (p) => `Arday ayaa isku dayay imtixaan semestarka ${p.semester} laakiin khidmadda kulliyaddiisa iyo sannadkaas lama dejin. Ardayga lama joojin. Ku dar khidmadda bogga Lacagaha.` },

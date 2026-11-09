@@ -399,3 +399,24 @@ export interface ResultSearchRow {
   revisions: number;
 }
 export interface ResultSearchPage { items: ResultSearchRow[]; total: number; page: number; pageSize: number }
+
+/** Phase 6: SMS Management (simulated SMS). */
+export const SMS_CATEGORIES = ["UPCOMING_EXAM", "SCHEDULE_APPROVED", "PAYMENT_REMINDER", "PAYMENT_CONFIRMATION", "RESULTS_PUBLISHED", "RESULTS_REVISED", "GENERAL"] as const;
+export type SmsCategory = (typeof SMS_CATEGORIES)[number];
+export interface SmsTemplate {
+  id: string; name: string; category: SmsCategory; bodySo: string; bodyEn: string; isActive: boolean;
+  createdBy: { id: string; fullName: string }; updatedBy: { id: string; fullName: string }; createdAt: string; updatedAt: string;
+}
+export type RecipientRole = "STUDENT" | "LECTURER" | "INVIGILATOR";
+export interface RecipientChoice { roles: RecipientRole[]; facultyId?: string; academicYearId?: string; semesterNumber?: number; courseId?: string; userIds?: string[] }
+export interface RecipientPreview {
+  total: number; tooMany: boolean; max: number; withoutPhone: number; byRole: Partial<Record<RecipientRole, number>>;
+  sample: { id: string; fullName: string; username: string; role: RecipientRole; phone: string }[];
+}
+export type SmsStatus = "QUEUED" | "SENT" | "DELIVERED" | "FAILED";
+export interface SmsMessage {
+  id: string; phone: string; language: "so" | "en"; templateKey: string; body: string; status: SmsStatus; segments: number;
+  failureReason: string | null; createdAt: string; sentAt: string | null; deliveredAt: string | null;
+  recipient: { id: string; fullName: string; username: string; studentNumber: string | null; role: { name: string } };
+}
+export interface SmsOutboxPage { items: SmsMessage[]; total: number; page: number; pageSize: number; counts: Partial<Record<SmsStatus, number>>; simulated: true }
